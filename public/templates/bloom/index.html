@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BLOOM // Artisanal Floristry & Botanicals</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blush: #E8B4B8;
+      --deep-rose: #5C1A2E;
+      --deep-rose-dark: #3b0e1c;
+      --cream: #FDFBF9;
+      --rose-tint: rgba(232, 180, 184, 0.15);
+      --text-muted: #8c7077;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--deep-rose-dark);
+      color: var(--cream);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.6;
+    }
+    header {
+      padding: 1.5rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(232, 180, 184, 0.2);
+      background: rgba(92, 26, 46, 0.4);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .brand {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem;
+      letter-spacing: 0.1em;
+      color: var(--blush);
+      text-decoration: none;
+    }
+    .hero {
+      padding: 5rem 1.5rem 3rem;
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .hero h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-style: italic;
+      color: var(--cream);
+      line-height: 1.15;
+      margin-bottom: 1rem;
+    }
+    .hero p {
+      color: var(--blush);
+      font-size: 1.1rem;
+      font-weight: 300;
+    }
+    .flower-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 2rem;
+      max-width: 1200px;
+      margin: 3rem auto;
+      padding: 0 1.5rem;
+    }
+    .flower-card {
+      background: rgba(92, 26, 46, 0.5);
+      border: 1px solid rgba(232, 180, 184, 0.25);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.3s;
+    }
+    .flower-card:hover { transform: translateY(-4px); }
+    .card-visual {
+      height: 220px;
+      background: radial-gradient(circle at 50% 50%, #7d2640 0%, var(--deep-rose-dark) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3.5rem;
+    }
+    .card-body {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+    .flower-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.3rem;
+      color: var(--cream);
+      margin-bottom: 0.25rem;
+    }
+    .botanical {
+      font-size: 0.8rem;
+      font-style: italic;
+      color: var(--blush);
+      margin-bottom: 0.75rem;
+    }
+    .price-tag {
+      font-weight: 600;
+      color: var(--cream);
+      margin-top: auto;
+      margin-bottom: 1rem;
+    }
+    .btn-order {
+      background: var(--blush);
+      color: var(--deep-rose);
+      border: none;
+      font-weight: 600;
+      padding: 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+    .btn-order:hover {
+      background: #fff;
+    }
+    .subscription-box {
+      max-width: 750px;
+      margin: 4rem auto;
+      background: linear-gradient(135deg, rgba(92,26,46,0.8) 0%, rgba(59,14,28,0.95) 100%);
+      border: 1px solid var(--blush);
+      border-radius: 16px;
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="#" class="brand">BLOOM.</a>
+    <div style="font-size:0.85rem; color:var(--blush);">Seasonal Jos Harvests</div>
+  </header>
+
+  <section class="hero">
+    <h1>Petals nurtured by mist and basalt.</h1>
+    <p>Hand-tied bouquet compositions harvested fresh from Jos volcanic loam estates.</p>
+  </section>
+
+  <div class="flower-grid">
+    <div class="flower-card">
+      <div class="card-visual">🌸</div>
+      <div class="card-body">
+        <h3 class="flower-title">Highland Ranunculus</h3>
+        <div class="botanical">Ranunculus asiaticus • Blush & Crimson</div>
+        <p style="font-size:0.85rem; color:var(--blush); margin-bottom:1rem;">Layered tissue-thin petals in soft peach and deep claret tones.</p>
+        <div class="price-tag">₦38,000 per bespoke bunch</div>
+        <button class="btn-order" onclick="alert('Added Highland Ranunculus to delivery cart.')">Order Stem Arrangement</button>
+      </div>
+    </div>
+
+    <div class="flower-card">
+      <div class="card-visual">🌺</div>
+      <div class="card-body">
+        <h3 class="flower-title">Naraguta Garden Roses</h3>
+        <div class="botanical">Rosa damascena • Heirloom Fragrance</div>
+        <p style="font-size:0.85rem; color:var(--blush); margin-bottom:1rem;">Intensely scented heritage damask blooms with ruffled velvet centers.</p>
+        <div class="price-tag">₦45,000 per dozen</div>
+        <button class="btn-order" onclick="alert('Added Naraguta Garden Roses to delivery cart.')">Order Stem Arrangement</button>
+      </div>
+    </div>
+
+    <div class="flower-card">
+      <div class="card-visual">🌿</div>
+      <div class="card-body">
+        <h3 class="flower-title">Eucalyptus & Dried Thistle</h3>
+        <div class="botanical">Eucalyptus cinerea & Eryngium</div>
+        <p style="font-size:0.85rem; color:var(--blush); margin-bottom:1rem;">Silver-dollar foliage with architectural steel-blue dry thistles.</p>
+        <div class="price-tag">₦28,000 vase arrangement</div>
+        <button class="btn-order" onclick="alert('Added Eucalyptus Bouquet to delivery cart.')">Order Stem Arrangement</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="subscription-box">
+    <h2 style="font-family:'Playfair Display',serif; font-size:2rem; margin-bottom:0.75rem;">THE BOTANICAL SUBSCRIPTION</h2>
+    <p style="color:var(--blush); margin-bottom:1.5rem;">Fresh weekly vase-ready stems delivered to your home or creative atelier every Friday morning.</p>
+    <button class="btn-order" style="padding:0.9rem 2.2rem; font-size:0.95rem;" onclick="alert('Subscription enrollment opened via Paystack.')">Enroll in Weekly Ritual (₦65,000 / month)</button>
+  </section>
+</body>
+</html>

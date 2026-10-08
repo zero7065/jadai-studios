@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VENDOR // Tactical Hardware & Rugged Computing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #0A1628;
+      --navy-dark: #050B14;
+      --navy-light: #132238;
+      --ivory: #F8F9FA;
+      --crimson: #C0392B;
+      --crimson-glow: rgba(192, 57, 43, 0.4);
+      --border: rgba(255, 255, 255, 0.1);
+      --muted: #8A99AD;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--navy-dark);
+      color: var(--ivory);
+      font-family: 'Inter', -apple-system, sans-serif;
+      line-height: 1.5;
+    }
+    header.sticky-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10, 22, 40, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: 0.15em;
+      color: var(--ivory);
+      text-decoration: none;
+    }
+    .brand span { color: var(--crimson); }
+    .cart-btn {
+      background: var(--crimson);
+      border: none;
+      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .hero {
+      padding: 3rem 1.5rem;
+      text-align: center;
+      background: radial-gradient(circle at 50% 20%, #15253d 0%, var(--navy-dark) 70%);
+      border-bottom: 1px solid var(--border);
+    }
+    .hero h1 {
+      font-size: clamp(1.75rem, 4vw, 2.75rem);
+      margin-bottom: 0.5rem;
+      font-weight: 700;
+    }
+    .hero p {
+      color: var(--muted);
+      font-size: 0.95rem;
+      max-width: 500px;
+      margin: 0 auto;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+      max-width: 1200px;
+      margin: 3rem auto;
+      padding: 0 1.5rem;
+    }
+    .card {
+      background: var(--navy);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--crimson);
+    }
+    .card-img {
+      height: 180px;
+      background: linear-gradient(135deg, #132238 0%, #08111e 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--crimson);
+      font-size: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-body {
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+    .card-desc {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+      flex: 1;
+    }
+    .price-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: auto;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+    .price {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: var(--ivory);
+    }
+    .btn-buy {
+      background: transparent;
+      border: 1px solid var(--crimson);
+      color: var(--crimson);
+      padding: 0.45rem 0.9rem;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-buy:hover {
+      background: var(--crimson);
+      color: #fff;
+    }
+    /* Side Cart Drawer */
+    #cart-drawer {
+      position: fixed;
+      top: 0;
+      right: -380px;
+      width: 100%;
+      max-width: 360px;
+      height: 100vh;
+      background: var(--navy);
+      border-left: 1px solid var(--crimson);
+      z-index: 200;
+      transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      padding: 1.5rem;
+      box-shadow: -10px 0 30px rgba(0,0,0,0.8);
+    }
+    #cart-drawer.open { right: 0; }
+    .cart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1rem;
+      margin-bottom: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .cart-items { flex: 1; overflow-y: auto; }
+    .cart-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 0.85rem;
+    }
+    .btn-checkout {
+      background: var(--crimson);
+      color: #fff;
+      border: none;
+      width: 100%;
+      padding: 0.9rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header class="sticky-header">
+    <a href="#" class="brand">VENDOR<span>//SYS</span></a>
+    <div style="font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--muted);">SECURE DESPATCH PROTOCOL</div>
+    <button class="cart-btn" onclick="toggleCart()">Cart (<span id="cart-count">1</span>)</button>
+  </header>
+
+  <section class="hero">
+    <h1>SOVEREIGN COMPUTING HARDWARE</h1>
+    <p>Air-gapped key vaults, hardware enclosures, and mesh communicator arrays.</p>
+  </section>
+
+  <main class="product-grid">
+    <div class="card">
+      <div class="card-img">⬡ K-1</div>
+      <div class="card-body">
+        <h3 class="card-title">Plateau Enclosure K-1</h3>
+        <p class="card-desc">CNC-milled aerospace aluminum chassis for air-gapped nodes. Tamper-evident seals.</p>
+        <div class="price-row">
+          <span class="price">₦95,000 / $115</span>
+          <button class="btn-buy" onclick="addToCart('Plateau Enclosure K-1', '₦95,000')">+ Acquire</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-img">⚡ M-4</div>
+      <div class="card-body">
+        <h3 class="card-title">Mesh Node Radio Unit M-4</h3>
+        <p class="card-desc">Long-range LoRa encrypted packet radio. 18-hour cold-start battery reserve.</p>
+        <div class="price-row">
+          <span class="price">₦145,000 / $175</span>
+          <button class="btn-buy" onclick="addToCart('Mesh Node Radio M-4', '₦145,000')">+ Acquire</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-img">🛡 S-9</div>
+      <div class="card-body">
+        <h3 class="card-title">Cold Key Vault S-9</h3>
+        <p class="card-desc">Dual-microcontroller HSM key vault with optical biometric confirm and zero-trace wipe.</p>
+        <div class="price-row">
+          <span class="price">₦210,000 / $250</span>
+          <button class="btn-buy" onclick="addToCart('Cold Key Vault S-9', '₦210,000')">+ Acquire</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Side Cart Drawer -->
+  <div id="cart-drawer">
+    <div class="cart-header">
+      <span>ORDER DISPATCH (1)</span>
+      <button onclick="toggleCart()" style="background:none; border:none; color:#fff; cursor:pointer; font-size:1.2rem;">✕</button>
+    </div>
+    <div class="cart-items" id="cart-items">
+      <div class="cart-item">
+        <div>
+          <div>Plateau Enclosure K-1</div>
+          <small style="color:var(--muted)">Qty: 1</small>
+        </div>
+        <div>₦95,000</div>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border); padding-top:1rem;">
+      <div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:0.5rem;">
+        <span>TOTAL DUE:</span>
+        <span id="total-val">₦95,000</span>
+      </div>
+      <div style="font-size:0.75rem; color:var(--muted); line-height:1.4;">
+        Instant Paystack / Card checkout with express regional courier dispatch from Jos.
+      </div>
+      <button class="btn-checkout" onclick="alert('Order authenticated. Routing to Paystack settlement gateway...')">PAY NOW VIA PAYSTACK</button>
+    </div>
+  </div>
+
+  <script>
+    function toggleCart() {
+      document.getElementById('cart-drawer').classList.toggle('open');
+    }
+    function addToCart(title, price) {
+      alert('Item added: ' + title);
+      document.getElementById('cart-drawer').classList.add('open');
+    }
+  </script>
+</body>
+</html>

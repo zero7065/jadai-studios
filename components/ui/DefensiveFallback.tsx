@@ -1,0 +1,28 @@
+import React from 'react';
+
+export interface DefensiveFallbackProps {
+  onNavigate?: (path: string) => void;
+}
+
+export default function DefensiveFallback({ onNavigate }: DefensiveFallbackProps = {}) {
+  const handleHomeClick = (e: React.MouseEvent) => {
+    if (onNavigate) {
+      e.preventDefault();
+      onNavigate('/');
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050404' }}>
+      <div style={{ textAlign: 'center', color: '#C9A84C', fontFamily: 'Cinzel, serif' }}>
+        <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⬡</div>
+        <div>
+          This section is loading.{' '}
+          <a href="/" onClick={handleHomeClick} style={{ color: '#C9A84C', textDecoration: 'none', borderBottom: '1px solid #C9A84C' }}>
+            Return home →
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,15 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gold-bol" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#C9A84C"/>
+      <stop offset="100%" stopColor="#e8c96a"/>
+    </linearGradient>
+  </defs>
+  <!-- Open book with torn page forming question mark -->
+  <circle cx="20" cy="20" r="18" stroke="url(#gold-bol)" stroke-width="1.5" stroke-dasharray="2 2" opacity="0.3"/>
+  <path d="M5 30C12 28 18 30 20 32C22 30 28 28 35 30V10C28 8 22 10 20 12C18 10 12 8 5 10V30Z" stroke="url(#gold-bol)" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M20 12V32" stroke="url(#gold-bol)" stroke-width="1.5"/>
+  <!-- Question mark arc on page in crimson -->
+  <path d="M23 15C28 15 28 19 26 21V23" stroke="#C0392B" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="26" cy="26" r="1" fill="#C0392B"/>
+</svg>

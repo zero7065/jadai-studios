@@ -1,0 +1,16 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gold-oracle" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#C9A84C"/>
+      <stop offset="100%" stopColor="#e8c96a"/>
+    </linearGradient>
+  </defs>
+  <!-- Single eye with Metatron's Cube overlay -->
+  <circle cx="20" cy="20" r="18" stroke="url(#gold-oracle)" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.4"/>
+  <path d="M4 20C10 10 30 10 36 20C30 30 10 30 4 20Z" stroke="url(#gold-oracle)" stroke-width="1.5" stroke-linejoin="round"/>
+  <circle cx="20" cy="20" r="7" stroke="url(#gold-oracle)" stroke-width="1.5"/>
+  <polygon points="20,13 26,24 14,24" stroke="url(#gold-oracle)" stroke-width="1.5" opacity="0.75"/>
+  <polygon points="20,27 14,16 26,16" stroke="url(#gold-oracle)" stroke-width="1.5" opacity="0.75"/>
+  <!-- Crimson pupil -->
+  <circle cx="20" cy="20" r="2.2" fill="#C0392B"/>
+</svg>

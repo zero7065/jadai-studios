@@ -1,0 +1,13 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gold-market2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#C9A84C"/>
+      <stop offset="100%" stopColor="#e8c96a"/>
+    </linearGradient>
+  </defs>
+  <circle cx="20" cy="20" r="18" stroke="url(#gold-market2)" stroke-width="1.5" stroke-dasharray="2 2" opacity="0.3"/>
+  <rect x="7" y="12" width="22" height="22" rx="2.5" stroke="url(#gold-market2)" stroke-width="1.5" opacity="0.45"/>
+  <rect x="12" y="7" width="22" height="22" rx="2.5" stroke="url(#gold-market2)" stroke-width="1.5"/>
+  <path d="M12 21C22 21 22 29 28 29C28 18 18 18 18 7" stroke="url(#gold-market2)" stroke-width="1.5" stroke-dasharray="1.5 1.5" stroke-linecap="round"/>
+  <circle cx="22" cy="21" r="2" fill="#C0392B"/>
+</svg>

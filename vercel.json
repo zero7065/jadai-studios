@@ -1,0 +1,8 @@
+{
+  "crons": [
+    { "path": "/api/worker/scout", "schedule": "0 */4 * * *" },
+    { "path": "/api/worker/writer", "schedule": "0 */6 * * *" },
+    { "path": "/api/cron/deliver-content", "schedule": "0 21 * * *" },
+    { "path": "/api/cron/self-diagnostic", "schedule": "0 */6 * * *" }
+  ]
+}

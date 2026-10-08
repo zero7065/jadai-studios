@@ -1,0 +1,8 @@
+{
+  "name": "Jadai Studios",
+  "description": "JADAI STUDIOS — BUILD DIFFERENT. High-tier architecture, AI systems, site diagnostics, and creative technology suite.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,1070 @@
+@import "tailwindcss";
+
+:root {
+  /* Core void layers */
+  --void:        #050404;
+  --void-2:      #0a0908;
+  --void-3:      #111010;
+  --void-4:      #1a1816;
+
+  /* Ash spectrum */
+  --ash-100:     #e8e4de;
+  --ash-200:     #c4c0bb;
+  --ash-300:     #8a857e;
+  --ash-400:     #4a4744;
+
+  /* Gold spectrum */
+  --gold-50:     #f5e6b8;
+  --gold-100:    #e8c96a;
+  --gold-200:    #d4b050;
+  --gold-300:    #C9A84C;
+  --gold-400:    #D4AF37;
+  --gold-500:    #C9A84C;
+  --gold-600:    #B8941E;
+
+  /* Crimson */
+  --crimson:     #C0392B;
+  --crimson-100: #e85a4f;
+  --crimson-200: #C0392B;
+  --crimson-300: #8b2e24;
+
+  /* Legacy / semantic bindings */
+  --gold:        var(--gold-300);
+  --gold-dim:    var(--gold-400);
+  --gold-bright: var(--gold-100);
+  --white:       #f5f3f0;
+  --pale:        var(--ash-200);
+  --fog:         var(--ash-400);
+
+  /* Fonts */
+  --font-display: 'Cinzel', serif;
+  --font-mono:    'JetBrains Mono', monospace;
+  --font-body:    'Crimson Pro', serif;
+  --font-sans:    'Inter', sans-serif;
+  --font-signal:  'Space Grotesk', sans-serif;
+
+  /* Typography scale — scaled down 35-40% for airy editorial elegance */
+  --text-hero:   clamp(2.5rem, 8vw, 5rem);
+  --text-h1:     clamp(2rem, 4vw, 3.5rem);
+  --text-h2:     clamp(1.4rem, 3vw, 2.5rem);
+  --text-h3:     clamp(1.1rem, 2vw, 1.8rem);
+  --text-body:   0.92rem;
+  --text-small:  0.72rem;
+  --text-tiny:   0.62rem;
+
+  /* Spacing scale */
+  --space-1:     0.25rem;
+  --space-2:     0.5rem;
+  --space-3:     0.75rem;
+  --space-4:     1rem;
+  --space-6:     1.5rem;
+  --space-8:     2rem;
+  --space-12:    3rem;
+  --space-16:    4rem;
+  --space-24:    6rem;
+  --space-32:    8rem;
+
+  /* Border radius scale */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   16px;
+  --radius-xl:   28px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm:   0 2px 8px rgba(0,0,0,0.4);
+  --shadow-md:   0 8px 24px rgba(0,0,0,0.5);
+  --shadow-lg:   0 24px 64px rgba(0,0,0,0.6);
+  --shadow-glow: 0 0 30px rgba(201,168,76,0.25);
+
+  /* Motion */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-base: 300ms;
+  --duration-slow: 600ms;
+
+  /* Glass effect */
+  --blur-glass: 24px;
+  --blur-glass-hover: 16px;
+
+  /* Z-index scale */
+  --z-base: 1;
+  --z-dropdown: 100;
+  --z-modal: 1000;
+  --z-terminal: 9999;
+
+  --bg-primary: var(--void);
+  --bg-secondary: var(--void-2);
+  --bg-card: rgba(10, 9, 8, 0.78);
+  --border-color: rgba(201, 168, 76, 0.2);
+  --border-hover: rgba(201, 168, 76, 0.45);
+  --text-primary: var(--white);
+  --text-secondary: var(--ash-200);
+  --text-muted: var(--ash-400);
+
+  --gold-gradient: linear-gradient(135deg, #e8c96a 0%, #C9A84C 50%, #8a6e2a 100%);
+  --metallic-gold: linear-gradient(135deg, #f3e7be 0%, #C9A84C 35%, #8a6e2a 70%, #d4af37 100%);
+}
+
+h1 {
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: clamp(1.4rem, 3vw, 2.5rem);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+h3 {
+  font-size: clamp(1.1rem, 2vw, 1.8rem);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+h4, h5, h6 {
+  letter-spacing: -0.01em;
+}
+
+body {
+  font-size: 0.92rem;
+  line-height: 1.7;
+  letter-spacing: 0;
+}
+
+small, .label, label {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+}
+
+[data-theme="light"] {
+  --void: #faf7f2;
+  --void-2: #f2ede3;
+  --void-3: #e8e0cf;
+  --ash-100: #1a1714;
+  --ash-200: #3a3530;
+  --gold-300: #8a6e2a;
+  --gold: #8a6e2a;
+  --gold-bright: #b8941e;
+  --gold-dim: #6b5520;
+  --crimson: #8b2e24;
+  --pale: #3a3530;
+  --white: #1a1714;
+  --ash: #2a2520;
+  --fog: #7a7268;
+  --mist: #9a9088;
+
+  --bg-primary: var(--void);
+  --bg-secondary: var(--void-2);
+  --bg-card: rgba(250, 247, 242, 0.9);
+  --border-color: rgba(138, 110, 42, 0.2);
+  --border-hover: rgba(138, 110, 42, 0.45);
+  --text-primary: var(--white);
+  --text-secondary: var(--ash-200);
+  --text-muted: var(--fog);
+  --shadow-glow: 0 0 35px rgba(138, 110, 42, 0.15);
+}
+
+/* Full Surface Light Theme Transformations */
+[data-theme="light"] body {
+  background-color: var(--void) !important;
+  color: var(--white) !important;
+  opacity: 1 !important;
+}
+
+/* Paper Grain Texture via SVG noise at 3% opacity */
+[data-theme="light"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Drafting Grid visible in light mode: rgba(138, 110, 42, 0.08) */
+[data-theme="light"] body::after {
+  background-image: 
+    linear-gradient(to right, rgba(138, 110, 42, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(138, 110, 42, 0.08) 1px, transparent 1px) !important;
+  background-size: 40px 40px !important;
+  opacity: 1 !important;
+}
+
+/* Headings (Cinzel): color #1a1714 — near black, strong */
+[data-theme="light"] h1,
+[data-theme="light"] h2,
+[data-theme="light"] h3,
+[data-theme="light"] h4,
+[data-theme="light"] h5,
+[data-theme="light"] h6 {
+  font-family: var(--font-display) !important;
+  font-weight: 700 !important;
+  color: #1a1714 !important;
+}
+
+/* Cards: background rgba(250, 247, 242, 0.9), border 1px solid rgba(138, 110, 42, 0.2), warm sepia box shadows */
+[data-theme="light"] .glass,
+[data-theme="light"] .bg-\[\#0a0908\],
+[data-theme="light"] [class*="bg-[#0a0908]"] {
+  background-color: rgba(250, 247, 242, 0.9) !important;
+  border-color: rgba(138, 110, 42, 0.2) !important;
+  box-shadow: 0 8px 24px rgba(138, 110, 42, 0.15) !important;
+}
+
+/* Warm ivory tones - no pure white backgrounds */
+[data-theme="light"] .bg-\[\#050404\],
+[data-theme="light"] [class*="bg-[#050404]"] {
+  background-color: #faf7f2 !important;
+}
+
+[data-theme="light"] .bg-\[\#111010\],
+[data-theme="light"] [class*="bg-[#111010]"] {
+  background-color: #f2ede3 !important;
+}
+
+/* Text overrides for light theme WCAG AA contrast (4.5:1 minimum) */
+[data-theme="light"] .text-\[\#f5f3f0\],
+[data-theme="light"] [class*="text-[#f5f3f0]"] {
+  color: #1a1714 !important;
+}
+
+[data-theme="light"] .text-\[\#c4c0bb\],
+[data-theme="light"] [class*="text-[#c4c0bb]"] {
+  color: #3a3530 !important;
+}
+
+[data-theme="light"] .text-\[\#8a6e2a\],
+[data-theme="light"] [class*="text-[#8a6e2a]"] {
+  color: #6b5520 !important;
+}
+
+[data-theme="light"] .text-\[\#e8c96a\],
+[data-theme="light"] [class*="text-[#e8c96a]"] {
+  color: #8a6e2a !important;
+}
+
+/* Gold buttons in light theme: background #8a6e2a, text #faf7f2 — readable contrast */
+[data-theme="light"] .btn-primary,
+[data-theme="light"] button.bg-\[\#C9A84C\],
+[data-theme="light"] button[class*="from-[#C9A84C]"],
+[data-theme="light"] button[class*="from-[#e8c96a]"],
+[data-theme="light"] .bg-\[\#C9A84C\] {
+  background: #8a6e2a !important;
+  color: #faf7f2 !important;
+}
+
+[data-theme="light"] header {
+  background-color: rgba(250, 247, 242, 0.94) !important;
+  border-bottom-color: rgba(138, 110, 42, 0.2) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   SECTION A.2: GLASS LAYER SYSTEM
+--------------------------------------------------------------------------- */
+.glass {
+  background: rgba(10, 9, 8, 0.55);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(196, 192, 187, 0.08);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
+}
+
+.glass-hover:hover {
+  background: rgba(10, 9, 8, 0.65);
+  backdrop-filter: blur(16px) saturate(160%);
+  border-color: rgba(201, 168, 76, 0.3);
+}
+
+.glass-heavy {
+  background: rgba(5, 4, 4, 0.75);
+  backdrop-filter: blur(40px) saturate(120%);
+  border: 1px solid rgba(201, 168, 76, 0.15);
+  border-radius: var(--radius-lg);
+}
+
+[data-theme="light"] .glass {
+  background: rgba(250, 247, 242, 0.7) !important;
+  border: 1px solid rgba(138, 110, 42, 0.12) !important;
+  box-shadow: 0 8px 24px rgba(26, 22, 18, 0.08) !important;
+}
+
+[data-theme="light"] .glass-hover:hover {
+  background: rgba(250, 247, 242, 0.9) !important;
+  border-color: rgba(138, 110, 42, 0.4) !important;
+}
+
+[data-theme="light"] .glass-heavy {
+  background: rgba(242, 237, 227, 0.85) !important;
+  border: 1px solid rgba(138, 110, 42, 0.2) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   SECTION A.5: ATMOSPHERIC BACKGROUND SYSTEM PER SECTION (FIX 7 ANIMATIONS)
+--------------------------------------------------------------------------- */
+/* HOME — Radial gold haze with 30s shift */
+.bg-home,
+.bg-home-atmos {
+  background: 
+    radial-gradient(ellipse at top, rgba(201,168,76,0.08), transparent 60%),
+    var(--void);
+  animation: homeShift 30s ease-in-out infinite;
+}
+
+@keyframes homeShift {
+  0%, 100% { background-position: 50% 0%; }
+  50% { background-position: 50% 20%; }
+}
+
+/* STUDIO — Warm crimson pulse */
+.bg-studio {
+  background: radial-gradient(ellipse at center, rgba(192,57,43,0.12), transparent 60%), var(--void);
+  animation: studioPulse 20s ease-in-out infinite;
+}
+
+@keyframes studioPulse {
+  0%, 100% {
+    background-size: 100% 100%;
+    opacity: 0.9;
+  }
+  50% {
+    background-size: 115% 115%;
+    opacity: 1;
+  }
+}
+
+/* PLAYGROUND — Shift loop across 40s */
+.bg-playground {
+  background: linear-gradient(135deg, var(--void), #0d0b08), var(--void);
+  animation: playShift 40s ease-in-out infinite;
+}
+
+@keyframes playShift {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+}
+
+/* SIGNAL — Radial drift over 25s loop */
+.bg-signal {
+  background: radial-gradient(ellipse at top-right, rgba(255,140,60,0.15), transparent 50%), var(--void);
+  animation: signalDrift 25s ease-in-out infinite;
+}
+
+@keyframes signalDrift {
+  0%, 100% {
+    background-position: 100% 0%;
+    opacity: 0.85;
+  }
+  50% {
+    background-position: 90% 15%;
+    opacity: 1;
+  }
+}
+
+/* Typography Category Bindings */
+.font-home-studio {
+  font-family: var(--font-display);
+}
+.font-playground-ui {
+  font-family: var(--font-sans);
+}
+.font-marketplace-head {
+  font-family: var(--font-signal);
+}
+.font-hub-ui {
+  font-family: var(--font-sans);
+}
+.font-signal-data {
+  font-family: var(--font-signal);
+}
+
+/* SERVICES — Deep void with particle field (JS overlay) */
+.bg-services,
+.bg-services-atmos {
+  background: 
+    radial-gradient(ellipse 100% 60% at 50% 50%, rgba(201,168,76,0.05) 0%, transparent 70%),
+    var(--void) !important;
+}
+
+/* BOOK OF LIES — Warm crimson glow */
+.bg-book,
+.bg-book-atmos {
+  background: 
+    radial-gradient(ellipse 70% 50% at 50% 50%, rgba(192,57,43,0.2) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 30% 80%, rgba(201,168,76,0.1) 0%, transparent 50%),
+    var(--void) !important;
+}
+
+/* WORK — Cool cyan tint */
+.bg-work,
+.bg-work-atmos {
+  background: 
+    radial-gradient(ellipse 60% 40% at 70% 30%, rgba(56,189,248,0.06) 0%, transparent 60%),
+    var(--void) !important;
+}
+
+/* MARKETPLACE — Warm misty */
+.bg-marketplace,
+.bg-market-atmos {
+  background: 
+    linear-gradient(180deg, rgba(42,31,15,0.6) 0%, transparent 40%),
+    radial-gradient(ellipse 80% 40% at 50% 100%, rgba(201,168,76,0.08) 0%, transparent 60%),
+    var(--void) !important;
+}
+
+/* DREAM FORGE — Violet to gold */
+.bg-forge,
+.bg-forge-atmos {
+  background: 
+    radial-gradient(ellipse 70% 50% at 20% 20%, rgba(139,92,246,0.15) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(201,168,76,0.12) 0%, transparent 60%),
+    var(--void) !important;
+}
+
+/* ABOUT — Fog cinematic */
+.bg-about,
+.bg-about-atmos {
+  background: 
+    radial-gradient(ellipse 100% 60% at 50% 100%, rgba(196,192,187,0.08) 0%, transparent 70%),
+    var(--void) !important;
+}
+
+/* Oracle: Void with gold pulse every 8s */
+.bg-oracle-atmos {
+  animation: oraclePulse 8s ease-in-out infinite;
+  background: radial-gradient(circle at 50% 50%, rgba(201, 168, 76, 0.14) 0%, #050404 70%);
+}
+
+@keyframes oraclePulse {
+  0%, 100% {
+    background: radial-gradient(circle at 50% 50%, rgba(201, 168, 76, 0.08) 0%, #050404 75%);
+  }
+  50% {
+    background: radial-gradient(circle at 50% 50%, rgba(201, 168, 76, 0.2) 0%, #050404 70%);
+  }
+}
+
+/* Hub: Neutral void with fine grid lines */
+.bg-hub-atmos {
+  background-color: #050404;
+  background-image: 
+    linear-gradient(to right, rgba(201, 168, 76, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(201, 168, 76, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Admin: Solid void with grid, no atmosphere */
+.bg-admin-atmos {
+  background-color: #050404;
+  background-image: 
+    linear-gradient(to right, rgba(201, 168, 76, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(201, 168, 76, 0.03) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+/* ---------------------------------------------------------------------------
+   GLOBAL BASE STYLES & PAPER NOISE
+--------------------------------------------------------------------------- */
+* {
+  box-sizing: border-box;
+  border-color: var(--border-color);
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  line-height: 1.75;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Background Subtle Grid */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: 
+    linear-gradient(to right, rgba(201, 168, 76, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(201, 168, 76, 0.02) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Organic Fine Grain / Paper Noise at 4% opacity */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9998;
+}
+
+[data-theme="light"] body::before {
+  opacity: 0.055;
+}
+
+/* ---------------------------------------------------------------------------
+   SECTION 9: TYPOGRAPHY POLISH
+--------------------------------------------------------------------------- */
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+p, .font-serif, .font-body {
+  font-family: var(--font-body);
+  line-height: 1.75;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
+}
+
+/* Sharp horizontal gradient on headings (gold → transparent) */
+.heading-gold-gradient {
+  background: linear-gradient(90deg, #f5f3f0 0%, #C9A84C 60%, rgba(201, 168, 76, 0.2) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Blade reflection mirror effect */
+.blade-mirror {
+  position: relative;
+  overflow: hidden;
+}
+.blade-mirror::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  transform: skewX(-25deg);
+  animation: bladeShine 8s infinite ease-in-out;
+}
+@keyframes bladeShine {
+  0%, 80% { left: -100%; }
+  100% { left: 200%; }
+}
+
+/* Custom underline that animates from center outward on hover */
+.draw-underline {
+  position: relative;
+  display: inline-block;
+}
+.draw-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 1.5px;
+  background: #C9A84C;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.draw-underline:hover::after {
+  transform: scaleX(1);
+}
+
+.glass {
+  background: var(--bg-card);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-base);
+}
+
+.glass:hover {
+  border-color: var(--border-hover);
+}
+
+/* ---------------------------------------------------------------------------
+   Work Section Electric Frame Pulse
+--------------------------------------------------------------------------- */
+@keyframes electricBorderGlow {
+  0% {
+    border-color: rgba(201, 168, 76, 0.9);
+    box-shadow: 0 0 20px rgba(201, 168, 76, 0.4), inset 0 0 15px rgba(201, 168, 76, 0.2);
+  }
+  50% {
+    border-color: rgba(192, 57, 43, 0.9);
+    box-shadow: 0 0 25px rgba(192, 57, 43, 0.45), inset 0 0 15px rgba(192, 57, 43, 0.2);
+  }
+  100% {
+    border-color: rgba(201, 168, 76, 0.9);
+    box-shadow: 0 0 20px rgba(201, 168, 76, 0.4), inset 0 0 15px rgba(201, 168, 76, 0.2);
+  }
+}
+
+.electric-frame {
+  animation: electricBorderGlow 3s ease-in-out infinite;
+}
+
+/* Print protection watermark */
+@media print {
+  body::before {
+    content: "© JADAI STUDIOS | jadai.dev | UNAUTHORIZED COPY";
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    font-size: 44px;
+    color: rgba(201, 168, 76, 0.18);
+    z-index: 9999;
+    font-family: 'Cinzel', serif;
+    font-weight: 900;
+    pointer-events: none;
+    width: 100vw;
+    text-align: center;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Visual Lock Header & Navigation Clean Enforcement (Section 1 & 4)
+--------------------------------------------------------------------------- */
+header {
+  height: 64px !important;
+  background-color: rgba(5, 4, 4, 0.6) !important;
+  backdrop-filter: blur(24px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(140%) !important;
+  border-bottom: 1px solid rgba(196, 192, 187, 0.06) !important;
+}
+
+@media (max-width: 640px) {
+  header {
+    height: 56px !important;
+  }
+}
+
+/* Hide noise icons per Section 1: sparkle, camera, signal broadcast, guide */
+header button[aria-label="PRIME Oracle AI"],
+header button[title="Open PRIME Oracle Intelligence"],
+header button[title="Jadai Signal — The Distribution OS"],
+header button[aria-label="Studio Tour"],
+header button[title="Return to Sovereign Surface (Home)"],
+header button[title="Return Home"],
+[class*="sovereign-edge"],
+[id*="sovereign-edge"] {
+  display: none !important;
+}
+
+/* Hide Guide from legacy bottom dock if present */
+div.md\:hidden.fixed.bottom-0 button:has(svg.lucide-help-circle) {
+  display: none !important;
+}
+
+@keyframes goldGradientShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.gold-separator-line {
+  position: relative;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(201, 168, 76, 0.04) 20%,
+    rgba(212, 175, 55, 0.18) 50%,
+    rgba(201, 168, 76, 0.04) 80%,
+    transparent 100%
+  );
+  opacity: 0.7;
+}
+
+.gold-separator-glow {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50%;
+  height: 16px;
+  background: radial-gradient(ellipse at center, rgba(201, 168, 76, 0.1) 0%, transparent 75%);
+  filter: blur(6px);
+  pointer-events: none;
+}
+
+/* ===========================================================================
+   VISUAL LOCK SUPPLEMENT — SPACE, 3D DEPTH, HD QUALITY
+   =========================================================================== */
+
+/* 1. Global Spacing & Breathing (Reduced by 35-40% — airy, elegant, open) */
+.section {
+  padding: 5rem 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.section + .section {
+  margin-top: 3.5rem;
+}
+
+.card {
+  padding: 1.25rem;
+  gap: 1rem;
+}
+
+/* Grid System — Max 1100px centered, 16px mobile, 24px tablet, auto margins desktop */
+.grid-container, .main-container {
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+@media (min-width: 640px) {
+  .grid-container, .main-container {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+@media (min-width: 1148px) {
+  .grid-container, .main-container {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* Constellation & Sigil Orbital Physics */
+@keyframes sigilRotation {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orbitRotation {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 2. 3D Depth System */
+.card-3d {
+  transform-style: preserve-3d;
+  transition: transform 400ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 400ms ease;
+  will-change: transform;
+}
+
+.card-3d:hover {
+  transform: 
+    perspective(1000px)
+    rotateX(2deg)
+    rotateY(-2deg)
+    translateZ(12px)
+    translateY(-4px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(201, 168, 76, 0.15);
+}
+
+/* Layered depth hierarchy */
+.layer-depth-bg {
+  transform: translateZ(-100px);
+}
+.layer-depth-base {
+  transform: translateZ(0);
+}
+.layer-depth-card {
+  transform: translateZ(20px);
+}
+.layer-depth-hover {
+  transform: translateZ(40px);
+}
+.layer-depth-floating {
+  transform: translateZ(60px);
+}
+.layer-depth-modal {
+  transform: translateZ(100px);
+}
+
+/* Parallax on scroll */
+.parallax-bg {
+  will-change: transform;
+  transform: translateY(calc(var(--scroll-y, 0px) * 0.5));
+}
+
+/* 3D Parallax Tilt for Founder Card in Hero (.hero__card) */
+.hero__card {
+  transform-style: preserve-3d;
+  transition: transform 300ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 300ms ease;
+  will-change: transform;
+  transform: perspective(1000px);
+  cursor: pointer;
+}
+
+.hero__card:hover {
+  box-shadow: 
+    0 30px 80px rgba(0, 0, 0, 0.8),
+    0 0 45px rgba(201, 168, 76, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+/* Card flip 3D */
+.flip-card {
+  perspective: 1200px;
+}
+.flip-card__inner {
+  transform-style: preserve-3d;
+  transition: transform 700ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.flip-card.flipped .flip-card__inner {
+  transform: rotateY(180deg);
+}
+.flip-card__front,
+.flip-card__back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-card__back {
+  transform: rotateY(180deg);
+}
+
+/* 3. HD / 4K Visual Quality */
+img, video {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.border-crisp {
+  border: 1px solid rgba(196, 192, 187, 0.08);
+  box-shadow: inset 0 0 0 0.5px rgba(201, 168, 76, 0.04);
+}
+
+.glass-hd {
+  background: rgba(15, 14, 12, 0.55);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(196, 192, 187, 0.08);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* 4. Motion Quality & 60fps */
+.animate-transform {
+  transition: transform 300ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 600ms ease-out, transform 600ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Slow atmospheric breathing zoom for background images */
+@keyframes slowAtmosphereZoom {
+  0% {
+    transform: scale(1.02) translate(0, 0);
+  }
+  50% {
+    transform: scale(1.08) translate(-1%, -1%);
+  }
+  100% {
+    transform: scale(1.03) translate(1%, 0.5%);
+  }
+}
+
+.animate-atmosphere {
+  animation: slowAtmosphereZoom 25s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+/* Futuristic Gyro Ring Keyframes */
+@keyframes gyroSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes gyroCounterSpin {
+  0% {
+    transform: rotate(360deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes radarSweepPulse {
+  0% {
+    transform: rotate(0deg);
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: rotate(360deg);
+    opacity: 0.8;
+  }
+}
+
+.animate-gyro-ring {
+  animation: gyroSpin 22s linear infinite;
+  will-change: transform;
+}
+
+.animate-gyro-ring-fast {
+  animation: gyroSpin 6s linear infinite;
+  will-change: transform;
+}
+
+.animate-gyro-counter {
+  animation: gyroCounterSpin 16s linear infinite;
+  will-change: transform;
+}
+
+.animate-radar-sweep {
+  animation: radarSweepPulse 4s linear infinite;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+/* Product previews slow floating drift (4s loop, translateY ±4px) */
+@keyframes slowFloatDrift {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-float-drift {
+  animation: slowFloatDrift 4s ease-in-out infinite;
+}
+
+/* ===========================================================================
+   PRIME GUIDE BEE & TARGET HIGHLIGHT MECHANIC
+   =========================================================================== */
+.prime-target {
+  animation: prime-jiggle 0.4s ease, prime-glow 2s ease !important;
+  border-color: #C9A84C !important;
+}
+
+@keyframes prime-jiggle {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+@keyframes prime-glow {
+  0%, 100% { box-shadow: 0 0 0 transparent; }
+  50% { box-shadow: 0 0 24px rgba(201, 168, 76, 0.7); }
+}
+
+@keyframes beeBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes beePulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(201, 168, 76, 0.4); }
+  50% { box-shadow: 0 0 22px rgba(201, 168, 76, 0.75); }
+}
+
+/* ===========================================================================
+   SECTION LIVING ATMOSPHERE KEYFRAMES
+   =========================================================================== */
+@keyframes scanlineLoop {
+  0% { transform: translateY(-100%); opacity: 0.01; }
+  50% { opacity: 0.04; }
+  100% { transform: translateY(100vh); opacity: 0.01; }
+}
+
+@keyframes breathingPulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
+@keyframes lightBeamDrift {
+  0% { transform: translateY(-20vh); opacity: 0.02; }
+  50% { opacity: 0.05; }
+  100% { transform: translateY(120vh); opacity: 0.01; }
+}
+
+@keyframes dataStreamFall {
+  0% { transform: translateY(-50%); }
+  100% { transform: translateY(0%); }
+}
+
+@keyframes metatronRotate120 {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ===========================================================================
+   BENTO PREVIEW KEYFRAMES
+   =========================================================================== */
+@keyframes bentoBars {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes shimmerBox {
+  0% { opacity: 0.35; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 0.35; transform: scale(0.96); }
+}
+
+/* Preferred reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

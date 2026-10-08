@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>APERTURE — Fine Art Photography & Archival Prints</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=JetBrains+Mono:wght@300;400&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #000000;
+      --surface: #0a0a0a;
+      --amber: #D4A574;
+      --amber-dim: #8c6742;
+      --ivory: #F8F5EE;
+      --muted: #888277;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ivory);
+      font-family: 'Crimson Pro', Georgia, serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(212,165,116,0.15);
+      padding: 1.25rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      font-family: 'Cinzel', serif;
+      font-size: 1.1rem;
+      letter-spacing: 0.25em;
+      color: var(--ivory);
+      text-decoration: none;
+    }
+    .logo span { color: var(--amber); }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      margin-left: 1.5rem;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+    nav a:hover, nav a.active { color: var(--amber); }
+    .hero {
+      padding: 4rem 2rem 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .hero h1 {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(2rem, 5vw, 3.75rem);
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      color: var(--ivory);
+      margin-bottom: 1rem;
+    }
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 600px;
+      margin: 0 auto 2rem;
+      font-style: italic;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.5rem;
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 0 1.5rem 5rem;
+    }
+    .photo-card {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid rgba(212,165,116,0.12);
+      border-radius: 4px;
+      overflow: hidden;
+      aspect-ratio: 4/5;
+      cursor: pointer;
+    }
+    .photo-inner {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 1.5rem;
+      background-size: cover;
+      background-position: center;
+      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .photo-card:hover .photo-inner {
+      transform: scale(1.03);
+    }
+    .exif-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(8px);
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .photo-card:hover .exif-overlay {
+      opacity: 1;
+    }
+    .exif-meta {
+      font-size: 0.75rem;
+      color: var(--amber);
+      line-height: 1.8;
+      letter-spacing: 0.05em;
+    }
+    .exif-meta span { color: var(--ivory); font-weight: bold; }
+    .btn-print {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem 1.5rem;
+      border: 1px solid var(--amber);
+      color: var(--bg);
+      background: var(--amber);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-print:hover {
+      background: var(--ivory);
+      border-color: var(--ivory);
+    }
+    .cta-banner {
+      background: #080808;
+      border-top: 1px solid rgba(212,165,116,0.2);
+      border-bottom: 1px solid rgba(212,165,116,0.2);
+      padding: 4rem 2rem;
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+    .cta-banner h2 {
+      font-family: 'Cinzel', serif;
+      font-size: 2rem;
+      color: var(--amber);
+      margin-bottom: 1rem;
+    }
+    footer {
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding: 2rem;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+    @media (max-width: 600px) {
+      .grid { grid-template-columns: 1fr; }
+      nav { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="#" class="logo">APER<span>TURE</span></a>
+    <nav>
+      <a href="#" class="active">Archive</a>
+      <a href="#">Series</a>
+      <a href="#">Monographs</a>
+      <a href="#">Print Studio</a>
+    </nav>
+    <a href="#prints" class="btn-print">Inquire Print</a>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>LIGHT COLLECTED IN SOLITUDE</h1>
+      <p>Fine-art monochrome and high-latitude silver gelatin prints from the Plateau and Sahara.</p>
+    </section>
+
+    <div class="grid">
+      <!-- 1 -->
+      <div class="photo-card">
+        <div class="photo-inner" style="background: radial-gradient(circle at 60% 40%, #2a221b 0%, #080808 100%);">
+          <div style="font-family:'Cinzel',serif; font-size:1.25rem;">I. Shere Hills at Dawn</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--amber);">₦185,000 · Limited 1/15</div>
+        </div>
+        <div class="exif-overlay">
+          <div>
+            <div style="font-size:0.65rem; color:var(--muted); margin-bottom:0.5rem;">PLATE 01 // ARCHIVAL PIGMENT</div>
+            <h3 style="font-family:'Cinzel',serif; font-size:1.25rem; color:var(--ivory); margin-bottom:1rem;">Shere Hills at Dawn</h3>
+            <div class="exif-meta">
+              CAMERA: <span>Hasselblad 500C/M</span><br>
+              LENS: <span>Zeiss Planar 80mm f/2.8</span><br>
+              EXPOSURE: <span>1/30s at f/8.0, ISO 100</span><br>
+              LOCATION: <span>Jos Highlands, Nigeria</span><br>
+              PAPER: <span>Hahnemühle Photo Rag 308gsm</span>
+            </div>
+          </div>
+          <button class="btn-print" onclick="alert('Added Shere Hills Archival Print to Collection')">Acquire Print ($220 / ₦185,000)</button>
+        </div>
+      </div>
+
+      <!-- 2 -->
+      <div class="photo-card">
+        <div class="photo-inner" style="background: radial-gradient(circle at 40% 60%, #1f1d1b 0%, #050505 100%);">
+          <div style="font-family:'Cinzel',serif; font-size:1.25rem;">II. The Copper Smelter</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--amber);">₦220,000 · Limited 1/10</div>
+        </div>
+        <div class="exif-overlay">
+          <div>
+            <div style="font-size:0.65rem; color:var(--muted); margin-bottom:0.5rem;">PLATE 02 // SILVER GELATIN</div>
+            <h3 style="font-family:'Cinzel',serif; font-size:1.25rem; color:var(--ivory); margin-bottom:1rem;">The Copper Smelter</h3>
+            <div class="exif-meta">
+              CAMERA: <span>Leica M6 Classic</span><br>
+              LENS: <span>Summicron 35mm f/2 ASPH</span><br>
+              EXPOSURE: <span>1/60s at f/2.8, Kodak Tri-X 400</span><br>
+              LOCATION: <span>Old Market, Naraguta</span><br>
+              EDITION: <span>Signed & Embossed</span>
+            </div>
+          </div>
+          <button class="btn-print" onclick="alert('Added Copper Smelter to Collection')">Acquire Print ($260 / ₦220,000)</button>
+        </div>
+      </div>
+
+      <!-- 3 -->
+      <div class="photo-card">
+        <div class="photo-inner" style="background: radial-gradient(circle at 50% 50%, #26221c 0%, #080808 100%);">
+          <div style="font-family:'Cinzel',serif; font-size:1.25rem;">III. Solitary Acacia</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--amber);">₦160,000 · Open Edition</div>
+        </div>
+        <div class="exif-overlay">
+          <div>
+            <div style="font-size:0.65rem; color:var(--muted); margin-bottom:0.5rem;">PLATE 03 // EXHIBITION PROOF</div>
+            <h3 style="font-family:'Cinzel',serif; font-size:1.25rem; color:var(--ivory); margin-bottom:1rem;">Solitary Acacia</h3>
+            <div class="exif-meta">
+              CAMERA: <span>Linhof Master Technika 4x5</span><br>
+              LENS: <span>Schneider Symmar-S 150mm f/5.6</span><br>
+              EXPOSURE: <span>1/4s at f/22, Ilford HP5+</span><br>
+              LOCATION: <span>Rayfield Plains</span><br>
+              FRAME: <span>Smoked Walnut & Museum Glass</span>
+            </div>
+          </div>
+          <button class="btn-print" onclick="alert('Added Solitary Acacia to Collection')">Acquire Print ($190 / ₦160,000)</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="cta-banner" id="prints">
+      <h2>CUSTOM DARKROOM COMMISSIONS</h2>
+      <p style="color:var(--muted); max-width:550px; margin:0 auto 1.5rem;">Each print is signed, hand-numbered, and shipped in custom museum archival cylinders worldwide.</p>
+      <button class="btn-print" style="padding:1rem 2.5rem; font-size:0.85rem;" onclick="alert('Order inquiry logged. Confirmation sent to your inbox.')">Book Private Studio Consultation</button>
+    </section>
+  </main>
+
+  <footer>
+    © APERTURE GALLERY & FINE ART ARCHIVE • POWERED BY JADAI STUDIOS • BUILT DIFFERENT
+  </footer>
+</body>
+</html>

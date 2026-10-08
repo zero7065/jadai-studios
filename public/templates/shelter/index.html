@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SHELTER // High-Plateau Wildlife & Companion Sanctuary</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green-dark: #122116;
+      --green: #1A2E1F;
+      --green-card: #223c29;
+      --cream: #FDFBF7;
+      --cream-muted: #D3CDC2;
+      --orange: #D97706;
+      --orange-light: #F59E0B;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--green-dark);
+      color: var(--cream);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      line-height: 1.6;
+    }
+    header {
+      background: var(--green);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding: 1.25rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand {
+      font-weight: 700;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+      color: var(--cream);
+      text-decoration: none;
+    }
+    .brand span { color: var(--orange); }
+    .hero {
+      text-align: center;
+      padding: 4rem 1.5rem 2.5rem;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.25rem);
+      line-height: 1.15;
+      margin-bottom: 1rem;
+      color: var(--cream);
+    }
+    .hero p {
+      color: var(--cream-muted);
+      font-size: 1.1rem;
+    }
+    .filter-bar {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 1.5rem 0 3rem;
+      padding: 0 1rem;
+    }
+    .pill {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--cream-muted);
+      padding: 0.5rem 1.2rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .pill.active, .pill:hover {
+      background: var(--orange);
+      color: #fff;
+      border-color: var(--orange);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 2rem;
+      max-width: 1180px;
+      margin: 0 auto 5rem;
+      padding: 0 1.5rem;
+    }
+    .animal-card {
+      background: var(--green);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .animal-img {
+      height: 200px;
+      background: radial-gradient(circle at 50% 40%, #2f5238 0%, #15271a 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3.5rem;
+    }
+    .animal-info {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+    .animal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 0.5rem;
+    }
+    .animal-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--cream);
+    }
+    .animal-tag {
+      font-size: 0.75rem;
+      color: var(--orange);
+      background: rgba(217,119,6,0.15);
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+    }
+    .animal-desc {
+      font-size: 0.9rem;
+      color: var(--cream-muted);
+      margin-bottom: 1.25rem;
+      flex: 1;
+    }
+    .btn-adopt {
+      width: 100%;
+      background: var(--orange);
+      border: none;
+      color: #fff;
+      font-weight: 600;
+      padding: 0.75rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+    .btn-adopt:hover { background: var(--orange-light); }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="#" class="brand">SHELTER<span>.JOS</span></a>
+    <div style="font-size:0.85rem; color:var(--cream-muted);">Jos Mountain Sanctuary #404</div>
+  </header>
+
+  <section class="hero">
+    <h1>Every Life Deserves a Mountain to Stand On</h1>
+    <p>Rescued, rehabilitated, and sheltered companion animals on the Plateau ready for lifelong adoption.</p>
+  </section>
+
+  <div class="filter-bar">
+    <button class="pill active">All Companions</button>
+    <button class="pill">Canines</button>
+    <button class="pill">Felines</button>
+    <button class="pill">Plateau Goats</button>
+    <button class="pill">Sponsorship</button>
+  </div>
+
+  <div class="grid">
+    <div class="animal-card">
+      <div class="animal-img">🐕</div>
+      <div class="animal-info">
+        <div class="animal-header">
+          <span class="animal-name">Simi</span>
+          <span class="animal-tag">Canine • 2 yrs</span>
+        </div>
+        <p class="animal-desc">High-spirited plateau shepherd mix. Gentle with children, fully vaccinated, loves morning highland trails.</p>
+        <button class="btn-adopt" onclick="alert('Adoption application initiated for Simi. Our field volunteer will contact you.')">Adopt Simi →</button>
+      </div>
+    </div>
+
+    <div class="animal-card">
+      <div class="animal-img">🐈</div>
+      <div class="animal-info">
+        <div class="animal-header">
+          <span class="animal-name">Kona</span>
+          <span class="animal-tag">Feline • 1 yr</span>
+        </div>
+        <p class="animal-desc">Rescued near Rayfield Lake. Affectionate, quiet purrer, comfortable in apartment settings or studio desks.</p>
+        <button class="btn-adopt" onclick="alert('Adoption application initiated for Kona. Our field volunteer will contact you.')">Adopt Kona →</button>
+      </div>
+    </div>
+
+    <div class="animal-card">
+      <div class="animal-img">🐐</div>
+      <div class="animal-info">
+        <div class="animal-header">
+          <span class="animal-name">Godiya</span>
+          <span class="animal-tag">Dwarf Goat • 8 mos</span>
+        </div>
+        <p class="animal-desc">Sanctuary mascot. Available for full lifetime sanctuary sponsorship and quarterly visitor visits.</p>
+        <button class="btn-adopt" onclick="alert('Sponsorship program initiated for Godiya. Thank you!')">Sponsor Godiya (₦15k/mo)</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GLOW // Esthétique Sanctuary & Skin Atelier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --plum: #2E1A2E;
+      --plum-dark: #1b0e1b;
+      --plum-light: #442744;
+      --rosegold: #D4A088;
+      --rosegold-light: #edd1c4;
+      --cream: #FAF6F0;
+      --cream-muted: #d0c4be;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--plum-dark);
+      color: var(--cream);
+      font-family: 'Montserrat', sans-serif;
+      line-height: 1.6;
+    }
+    header {
+      padding: 1.75rem 2.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(212, 160, 136, 0.15);
+    }
+    .brand {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.8rem;
+      letter-spacing: 0.2em;
+      color: var(--rosegold);
+      text-decoration: none;
+    }
+    /* Split-screen Hero */
+    .split-hero {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 75vh;
+      border-bottom: 1px solid rgba(212, 160, 136, 0.15);
+    }
+    .hero-content {
+      padding: 4rem 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .hero-content h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2.5rem, 5vw, 4.2rem);
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+      font-weight: 400;
+    }
+    .hero-content h1 span {
+      color: var(--rosegold);
+      font-style: italic;
+    }
+    .hero-content p {
+      color: var(--cream-muted);
+      font-size: 1rem;
+      margin-bottom: 2rem;
+      max-width: 450px;
+    }
+    .hero-media {
+      background: radial-gradient(circle at 60% 40%, var(--plum-light) 0%, var(--plum-dark) 80%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      position: relative;
+    }
+    .media-card {
+      width: 80%;
+      height: 75%;
+      border: 1px solid var(--rosegold);
+      border-radius: 200px 200px 0 0;
+      background: rgba(46, 26, 46, 0.7);
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+    }
+    .btn-gold {
+      display: inline-block;
+      align-self: flex-start;
+      background: var(--rosegold);
+      color: var(--plum-dark);
+      padding: 0.9rem 2rem;
+      font-size: 0.8rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.3s;
+    }
+    .btn-gold:hover {
+      background: var(--cream);
+    }
+    /* Service Menu */
+    .menu-section {
+      max-width: 900px;
+      margin: 5rem auto;
+      padding: 0 2rem;
+    }
+    .section-title {
+      text-align: center;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2.5rem;
+      margin-bottom: 3rem;
+      color: var(--rosegold);
+    }
+    .service-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 1.5rem 0;
+      border-bottom: 1px solid rgba(212, 160, 136, 0.2);
+    }
+    .service-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem;
+      color: var(--cream);
+    }
+    .service-meta {
+      font-size: 0.8rem;
+      color: var(--rosegold);
+      margin-top: 0.25rem;
+    }
+    .service-price {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem;
+      color: var(--rosegold-light);
+      font-weight: 600;
+    }
+    @media (max-width: 768px) {
+      .split-hero { grid-template-columns: 1fr; }
+      .hero-media { min-height: 350px; }
+      .media-card { width: 90%; border-radius: 120px 120px 0 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="#" class="brand">GLOW ATELIER</a>
+    <div style="font-size:0.75rem; letter-spacing:0.15em; color:var(--rosegold);">PRIVATE SKINCARE RITUALS</div>
+  </header>
+
+  <section class="split-hero">
+    <div class="hero-content">
+      <h1>Radiance sculpted in <span>calm silence</span>.</h1>
+      <p>Bespoke facial architecture, cold-pressed botanical infusions, and non-invasive lifting rituals tailored to your skin rhythm.</p>
+      <button class="btn-gold" onclick="alert('Booking calendar loaded for Glow Atelier.')">Reserve Treatment</button>
+    </div>
+    <div class="hero-media">
+      <div class="media-card">
+        <div style="font-size:2.5rem; margin-bottom:1rem;">✧</div>
+        <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem; color:var(--cream);">The Plateau Botanical Protocol</div>
+        <div style="font-size:0.8rem; color:var(--rosegold); margin-top:0.5rem;">90-Minute Signature Session</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="menu-section">
+    <h2 class="section-title">Curated Treatments</h2>
+    
+    <div class="service-row">
+      <div>
+        <div class="service-name">Highland Hydration Infusion</div>
+        <div class="service-meta">60 MIN • Ultrasonic Hyaluronic + Cold Basalt Stones</div>
+      </div>
+      <div class="service-price">₦42,000</div>
+    </div>
+
+    <div class="service-row">
+      <div>
+        <div class="service-name">Sculptural Buccal Lifting Ritual</div>
+        <div class="service-meta">75 MIN • Deep Tissue Facial Contouring & Lymphatic Drainage</div>
+      </div>
+      <div class="service-price">₦58,000</div>
+    </div>
+
+    <div class="service-row">
+      <div>
+        <div class="service-name">Full Spectrum Collagen Restoration</div>
+        <div class="service-meta">90 MIN • Red Light Phototherapy + Stem Cell Peptide Glaze</div>
+      </div>
+      <div class="service-price">₦75,000</div>
+    </div>
+  </section>
+</body>
+</html>
