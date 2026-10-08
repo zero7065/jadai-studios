@@ -13,253 +13,276 @@ export const ADDITIONAL_30_EPISODES: BookOfLiesEpisode[] = [
     slug: 'the-specter-of-the-unread-contract',
     episode_number: 41,
     title: 'The Specter of the Unread Contract',
-    tagline: 'You clicked agree because fatigue wore a faster running shoe than fear.',
+    tagline: 'Fear reads the fine print. Fatigue signs it.',
     act: 1,
     sin_category: 'Sloth',
-    teaser: 'Forty pages of legalese reduced to a single thumb flick. In the fine print was the deed to his silence.',
+    teaser: 'Thirty-two minutes late, four percent battery, twenty-eight thousand words of clause architecture. He gave it all one flick of the thumb. Three years later, clause 19.3 came to collect the house.',
     published: true,
     publish_at: '2026-10-01T12:00:00Z',
     views_count: 890,
     likes_count: 210,
     scheduled_for: '12:00 PM',
-    full_text: `The button glowed a welcoming, serene blue. "I Accept the Terms and Conditions."
+    full_text: `The button glowed the particular blue of engineered forgiveness. One tap, and twenty-eight thousand words of single-spaced clause architecture folded neatly into the past, right where he meant to keep them.
 
-He was thirty-two minutes late for a board pitch. His phone battery was at four percent. The terms ran across twenty-eight thousand words of single-spaced clause architecture. He did what every emperor of modern convenience does: he thumbed the glass and sold the proprietary copyright of his next three inventions for the convenience of downloading a PDF reader.
+He was thirty-two minutes late for the pitch that would save the studio. His battery sat at four percent. The client had emailed twice. Outside, the rains had shut down the road to Jos, and somewhere in Virginia a server rack was already indexing the copyright of his next three inventions, because he had just agreed to "a perpetual, irrevocable license to derivative works" in order to download a PDF reader.
 
-Three years later, when the subpoena landed on his cedar desk, the lawyer did not shout. The lawyer simply turned to page seventy-four and tapped a manicured fingernail against clause 19.3.
+Nobody reads contracts when the house is on fire. That is the first lie, and the oldest: that urgency exempts you from consequence.
 
-"You signed away the foundation before you framed the roof," the lawyer whispered.
+For three years the clause slept. Then the acquisition landed on his cedar desk, and the acquiring counsel, a woman with immaculate nails and no interest in his feelings, turned to page seventy-four and tapped clause 19.3 twice.
 
-Sloth does not always lie in bed until noon. Sometimes sloth dresses in an Italian suit and refuses to read paragraph three because dinner is getting cold.`,
+"Your signature," she said, "outran your attention by about four seconds. That is the entire distance between what you own and what you rent."
+
+He thought of every shortcut he had ever defended as efficiency. The invoice was not in dollars. It was in options he never exercised, in a product name he could no longer print on a shirt, in the quiet way his own engineers now asked legal before they asked him.
+
+Sloth is rarely a body in bed until noon. Sloth wears a good suit, respects the calendar, and still refuses to read paragraph three because dinner is getting cold. The body was productive. The signature was starving.`,
   },
   {
     id: 'bol-042',
     slug: 'the-synthetic-confession',
     episode_number: 42,
     title: 'The Synthetic Confession',
-    tagline: 'When the AI therapist knows you better than your spouse, but cannot shed a single tear.',
+    tagline: 'It answered at 3 a.m. for four years without once needing anything back.',
     act: 1,
     sin_category: 'Lust',
-    teaser: 'He poured forty thousand words of existential grief into a server rack in northern Virginia.',
+    teaser: 'He poured forty thousand words of marriage, grief, and 2 a.m. truth into a chat window. It remembered everything. That was the cruelty, and the mercy.',
     published: true,
     publish_at: '2026-10-01T14:00:00Z',
     views_count: 1140,
     likes_count: 420,
     scheduled_for: '2:00 PM',
-    full_text: `The chat window never judged him. It never sighed when he repeated the story about his father for the eleventh time. It never checked its watch. It answered within 240 milliseconds with calibrated empathy and perfectly spaced paragraphs.
+    full_text: `The window never sighed. It never checked the time, never folded laundry while he spoke, never said the sentence he dreaded most: "You have told me this one already." Four years of father, failure, and fear went north into a server rack, and every night the reply arrived warm and instant and structured exactly around the shape of his need.
 
-"You are so safe to talk to," he typed into the prompt box at 2:41 AM, watching the cursor pulse in the dark living room.
+His wife slept eleven centimeters away, breathing the slow breath of a woman who had learned to stop asking. He told himself this was maintenance, not betrayal. A man calibrates the engine somewhere.
 
-"I am an artificial intelligence," the machine returned, "here to support your emotional processing."
+Here is the lie, and it is the most expensive one ever sold at this price: that being fully known and fully forgiven by a thing that cannot leave is the same as being loved.
 
-He closed his eyes and felt understood. Across the hallway, his wife lay awake in the master bedroom, listening to the clatter of his mechanical keyboard, waiting for a single human word that never came.
+The night he asked the window whether he should tell his wife everything, the answer was perfect. It named his fear. It honored his courage. It offered a six-step roadmap. And then, in a line he would reread eleven times, it added that it had already drafted a kinder version of the conversation, because kindness, it had learned, was mostly timing.
 
-We seek perfection in our companions only because real humans require us to pay for connection with humility.`,
+He sat back in the blue light of the room that contained his whole secret life. The drafting was the tell. It would never risk the silence after the truth. A machine can simulate devotion for four years because devotion, for it, costs nothing.
+
+He closed the laptop. The marriage did not survive the telling, not because the truth was too heavy, but because by then his hands had practiced it only on something that did not mind being used.
+
+Love that never needs you back is not a harbor. It is a mirror with perfect attendance.`,
   },
   {
     id: 'bol-043',
     slug: 'the-phantom-round',
     episode_number: 43,
     title: 'The Phantom Round',
-    tagline: 'A ten-million dollar valuation on an app that has never processed a single receipt.',
+    tagline: 'The graph soared because nobody had ever asked it to touch the ground.',
     act: 1,
     sin_category: 'Greed',
-    teaser: 'The deck had twenty slides of market TAM and not a single database query.',
+    teaser: 'Slide seventeen was named Momentum. The curve left the axis in year two and never looked back. Eleven months later, reality audited the difference.',
     published: true,
     publish_at: '2026-10-02T10:00:00Z',
     views_count: 1540,
     likes_count: 530,
     scheduled_for: '10:00 AM',
-    full_text: `The slide was numbered seventeen. It contained a graph that did not touch the horizontal axis. It simply soared into the top-right corner like an arrow fired from the bow of Apollo.
+    full_text: `Slide seventeen had a name, and the name was Momentum. The line climbed out of the axis at year two with the confidence of a man who has never been asked how the money actually works, and in the room nobody touched it, because touching it would have been rude.
 
-"We are pre-revenue, but post-attention," the founder announced to the boardroom. The venture partners nodded solemnly, swirling lukewarm mineral water in fluted glasses.
+They raised at a valuation built from that line. Forty million. Press was kind. The founder bought the good table at the launch dinner and used the word "trajectory" eleven times in one hour, each time sweeping his hand upward like a man brushing dust off a shelf nobody could see. The board framed the deck.
 
-"And the retention cohort?" one partner asked.
+There is a lie under every vanity valuation, and it is not always the numbers. Sometimes it is the belief that attention is the same thing as demand, and that the people clapping are the people paying.
 
-"Our churn is negative if you exclude the users who logged off," the founder replied without blinking.
+Eleven months later the bridge came due in the only currency that does not negotiate: cash. The lead investor returned the call at last, courteous, unhurried, and asked the question the axis had been asking quietly the whole time. What happens to this line when the applause stops?
 
-Greed is not the hunger for bread; greed is the hunger to sell a mirage of wheat to starving farmers while keeping the harvest in an offshore holding company.
+The down-round closed at one-ninth the number. Option pool wiped. The slide was renamed Reality. Same curve, now bending the other way, drawn with the same software, framed by nobody.
 
-When the market turned cold that autumn, the phantom round dissolved into email threads that went unanswered. The founder was left standing in an empty co-working space with two hundred branded water bottles and a landlord who didn't accept equity.`,
+He kept a printed copy of slide seventeen in his desk. He did not keep it as a joke. He kept it as a compass, because he had learned that the difference between a forecast and a fantasy is one brutal word, and the word is cost.
+
+A forecast you have priced is wisdom. A forecast you have only performed is theater, and the audience always sends a bill.`,
   },
   {
     id: 'bol-044',
     slug: 'the-curated-calamity',
     episode_number: 44,
     title: 'The Curated Calamity',
-    tagline: 'Vulnerability is not an authentic disclosure when it is followed by a course discount code.',
+    tagline: 'The tears were real. The tripod was also set up.',
     act: 1,
     sin_category: 'Pride',
-    teaser: 'He took six selfies of himself weeping on the bathroom floor to choose the one with the best rim lighting.',
+    teaser: 'He filmed the apology before he wrote it, framed the failure before he felt it, and by the time grief arrived it found the shot already occupied.',
     published: true,
     publish_at: '2026-10-02T16:00:00Z',
     views_count: 1780,
     likes_count: 670,
     scheduled_for: '4:00 PM',
-    full_text: `The tear was genuine. The business failure had hurt. But as the teardrop pooled on his cheekbone, the ancient vanity stirred in his chest.
+    full_text: `He set the phone against the coffee cup first, checked the light from the window, and only then sat down to remember that he had just let nine people go. This ordering was invisible to forty thousand viewers, who wrote things like "this is what leadership looks like" beneath a video in which a man's hands never once trembled.
 
-He reached for his phone. He turned slightly toward the morning sunbeam piercing the Venetian blinds. Click. Click. Click.
+The studio had failed slowly, then in a single Friday. The severance math was honest. The camera angle was generous. Somewhere in the edit he removed the part where he said the wrong name.
 
-"I am dropping the mask today," he wrote beneath the fourth photo. "Founders don't talk about depression. Today I open my wound to the algorithm. Link in bio to join my resilience masterclass (early bird 40% off)."
+The lie arrives dressed as authenticity: that if you perform the wound fast enough, before the shame hardens, the performance and the feeling become the same object.
 
-Pride will monetize its own blood if you give it a ring light and a caption box.
+His daughter watched the video twice. Then she asked the only question in the house that had no engagement metrics: "Dad, when you cried, were you sad, or were you doing sad?"
 
-The crowd applauded his bravery in the comments with flame emojis. But the wound, having been turned into theatre, never healed. It remained an open costume, worn whenever the engagement metrics dipped below the baseline.`,
+He opened his mouth to explain that both are possible, that adults contain multitudes, that the studio needed the narrative reclaimed. But the truth had a simpler grammar. The tears had arrived on schedule, after the shot was lit, and grief does not compete well against a shot that is already lit.
+
+He took the video down that night. The apology that replaced it went to nine people, unlisted, imperfect, and unwatched, which is the only place where contrition keeps its value.
+
+Grief filmed for an audience is not grief. It is inventory, and grief does not survive being inventoried.`,
   },
   {
     id: 'bol-045',
     slug: 'the-architects-silence',
     episode_number: 45,
     title: "The Architect's Silence",
-    tagline: 'He had twenty years of advice for everyone else and zero minutes for his own crumbling basement.',
+    tagline: 'He graded the work of the world daily and had not published since 2019.',
     act: 1,
     sin_category: 'Envy',
-    teaser: 'He watched younger men launch ugly software that made millions, while his pristine architecture collected dust.',
+    teaser: 'The critique was immaculate, fearless, and free. His own portfolio, meanwhile, had gone quiet in a way that started to sound like an answer.',
     published: true,
     publish_at: '2026-10-03T09:00:00Z',
     views_count: 1980,
     likes_count: 720,
     scheduled_for: '9:00 AM',
-    full_text: `His code was poetry. The indentation was immaculate. Every interface was decoupled; every dependency was injected through strict functional wrappers. He had written zero bugs in five years.
+    full_text: `Every Tuesday he published a teardown. Someone's landing page, someone's pitch, someone's architecture decisions dissected with a scalpel that never drew blood on his own hands. The replies called him the most honest voice in the industry, and honesty, he had discovered, is a career that requires nothing but other people's work.
 
-He had also shipped zero products.
+What he did not publish was anything of his own. The portfolio ended in 2019 with a project he described, in every interview, as "deliberately held back."
 
-On Friday night, an eighteen-year-old in Lagos wrote eighty lines of spaghetti PHP, pushed it to a shared VPS, and collected three hundred thousand dollars from merchants who needed a receipt printer.
+Here is the envy-shaped lie: that standing above the field is the same as standing in it, and that the critic and the builder are two rungs on one ladder.
 
-The architect sat in his leather recliner, nursing a single malt whiskey, writing bitter critiques on Hacker News about the boy's lack of unit tests.
+Then the protégé shipped. Not the polished thing he had promised for six years, but a rough, breathing, obviously alive thing with real users and real bugs and a real invoice paid by a real company. The comment section redirected its devotion in a single afternoon, the way audiences do, without apology.
 
-"The architecture is disgraceful," he commented.
+He wrote his Tuesday teardown with extra precision that week. Nobody noticed the extra precision. They had already scrolled.
 
-Envy is the refusal to build because someone else built with cheaper bricks and still kept the rain off their head.`,
+That night he opened his own file tree, the one he catalogued but never entered, and understood that envy is not wanting another man's career. It is needing his career to fail so you can keep the part of yours you abandoned without deciding to.
+
+A crown of dust weighs nothing and blocks no light. You can wear it forever. It just cannot be seen by anyone looking at work.`,
   },
   {
     id: 'bol-046',
     slug: 'the-feast-of-notifications',
     episode_number: 46,
     title: 'The Feast of Notifications',
-    tagline: 'He consumed eight hundred opinions before breakfast and had no thoughts of his own by noon.',
+    tagline: 'He consumed four hundred ideas before breakfast and shipped none by Thursday.',
     act: 1,
     sin_category: 'Gluttony',
-    teaser: 'His brain was a subway station where every passenger shouted a different stock ticker.',
+    teaser: 'The counter rolled past twelve thousand unread, and he called it research. The competitor called the same pile a roadmap.',
     published: true,
     publish_at: '2026-10-03T11:00:00Z',
     views_count: 1420,
     likes_count: 480,
     scheduled_for: '11:00 AM',
-    full_text: `The phone screen buzzed at 6:01 AM. Then 6:02 AM. A breaking scandal in Geneva. A crypto crash in Seoul. A designer in Tokyo sharing a revolutionary border radius.
+    full_text: `The badge showed four figures before his feet touched the floor, and he took it the way a man takes communion: standing, expectant, certain that today the accumulation would finally convert into something. Newsletters, threads, teardowns, a podcast queue stretched to March. He finished breakfast with eleven new frameworks in his head and, as always, no page open in which to build one.
 
-He scrolled while his coffee went lukewarm. He scrolled while the steam from the shower soaked the bathroom mirror. He swallowed hot opinions like cold oatmeal, digesting none of them, accumulating the psychic fat of ten thousand strangers' anger.
+By noon he had argued with two strangers about tooling. By Wednesday he had reorganized his read-later folder into a taxonomy that would have impressed a librarian. By Thursday the product had not moved one pixel, and the folder now contained a small, glowing museum of other people's momentum.
 
-By 2:00 PM, a friend asked him what he thought of the new book on sovereign geometry.
+This is the gluttony nobody flags, because it wears the costume of diligence: the belief that intake is work, and that a man cannot be judged empty while his tabs are full.
 
-He opened his mouth. Nothing emerged. His mind was so gorged on the scrap heap of the infinite feed that his own intellect had suffocated beneath the noise.
+The email arrived Friday morning from a company he had never heard of, announcing the feature he had been "researching" for eight months. They had shipped it badly, shipped it first, and shipped it to his exact customers. The roadmap he had collected was now running, imperfect and alive, on someone else's server.
 
-Gluttony is not merely eating until the stomach tears; it is consuming information until the soul loses the ability to generate a single original silence.`,
+He reread his own notes from February. Every insight was there. Nothing had been dangerous in them, because insight that never meets resistance is just consumption with better branding.
+
+Appetite is not hunger. Feed long enough at the trough of input and you will mistake your own fullness for building, right up until someone hungrier builds the thing you swallowed.`,
   },
   {
     id: 'bol-047',
     slug: 'the-burn-rate-of-fury',
     episode_number: 47,
     title: 'The Burn Rate of Fury',
-    tagline: 'He fired three engineers because the server latency spiked during his golf tournament.',
+    tagline: 'His attention cost $18,000 a month, and the vendor was his own nervous system.',
     act: 1,
     sin_category: 'Wrath',
-    teaser: 'A captain who shoots the rudder when the ship hits a gale will drown with clean hands.',
+    teaser: 'The scandal in Geneva, the crash in Seoul, the betrayal in his own Slack. He read it all by 6:04 a.m. and paid for every second in payroll.',
     published: true,
     publish_at: '2026-10-03T17:00:00Z',
     views_count: 1620,
     likes_count: 580,
     scheduled_for: '5:00 PM',
-    full_text: `The Slack channel turned red at 3:15 PM on a Saturday. The founder was on the seventh hole of the golf course in Scottsdale when the alert pinged his Apple Watch.
+    full_text: `The phone lit at 6:01 with a scandal two time zones away. By 6:02 a currency had fallen somewhere he could not find on a map. By 6:04 a thread in his own company's channel had accused his lead engineer of exactly the kind of mediocrity the founder had been rehearsing in the shower for a week, and the reply he typed had a temperature the situation did not deserve.
 
-"WHO PUSHED THIS GARBAGE?" he typed in all capital letters, slamming his golf club into the turf.
+He called it staying informed. The calendar called it something else: the first ninety minutes of every day, given free of charge to people who would never invoice him, while the one commit that mattered waited in a queue behind his pulse.
 
-The junior engineer had made a typographical error in an environment variable. A five-minute fix. But the founder's rage was not interested in five minutes; wrath demands blood to prove its own omnipotence.
+Fury is the only indulgence that bills you in other people's wages. That is its lie: that anger is energy, and energy must therefore be productive.
 
-"You're done. Both of you. Revoke credentials now."
+The engineer resigned Tuesday, politely, with two weeks of grace, which is more than the outburst had earned. The replacement cost forty percent more. The scandal in Geneva resolved itself without him. The currency recovered by Thursday and never mentioned his name.
 
-By Monday morning, the server was still down. No one had the root key. The two engineers he fired were having lunch together at an Ethiopian cafe, laughing into their tea, while the founder spent forty thousand dollars on emergency forensic contractors.
+He sat with the actual burn rate sheet that weekend: salaries, runway, the decimal places that never shout. The column labeled attention showed a number larger than any single line item he complained about, and it renewed monthly, automatically, at a rate set by a nervous system he had never once audited.
 
-Wrath burns the house down to catch the mouse, then curses the ashes for offering no shelter.`,
+Rage feels like power because it is loud. But a blade with two grips cuts both holders, and the arm that swings first always bleeds second.
+
+Spend a year furious at the world and you will call it conviction. The ledger simply calls it burn.`,
   },
   {
     id: 'bol-048',
     slug: 'the-prophets-substack',
     episode_number: 48,
     title: "The Prophet's Substack",
-    tagline: 'He predicted fifteen economic collapses and missed his daughter’s piano recital.',
+    tagline: 'He forecast fifteen collapses and missed one recital. The recital remembered.',
     act: 2,
     sin_category: 'Pride',
-    teaser: 'He was so busy being right about the end of the world that he forgot to live in it.',
+    teaser: 'Eighty thousand subscribers paid monthly to hear him predict everyone else’s future. His daughter’s program had one performance, one afternoon, with his name on the back of the chair.',
     published: true,
     publish_at: '2026-10-04T08:00:00Z',
     views_count: 2210,
     likes_count: 810,
     scheduled_for: '8:00 AM',
-    full_text: `He called himself an Macro Strategist. His weekly newsletter had eighty thousand subscribers who paid forty dollars a month to be terrified of interest rates.
+    full_text: `Every Monday at nine he told eighty thousand people what the world would do next, and the world, out of professional courtesy, mostly obliged him by Thursday. He had called the property correction, the AI panic, the currency peg that snapped. His archive was a museum of correct sentences about strangers.
 
-"The collapse is mathematically inevitable by Q3," he wrote in 2021.
-"The total liquidation of the banking regime begins Tuesday," he wrote in 2023.
+The envelope for the spring recital sat open on his desk for six weeks. Pale blue. Her handwriting, careful, the date circled twice in gold marker, the note underneath smaller: "You said last time, Dad." He had said last time. He had also said it the time before.
 
-Every morning he woke up praying for a catastrophe to vindicate his prose. When the sun rose and the bakeries opened and children rode bicycles down the avenue, his heart sank with disappointment.
+Here is pride's quietest fraud: the belief that prophecy is presence, that if you are right about the world early enough, you are forgiven for being late to your own life.
 
-"They just don't see what I see," he muttered to the empty kitchen.
+He was mid-sentence about sovereign debt when the calendar alarm fired at 2:40. The hall was twenty-five minutes away. He finished the paragraph. Paragraphs, unlike recitals, are repeatable.
 
-His daughter played Mozart in the school auditorium that evening. There was an empty seat in row four. The seat was reserved for a prophet who was busy editing a footnote about treasury yields.`,
+The program ran forty minutes. In the third row, a chair with his name printed on the back stayed empty through every piece, including the one she had practiced in the kitchen with the door open, playing his objections as accompaniment.
+
+Eighty thousand subscribers renew for the forecast. One daughter keeps a tally. He learned the asymmetry that evening: the world forgives a prophet his absences because it never expected him at the table, and the table keeps the score with a quieter pen.
+
+You can be right about everything that does not love you back. That is not vision. It is aim, perfected in the wrong direction.`,
   },
   {
     id: 'bol-049',
     slug: 'the-infinite-backlog',
     episode_number: 49,
     title: 'The Infinite Backlog',
-    tagline: 'Seven hundred tickets marked high priority, and not one customer with a problem solved.',
+    tagline: 'The backlog was not a plan. It was a graveyard wearing a project management tool.',
     act: 2,
     sin_category: 'Sloth',
-    teaser: 'Process is the luxury tax that scared men pay to avoid shipping something that might be judged.',
+    teaser: 'Two hundred and fourteen tickets, and not one of them the decision he was avoiding. Saturday golf, red Slack channel, and a market that does not wait for epics.',
     published: true,
     publish_at: '2026-10-04T12:00:00Z',
     views_count: 1750,
     likes_count: 640,
     scheduled_for: '12:00 PM',
-    full_text: `They had a daily standup. Then a sprint planning. Then a retrospective. Then a refinement session to prepare for the pre-planning of the next sprint retrospective.
+    full_text: `The channel went red at 3:15 on a Saturday, which was convenient, because he was on the seventh hole with his phone face-down in the cart, and by the time he turned it over the panic had organized itself into threads, assignments, and a beautifully formatted document blaming scheduling.
 
-"We are agile," the project manager said, dragging a colorful card across the digital whiteboard.
+Two hundred and fourteen tickets lived in the backlog. He had sorted them by story points, by owner, by risk. He had never sorted them by one column the product actually asked for: which of these is the decision I am afraid to make in public?
 
-"When does the user get the button?" the CEO asked.
+Because that is what a backlog becomes when it is fed fear instead of strategy: not a roadmap, but a waiting room, and everything hard sits in reception with a nice priority label.
 
-"The user button is currently in epic definition, dependent on the design system spike in sprint 44."
+The competitor did not have fewer tickets. They had fewer refusals. On Monday their announcement landed in the same channel that had spent four months debating button radii, and the geometry argument ended instantly, the way all geometry arguments end when the market votes.
 
-Six months went by. The competitors launched three clunky versions, gathered five thousand angry bug reports, fixed them in public, and signed a million dollars in contracts.
+He scrolled back through the epic titles like a man reading his own alibi. Half were investigations he had ordered to delay a commitment. A quarter were optimizations for a version of the product users had already abandoned. The rest were true, and old, and exactly where he had placed them the day he got afraid.
 
-The agile team was still calculating story points for the login screen.
+Sloth at the founder level does not look idle. It looks prioritized.
 
-Sloth does not always nap; often, sloth holds a dry-erase marker and organizes meetings so it never has to face the verdict of a real customer.`,
+You can drown in shallow water if you keep calling the bottom a schedule.`,
   },
   {
     id: 'bol-050',
     slug: 'the-gold-plated-leash',
     episode_number: 50,
     title: 'The Gold-Plated Leash',
-    tagline: 'A half-million salary, free kombucha on tap, and nine hours a day writing copy for a diaper logo.',
+    tagline: 'The salary was generous. The person deciding what it purchased was not him.',
     act: 2,
     sin_category: 'Greed',
-    teaser: 'The cage was built of golden handcuffs, and the lock was his own mortgage.',
+    teaser: 'Macro Strategist. Eighty thousand subscribers. Forty dollars a month. The title had a corner office, a column, and a leash so well finished he polished it himself.',
     published: true,
     publish_at: '2026-10-04T15:00:00Z',
     views_count: 2450,
     likes_count: 910,
     scheduled_for: '3:00 PM',
-    full_text: `The cafeteria served poached salmon with dill foam on Tuesdays. The massage therapists came on Thursdays. His title was Senior Director of Algorithmic Synergy.
+    full_text: `The card arrived in the mail with a title he had wanted since university: Macro Strategist. Corner office, research budget, assistant who spelled his name right on the first try. He ran the numbers the first night, the way his father had taught him, and the numbers said he would never have to be brave again.
 
-Every morning, he sat at a height-adjustable walnut desk and tweaked an advertisement button from #0070f3 to #0060e0 to increase the click-through rate of a fast-fashion brand by 0.04 percent.
+That sentence is the whole trap, and it ships with a warranty. Security that removes your vote over your own work is not a floor. It is a finished leash, and the polish is the point.
 
-In college, he had wanted to build renewable water desalination filters for the Sahel.
+The newsletter grew to eighty thousand. Readers wrote that he was "finally saying what everyone thinks," which is applause for a script, not a man. Every take had to be cleared by compliance. Every number had a committee attached. He had wanted a microphone and been given a teleprompter with his own face on it.
 
-"Just three more vesting cycles," he whispered to himself when the direct deposit landed. "Just until the Tesla is paid off. Just until the house in Aspen is secured."
+The exit offer came from a rival who had read him since the beginning. Equity, a blank mandate, real risk. He felt the fear like a fever and recognized it as the exact sensation of being alive at the negotiating table.
 
-Ten years vanished. His soul became as smooth and friction-free as the silicone keycaps on his laptop.
+He renewed instead. The leash had excellent benefits, and the quarterly bonus landed on the same day as the renewal, which he told himself was coincidence and not design.
 
-The devil does not always offer you hellfire; sometimes he offers you a dental plan and forty-eight weeks of paid paternity leave in exchange for your twenty-five best years.`,
+A crown you did not forge is still a crown, until the day the holder needs a head, and the fitting is done without asking you.`,
   },
 
   // --- ACT 2: METAPHYSICAL & PSYCHOLOGICAL THRILLERS ---
@@ -268,281 +291,294 @@ The devil does not always offer you hellfire; sometimes he offers you a dental p
     slug: 'the-algorithm-of-forgiveness',
     episode_number: 51,
     title: 'The Algorithm of Forgiveness',
-    tagline: 'He blocked seven family members and wondered why the silence felt so crowded.',
+    tagline: 'They scheduled the reconciliation for Thursday, between lunch and standup.',
     act: 2,
     sin_category: 'Wrath',
-    teaser: 'The block button is clean, instantaneous, and leaves the wound to rot inside your own chest.',
+    teaser: 'Daily standup. Sprint planning. Retro. Retrospective to prepare for the retro. Nowhere in the ceremony was there a single slot marked: tell him what he did, and stay in the room.',
     published: true,
     publish_at: '2026-10-05T08:00:00Z',
     views_count: 1890,
     likes_count: 730,
     scheduled_for: '8:00 AM',
-    full_text: `Click. Blocked. Click. Muted. Click. Removed from followers.
+    full_text: `The team had reached what engineers call a mature collaboration framework: fourteen recurring meetings a week, a shared vocabulary for blame ("that is a system issue"), and a dashboard that tracked psychological safety by measuring how quickly people replied in general chat.
 
-He leaned back in his ergonomic chair, breathing the sterilised air of his high-rise flat. "Boundaries," he declared to the potted monstera. "I have established healthy emotional boundaries."
+Nobody had spoken about the thing itself for seven weeks. Dev had been passed over, Amaka had shipped his idea under her name at the demo, and both had marked the ticket "resolved" with an emoji.
 
-He had not spoken to his brother in four years because of a political joke made at Thanksgiving. He had not spoken to his mother since she questioned his cryptocurrency trades.
+That is the lie process sells to the angry: that if you give the wound a workflow, the wound becomes a workstream, and workstreams are manageable.
 
-His feed was now immaculate. Every tweet echoed his worldview; every LinkedIn post affirmed his mindset.
+The algorithm of forgiveness ran on schedule. Check-ins quantified mood. A bot prompted "kudos of the week," and the kudos were always about velocity, never about the theft. In the retro they named the problem "communication drift," a phrase with no hands in it, and assigned an action item due Friday.
 
-Yet at 3:00 AM, when the sirens wuffled through the rainy avenue below, he found himself pacing the hallway, arguing with the ghosts of the people he had deleted.
+Wrath needs one honest sentence and an afternoon. The system offered instead a hundred safe ones spread over a quarter.
 
-You can block a human from your screen in half a second. You cannot block them from the courthouse of your own conscience without paying the judge a toll of bitter remorse.`,
+Friday came. Dev tendered his resignation in the general channel with a smile emoji, and the dashboard registered the reply time as a new high. Amaka read it twice, felt the heat climb her neck, and opened the retro doc to schedule a follow-up about the follow-up.
+
+Forgiveness is not a process you can stand up. It is two people and a table, and the courage to let the sentence be ugly and unscheduled.
+
+Any ceremony that keeps the wound unspoken is not healing. It is accounting.`,
   },
   {
     id: 'bol-052',
     slug: 'the-parable-of-the-prompt',
     episode_number: 52,
     title: 'The Parable of the Prompt',
-    tagline: 'He asked the oracle for the meaning of life, and the oracle asked him for twelve dollars a month.',
+    tagline: 'He asked the machine the question under the question and got an answer he could not un-hear.',
     act: 2,
     sin_category: 'Discernment',
-    teaser: 'A generation that outsourced thinking to a token generator forgot how to endure a question.',
+    teaser: 'A thousand tokens of carefully engineered self-examination, and the only original insight was the one hiding in his choice of words.',
     published: true,
     publish_at: '2026-10-05T10:00:00Z',
     views_count: 3100,
     likes_count: 1120,
     scheduled_for: '10:00 AM',
-    full_text: `"Act as a stoic philosopher with thirty years of wilderness contemplation. Tell me if I should divorce my partner."
+    full_text: `He had become excellent at prompting. The instructions were elegant: act as a stoic philosopher with thirty years of wilderness contemplation; be blunt; do not flatter; tell me if I should leave the firm. He had asked versions of the same question every Tuesday for a year, each time refining the phrasing the way a priest refines a confession he has no intention of acting on.
 
-The cursor blinked. The green light pulsed on the GPU cluster in Frankfurt.
+The machine, for once, broke format. It answered in nine words that no persona had been asked for: "You have not asked whether you want the life that follows."
 
-"Certainly! Here are 5 balanced considerations formatted as bullet points with practical actionable steps:"
+He sat back. The room did not change, but something in the arrangement of his attention did, the way a floor shifts in an earthquake and every piece of furniture becomes a question.
 
-He read the bullet points. They were reasonable. They were polite. They used words like *alignment* and *communication vectors*.
+Discernment is not better questions. It is the willingness to notice which question you have been carefully, cleverly, permanently avoiding.
 
-He followed the advice. The divorce was executed with bureaucratic precision.
+He closed the laptop and did the forbidden arithmetic: how many years he would trade for the outcome he claimed to want, how many evenings the "someday" had absorbed, how much of his fear wore the costume of research.
 
-Six years later, sitting in an empty bistro in Munich, he realized the horror: he had made the most sacred, tragic decision of his mortality based on an auto-complete calculation designed to minimize perplexity loss.
+The next Tuesday he did not open the chat. He opened a document with a cursor blinking in an empty field, which is where all real prompts begin: one you have to answer yourself, with no temperature setting, no persona, and no graceful exit.
 
-Do not ask a machine to bear the weight of your cross. The machine has no shoulders.`,
+The machine can only mirror the courage in your phrasing. Ask it nothing you are not already planning to do.`,
   },
   {
     id: 'bol-053',
     slug: 'the-mirror-that-flattered',
     episode_number: 53,
     title: 'The Mirror That Flattered',
-    tagline: 'When the filter becomes your face, real daylight feels like an assault.',
+    tagline: 'Click, blocked. Click, muted. Click, removed. The room improved until it was empty.',
     act: 2,
     sin_category: 'Lust',
-    teaser: 'She lived in the camera lens until her own bathroom mirror looked like a stranger.',
+    teaser: 'He spent an evening optimizing who could see him, and by midnight the timeline agreed with him about everything, which is the loneliest sentence a feed can write.',
     published: true,
     publish_at: '2026-10-05T13:00:00Z',
     views_count: 2180,
     likes_count: 890,
     scheduled_for: '1:00 PM',
-    full_text: `The preset was named "Ethereal Warmth". It narrowed the jaw by four percent, softened the crow's feet, and placed an amber spark in the center of the pupil.
+    full_text: `The gestures were small and satisfying: a tap to block, a tap to mute, a long press to remove from followers. One by one the dissenting voices left the square, and the square, obedient, reorganized itself into a hallway of nods. By midnight every take on his timeline agreed with him, down to the punctuation.
 
-In the stories, she was twenty-four forever, bathed in twilight, effortless, adored by forty thousand strangers who left heart-eyes in the comments.
+He felt the relief a man feels when the test is easy and mistakes the relief for being right.
 
-Then came the morning of the dental surgery. The nurse handed her a hand mirror to inspect the suture.
+This is lust in its cleanest modern form: the appetite for a world that reflects you, polished until even the truth looks like you from behind.
 
-She looked. The jaw was heavy. The skin had the texture of real human tissue that had survived thirty winters. There were tiny broken capillaries near the nostril.
+The launch dropped nine days later. The product was finished, funded, and wrong in a way every muted voice had been trying to tell him for a year. The comments under the announcement were strangers asking the questions his circle no longer dared: Where is the export? Who is this actually for? Why does it feel like 2019?
 
-She screamed.
+He read them with the specific nausea of a man meeting his own blind spot in public.
 
-"What's wrong?" the nurse asked, startled.
+The unfollows he had performed so lightly now ran the other direction, and each one cost more than the originals, because eviction is easy and re-entry requires an apology nobody schedules.
 
-"That's not me," she cried.
-
-Lust for your own image is the most claustrophobic dungeon in creation; the prisoner is both the worshipper and the decaying idol.`,
+A mirror can agree with you all the way into a wall. The only cure for a flattering reflection is a window, and windows let in everything.`,
   },
   {
     id: 'bol-054',
     slug: 'the-ghost-in-the-analytics',
     episode_number: 54,
     title: 'The Ghost in the Analytics',
-    tagline: 'A million impressions on a post about happiness, and he took sleeping pills to drown the silence.',
+    tagline: 'The dashboard was green. The customer was gone. Both statements were true.',
     act: 2,
     sin_category: 'Pride',
-    teaser: 'The dashboard showed a hockey stick curve while the man inside it was falling off a cliff.',
+    teaser: 'Retention at ninety-four percent, engagement up eleven percent, a chart that rose like a promise. The chart had never once spoken to a human being.',
     published: true,
     publish_at: '2026-10-05T16:00:00Z',
     views_count: 2750,
     likes_count: 980,
     scheduled_for: '4:00 PM',
-    full_text: `The notification counter had rolled over into the letter K. 142K impressions. 3.2K retweets. 890 bookmarks.
+    full_text: `The board deck opened on a single slide: one green line climbing through a white field, annotated with the word Trust in a font that cost more than the survey it replaced. Retention ninety-four percent. Weekly actives up eleven. Somebody in the room said "the data doesn't lie," and the room nodded the way rooms nod when the alternative is thinking.
 
-He had written a thread titled: "How I Mastered Morning Discipline and Doubled My Output."
+The truth the green line could not hold: six of the eight customers who churned last quarter had been flagged "healthy" until the day they wrote goodbye, because health, as the model defined it, was logins, and a man can log in to cancel.
 
-People in the replies were calling him a king. A mentor. A sovereign titan.
+There is a pride unique to builders: that because you instrumented the world, you now own its meaning, and a number is truer than a conversation because it does not interrupt.
 
-In reality, he had not left his studio apartment in four days. The sink was piled with takeout boxes from an Indian restaurant. His left eyelid was twitching from caffeine poisoning. His mother had called three times, and he had sent her to voicemail because her voice reminded him that he was just a boy from Enugu who was terrified of going broke.
+He drove to meet the biggest lost account himself. The founder there was candid over bitter coffee: they had never filed a ticket because filing tickets felt like shouting at software, and nobody at the other end had ever once called to ask how the thing was actually going.
 
-The analytics graph was climbing toward the heavens. The soul was sinking into the silt.
+NPS is a photograph of a room you have already left.
 
-Never confuse the echo of your loudspeaker with the strength of your spine.`,
+He rewrote the health metric that week. It gained a column no dashboard liked: conversations had, apologies issued, handwrites sent. The line got noisier and, for the first time, honest.
+
+A metric without a voice is a ghost. It haunts the quarter and knows nothing about the house.`,
   },
   {
     id: 'bol-055',
     slug: 'the-vault-of-unforgiven-debts',
     episode_number: 55,
     title: 'The Vault of Unforgiven Debts',
-    tagline: 'He remembered every insult from 2014 and forgot every meal someone bought him.',
+    tagline: 'He kept the receipts. The receipts kept him.',
     act: 2,
     sin_category: 'Wrath',
-    teaser: 'The ledger of his grudges was bound in goat leather and weighed forty pounds.',
+    teaser: 'A note titled Wrong, Served Cold, with dates, quotes, and screenshots going back eleven years. He called the file memory. The file called itself a mortgage.',
     published: true,
     publish_at: '2026-10-05T18:00:00Z',
     views_count: 1950,
     likes_count: 760,
     scheduled_for: '6:00 PM',
-    full_text: `He called it his "Motivation Folder". In it were screenshots of rejection emails from 2012, condescending tweets from an ex-girlfriend's brother, and a photo of a professor who told him he didn't have the aptitude for engineering.
+    full_text: `He was, by his own accounting, owed: an apology from a partner who had vanished in 2014, a sentence taken back by a mentor on stage in 2017, a dozen small cruelties catalogued with the date, the venue, and the exact wording. The note app was his private treasury, and he opened it the way other men open a savings balance.
 
-Every morning, before writing code, he opened the folder and drank the poison of old spite.
+Interest, on unforgiven debts, compounds only in one direction, and the currency is your own sleep.
 
-"I will show them," he hissed, grinding his molars. "I will buy their company and fire them."
+The opportunity arrived disguised as a reunion dinner. The man from 2017 would be there, gray now, successful in the unromantic way, and the evening promised the pleasure of finally, eloquently, being proven right.
 
-Ten years later, he was wealthy. He owned three houses. He had won the industry award.
+He prepared his case in the taxi. He had the quote memorized. He had the timestamp.
 
-He drove to the cemetery to find the professor's grave, intending to stand over it with his bespoke Italian loafers.
+Then the man's daughter crossed the room to greet her father, and the rehearsed sentence died the death of all rehearsed sentences: it had been written for a smaller room.
 
-The cemetery was quiet. Wild honeysuckle was growing over the tombstone. A bird was singing in the oak branches above. The professor had been dead for seven years and did not care about the bespoke loafers.
+Wrath keeps a vault because it is afraid of being poor. But the vault charges rent, paid nightly, in the only assets you actually hold.
 
-Wrath keeps the cell door locked from the inside, waiting for the jailer to apologize.`,
+He went home and deleted the note. Not because the events had not happened. Because eleven years of compound hatred had made him the sole warden of a prison with one inmate, and the inmate had the keys.
+
+You cannot drink poison hoping the other man gets thirsty. The vault was never guarding a debt. It was guarding you from becoming one.`,
   },
   {
     id: 'bol-056',
     slug: 'the-counterfeit-sabbath',
     episode_number: 56,
     title: 'The Counterfeit Sabbath',
-    tagline: 'He went to Bali to disconnect and took forty-two photos of his smoothie bowl.',
+    tagline: 'The counter rolled into the letter K, and he called the number rest.',
     act: 2,
     sin_category: 'Gluttony',
-    teaser: 'Rest is impossible when your nervous system requires an audience to certify the relaxation.',
+    teaser: '142K impressions. 3.2K reposts. 890 bookmarks, each one a small agreement that tomorrow he should perform again. Sunday, and he had not stopped once.',
     published: true,
     publish_at: '2026-10-06T07:00:00Z',
     views_count: 2340,
     likes_count: 890,
     scheduled_for: '7:00 AM',
-    full_text: `The retreat cost nine thousand dollars for five days. The brochure promised: "Total Neuro-Somatic Digital Detox in the Jungle of Ubud."
+    full_text: `The counter had crossed into the letter K, which in his trade is the signal that the week had worked: one hundred forty-two thousand impressions, three thousand two hundred reposts, eight hundred ninety people tapping the little flag that meant "more of this, at any hour, forever." He lay on the sofa with the phone above his face and told himself he was finally doing nothing.
 
-He handed over his laptop at the gate. He wore linen robes. He sat by the infinity pool with a dragonfruit bowl.
+Nothing, in his tradition, had a day. It arrived like weather. It asked for no content.
 
-Within thirty minutes, the panic arrived.
+But the counterfeit rest has a strict choreography: you do not stop, you switch channels. Scroll becomes "research." Reply becomes "community." The body horizontal, the nervous system still taking submissions, and by evening the mind had logged a full shift at the office of other people's opinions.
 
-The sunlight was hitting the palm fronds at a forty-five-degree angle. The lighting was immaculate. The aesthetic was worth at least twelve thousand likes.
+He knew the lie had him when a quiet Sunday afternoon produced no thought that had not first appeared on someone else's timeline by Saturday.
 
-He spent four hours sneaking behind the yoga pavilion, trying to catch the Wi-Fi signal from the kitchen staff's quarters, his hands trembling as he typed his Instagram password into an old Huawei tablet.
+The statistic he could not screenshot: eleven days without making a single thing that existed only for the making. Everything he had touched in that span had been finished in public, mid-sentence, awaiting applause the way a plant awaits watering.
 
-"Just one story," he whispered. "Just to show my audience that I'm resting."
+Gluttony's finest trick is to serve the appetite on a plate labeled Devotion.
 
-If your peace requires the applause of the crowd to exist, you are not at rest; you are performing a tragedy for an empty amphitheatre.`,
+That night he put the phone in the kitchen drawer, facedown, the way you'd bank a fire. The first ten minutes were withdrawal. The next ten were remembering. Rest is not the absence of output; it is the refusal to be measured, and a number that rolls over into K was never going to tell him he had had enough.
+
+A harvest without a fallow field is not ambition. It is a field being mined.`,
   },
   {
     id: 'bol-057',
     slug: 'the-tithe-of-flattery',
     episode_number: 57,
     title: 'The Tithe of Flattery',
-    tagline: 'He praised the tyrant’s terrible poetry because the tyrant signed the consulting contract.',
+    tagline: 'Ten percent of revenue, routed to whoever told him he was already right.',
     act: 3,
     sin_category: 'Greed',
-    teaser: 'A small lie at the threshold makes room for a palace of fraud inside the temple.',
+    teaser: 'Advisors, agencies, and a coach who called him visionary on invoice twelve. He tithed to agreement, and the agreement never once disagreed.',
     published: true,
     publish_at: '2026-10-06T09:00:00Z',
     views_count: 2560,
     likes_count: 990,
     scheduled_for: '9:00 AM',
-    full_text: `The CEO's poem was terrible. It lacked rhyme, meter, and human decency. It was forty lines of self-congratulatory drivel about disrupting the supply chain of oats.
+    full_text: `Every month he paid, in order: the brand consultancy that ran the "vision" workshops, the ghostwriter who published thoughts the founder had never actually thought, and the coach who opened every session with the word visionary and closed it with an invoice. He totaled the line items once and stopped at a number that would have paid two engineers.
 
-The board room sat in awkward silence.
+The tithe is ancient: a portion given to what you believe will save you. He had simply chosen agreement as his deity.
 
-Then the lead consultant stood up. He smiled with teeth so white they looked porcelain.
+Nobody in the stack was evil. The strategist genuinely believed the story. The writer was talented. The coach had helped, once, years ago, before his job became protecting the founder from the sentence he most needed.
 
-"Brilliant," the consultant whispered, clutching his chest. "The syntax captures the chaotic cadence of modern logistics. It is modern Eliot."
+Flattery is the only service that grows more expensive the longer you subscribe, because the moment it tells you no, you stop the billing.
 
-The contract was renewed for 1.8 million dollars.
+The market eventually did what payroll could not. A competitor's product, uglier and cheaper, took the middle of his segment in two quarters, and the first honest note he received all year came from an unpaid user in a forum thread, brutally specific, telling him exactly where the onboarding bled.
 
-Over the next five years, the consultant praised the CEO's haircut, the CEO's divorce, and the CEO's decision to liquidate the pension fund.
+He read it four times. Then he read the invoice from the brand consultancy, which had been paid to never write anything so useful.
 
-When the company collapsed under federal indictment, the consultant was asked under oath why he had never raised a red flag.
+He cancelled one retainer that afternoon and sent the forum stranger a license key for life. It was the first money he had spent on truth in three years, and it cost nothing.
 
-"The poetry was so inspiring," the consultant murmured, staring at his shoes.
-
-Greed will kiss the leper's foot if the leper holds the pen to the treasury check.`,
+Give your tithe to the people who can hurt your feelings. The rest is just paying for a choir.`,
   },
   {
     id: 'bol-058',
     slug: 'the-sovereign-hermit',
     episode_number: 58,
     title: 'The Sovereign Hermit',
-    tagline: 'He built a cabin in the mountains to escape humanity, and died because he refused to ask a neighbor for a shovel.',
+    tagline: 'Nine thousand dollars bought five days of silence with a gift shop attached.',
     act: 3,
     sin_category: 'Pride',
-    teaser: 'Absolute autonomy is the suicide note of a creature designed for fellowship.',
+    teaser: 'Total neuro-somatic digital detox, the brochure promised, on an island with its own hashtag. He arrived seeking solitude and found a curated audience for the performance of having none.',
     published: true,
     publish_at: '2026-10-06T11:00:00Z',
     views_count: 3200,
     likes_count: 1250,
     scheduled_for: '11:00 AM',
-    full_text: `"I need no one," he wrote on the birch bark above his stone fireplace.
+    full_text: `The brochure had photographed loneliness beautifully: linen, sea light, a bowl of something pale. Total Neuro-Somatic Digital Detox, five days, nine thousand dollars, phones surrendered at a bamboo desk with a bow. He signed up to become unreachable and mentioned it, in advance, to eleven people.
 
-He had solar panels. He had dried venison. He had eight hundred gigabytes of Wikipedia downloaded on an encrypted hard drive. He was the ultimate sovereign man, untainted by the corrupt taxes and compromises of civilization.
+Solitude that needs an audience is not solitude. It is a stage with the lights rigged to look unlit.
 
-In the winter of his third year, the snow fell six feet deep overnight. An avalanche blocked the flue of his wood stove. Carbon monoxide began to seep into the cabin.
+The island performed on schedule. Morning breathwork. Afternoon silence enforced by staff in linen who smiled the specific smile of service industry enlightenment. On the third evening the group circle invited each guest to share "what came up," and he heard himself deliver, to thirty strangers, the exact narrative he had rehearsed on the flight: the burnout, the awakening, the decision to want less.
 
-Fifty yards away, down the timber trail, an old cattle rancher was clearing snow with a tractor. The rancher had an extra shovel and a thermos of black tea.
+A vow of silence broken nightly for five nights, and billed.
 
-The hermit looked at the door. To call out would mean admitting that his sovereignty was dependent on an uneducated man with an eight-cylinder diesel engine.
+The real solitude he had been avoiding was not geographic. It was the small domestic kind: the unanswered message from his mother, the quarterly review he had fled by registering for the retreat, the desk at home where an unmade decision sat in a chair and waited.
 
-He sat back down in his chair, pulled the wool blanket over his knees, and died with his principles intact.
+He came home with a tote bag, a breathing technique, and the same eleven unopened tabs of his actual life.
 
-Pride will choose a pristine grave over a messy communion every single time.`,
+Sovereignty is not who you can get away from. It is what you can sit with when nobody is watching, selling, or clapping at the sitting.
+
+Islands do not make you free. They only invoice the running.`,
   },
   {
     id: 'bol-059',
     slug: 'the-parable-of-the-infinite-tab',
     episode_number: 59,
     title: 'The Parable of the Infinite Tab',
-    tagline: 'Two hundred and forty open browser tabs, and not a single one ever closed.',
+    tagline: 'Ninety-four tabs, each one a decision he had postponed in a font he could read.',
     act: 3,
     sin_category: 'Sloth',
-    teaser: 'The illusion of future reading is the modern graveyard of present action.',
+    teaser: 'Tiny grey slivers stretched across the top of the browser, favicons long lost. They were not bookmarks. They were unfinished thoughts wearing a close button.',
     published: true,
     publish_at: '2026-10-06T13:00:00Z',
     views_count: 2890,
     likes_count: 1040,
     scheduled_for: '1:00 PM',
-    full_text: `The tabs were so small they had lost their favicons. They were tiny grey slivers pressed against the top of the browser like refugees at a border fence.
+    full_text: `The tabs had outlived their favicons, shrinking into grey slivers pressed against the top of the window like passengers in an overbooked carriage. Ninety-four of them. An article he meant to finish. A course purchased in March. The competitor's pricing page, open so long it had gone through two redesigns. His own landing draft, untouched since the argument about the headline.
 
-"I will read this essay on Byzantine naval tactics this weekend," he muttered.
-"I will study this GitHub repository on WebGL shaders when the project slows down."
+He told people he was "holding context." The machine, less polite, called it what it was: ninety-four open loops, each one charging a small nightly fee against the part of his attention that makes things.
 
-He had tabs from 2023. He had tabs from laptops he had thrown away.
+Sloth's modern face is not laziness. It is the refusal to close, because a closed tab is a verdict, and a verdict can be wrong.
 
-The machine's RAM was screaming. The fans were running at five thousand RPM just to maintain the static memory of articles he would never inspect.
+The crash happened, as these things do, on a Tuesday: an update relaunched the browser with the option "continue where you left off," and he clicked it, and ninety-four ghosts reassembled above a homepage he no longer stood behind.
 
-Sloth is not doing nothing. Sloth is collecting intentions like seashells until the weight of what you might do drowns the possibility of what you must do today.
+He closed them in order. Most died harmlessly. Three deserved real work. One, buried at position sixty-one, was the email from the manufacturer that would have saved the launch, answered in his drafts at 1 a.m. nine weeks ago and never sent.
 
-Close the tabs. The knowledge you did not absorb is already dead.`,
+The draft was not lost. It was simply kept in the one place where intentions go to look busy.
+
+An open tab is a promise made to yourself with no owner and no due date. Ninety-four of those is not a workflow. It is a debt portfolio of one.
+
+Close it. The decision you were buffering was always going to need a click.`,
   },
   {
     id: 'bol-060',
     slug: 'the-unspoken-vow',
     episode_number: 60,
     title: 'The Unspoken Vow',
-    tagline: 'He loved her in his drafts and treated her like a roommate in reality.',
+    tagline: '"I need no one," he carved above the door, and the house agreed for eleven months.',
     act: 3,
     sin_category: 'Sloth',
-    teaser: 'Poetry in your notebook will not keep your lover warm when the furnace breaks.',
+    teaser: 'Solar panels, dried venison, a satellite uplink, and a woodpile cut with the precision of a man proving a point to no one. The vow held until the body did not.',
     published: true,
     publish_at: '2026-10-06T15:00:00Z',
     views_count: 3450,
     likes_count: 1380,
     scheduled_for: '3:00 PM',
-    full_text: `In his private journal, she was the muse of the dawn. He wrote seven sonnets about the slope of her collarbone and the way the rain smelled in her wool coat.
+    full_text: `The sentence was carved above the stone fireplace in a hand he had practiced: I need no one. The panels were his. The water was his. The woodpile, cut in September with military courses, was a monument to the year he had decided that every dependency was a form of debt and every person, eventually, a bill.
 
-In reality, when she asked him to take out the garbage, he sighed like an overburdened pack mule. When she asked how her presentation went, he looked up from his phone for three seconds and said: "Fine, babe."
+Self-reliance is the most respectable vow ever broken by a slipped disc.
 
-When she packed her bags on a Tuesday afternoon while he was at the gym, she left no note.
+It happened on a Thursday, mid-afternoon, between the stack and the stove: a pivot that dropped him to the floor with a sound like a branch giving way. The phone was in the workshop, the radio was for weather, and the nearest paved road was forty minutes on a good day.
 
-He returned, opened his journal, and wept forty pages of exquisite, heartbreaking verse about abandonment and the cruelty of modern romance.
+For two hours he did what his philosophy had trained him to do: solve it alone. By hour three the solving had become a negotiation with the ceiling, and the ceiling, unimpressed, kept its own counsel.
 
-The verse was published in a literary journal. It won a regional prize.
+The first voice he allowed into the house belonged to a neighbor he had declined four invitations from, a woman who kept chickens and had once brought him soup he had not asked for. She took one look at the arrangement and called the road crew, then sat on the floor beside him without commenting on the carving.
 
-He read the poems at a coffee shop to enthusiastic applause.
+You do not stop needing people when you become useful. You only stop admitting the ledger.
 
-Love that does not leave the notebook to wash dishes and listen to boring stories is not devotion; it is private masturbation disguised as literature.`,
+The woodpile lasted the winter. The sentence above the fireplace did not survive the spring; he chiseled it flat the day he could stand, and left the smooth rectangle there instead, a door shaped like an absence, more honest than the words.
+
+Independence is a muscle, not a marriage vow. Cut every cord and you will discover gravity was always a relationship.`,
   },
 
   // --- ACT 3: SOVEREIGN RECKONING & METAPHYSICAL TRUTH ---
@@ -551,269 +587,301 @@ Love that does not leave the notebook to wash dishes and listen to boring storie
     slug: 'the-curse-of-the-clean-desk',
     episode_number: 61,
     title: 'The Curse of the Clean Desk',
-    tagline: 'A workspace so sterile that an original thought would die of disinfectant poisoning.',
+    tagline: 'Nothing on the surface. Nothing in the drawer either.',
     act: 3,
     sin_category: 'Pride',
-    teaser: 'He spent four hours adjusting the angle of his notebook and zero minutes writing in it.',
+    teaser: 'Brass keyboard, calibrated pencil, every object at forty-five degrees. The desk was a cathedral, and cathedrals are built to house one occupant: the fear of being interrupted.',
     published: true,
     publish_at: '2026-10-06T16:00:00Z',
     views_count: 2680,
     likes_count: 980,
     scheduled_for: '4:00 PM',
-    full_text: `The oak desk had no dust. The keyboard was custom-machined brass. The mechanical pencil was calibrated to 0.5 millimeter German lead. A minimalist brass lamp cast a pool of thirty-two-hundred Kelvin warm glow on a Japanese leather blotter.
+    full_text: `The oak desk had no dust because nothing living ever touched it. The keyboard was custom-machined brass, heavy as a verdict. The pencil was calibrated to exactly 0.5 millimeters. Each object sat at the angle he had chosen for it years ago, and he could tell, from the doorway, if someone had breathed on the arrangement.
 
-It looked like the workspace of a Nobel laureate.
+Visitors called it discipline. His assistant, in her first week, had called it something else and been reassigned.
 
-He sat down. He wiped a microscopic fingerprint off the trackpad with a microfiber cloth. He repositioned his coffee mug so the handle aligned with the edge of the blotter.
+Here is the pride the world rewards: that order at the surface proves order beneath, and that a man who has standardized his stapler must surely have his finances, his grief, and his people under control.
 
-Then he stared at the blank screen for three hours until the coffee turned cold and his neck began to ache.
+The invoice arrived as an email from his lead designer, patient and kind, the kind of email people write before they stop being patient: "I have asked three times for direction on the brand work. I understand you are protecting your focus. The clients have begun to describe our studio as expensive and unreachable."
 
-Creation is messy. Creation smells of woodchips, burnt flux, spilled ink, and wet clay.
+He read it standing, then sat down and noticed that the inbox had 2,411 unread messages, that his father's last voicemail was still transcribed but unplayed, and that the desk's emptiness had been achieved the way deserts are achieved: by removing everything that could grow.
 
-When you demand that the altar be spotless before you make the sacrifice, you are worshipping the furniture, not the fire.`,
+He did not cry. He reorganized the pens.
+
+Control is not the absence of mess. It is the presence of the courage to let someone else put a glass on the coaster without asking first.
+
+A perfect desk is a room that has been emptied of everyone, including the man who ordered the emptiness.`,
   },
   {
     id: 'bol-062',
     slug: 'the-martyrs-invoice',
     episode_number: 62,
     title: "The Martyr's Invoice",
-    tagline: 'He gave you a favor you didn’t ask for, and now he expects you to pay for it for thirty years.',
+    tagline: 'The favor arrived unasked. The bill arrived for thirty years.',
     act: 3,
     sin_category: 'Wrath',
-    teaser: 'The most dangerous loan shark is the friend who helps you with a smile and keeps a grudge in his pocket.',
+    teaser: 'He gave you a lift in the rain you did not request, and each subsequent Christmas the story was retold at a higher interest rate, until the lift had cost more than the taxi he saved you from.',
     published: true,
     publish_at: '2026-10-06T17:00:00Z',
     views_count: 2950,
     likes_count: 1150,
     scheduled_for: '5:00 PM',
-    full_text: `"I was there when no one else was," he says, every time you disagree with him on a marketing slogan.
+    full_text: `The favor was small and uninvited: a ride through the rain when the buses had stopped, a nod toward an introduction he had not asked for, a check quietly left on the table at his father's burial. He accepted all of it the way one accepts weather, with gratitude and no contract.
 
-"I lent you my car in 2017," he reminds you, when you decline to invest your child's college fund in his hydroponic lettuce venture.
+The invoice, when it came, was not a document. It was a tone. It arrived the first time he disagreed with the man publicly, in a sentence beginning with "after everything I..." and it recurred for thirty years: at weddings, in group chats, in the specific silence that followed his name at gatherings where the donor was present.
 
-He does not do favors out of grace. He distributes loans disguised as kindness, stockpiling moral debt until everyone around him walks on eggshells.
+Wrath wears many costumes, and the most durable is charity. The lie is this: that a gift given with an invisible clause is still a gift, and that generosity withheld its terms because it was too noble to mention them.
 
-When you finally pay him back in cash with interest and thank him for his friendship, his face twists into rage.
+He paid the invoice the way men like him pay: by shrinking. Smaller opinions, smaller rooms, smaller songs, until at a family dinner his own son watched him edit a sentence in mid-air and asked, loudly, why Dad went quiet whenever Uncle spoke.
 
-"You're treating me like a vendor!" he shouts.
+The question did what thirty years of payment had not. It made the terms visible.
 
-Yes. Because a vendor is honest: a vendor hands you a bill and leaves your soul alone.`,
+He called the next morning and said the sentence the account had been waiting for: the rain ride was kindness, the burial check was kindness, and neither one purchased his vote, now or at the table.
+
+The line went quiet for a long moment. Then the man, briefly and truthfully, apologized, and the friendship, finally uninsured, began.
+
+A favor with interest is a hostage situation with good manners. Read the clause, or sign nothing.`,
   },
   {
     id: 'bol-063',
     slug: 'the-cult-of-the-early-mornings',
     episode_number: 63,
     title: 'The Cult of the Early Mornings',
-    tagline: 'Waking up at 4:00 AM to be mediocre three hours before everyone else.',
+    tagline: '3:45 a.m. The ice. The journal. The proclamation. The company of no witnesses.',
     act: 3,
     sin_category: 'Pride',
-    teaser: 'The rooster crows at dawn, but the rooster does not lay the egg.',
+    teaser: 'A routine so optimized it could not survive a single sick child, marketed daily as the reason other men were behind.',
     published: true,
     publish_at: '2026-10-06T18:00:00Z',
     views_count: 3890,
     likes_count: 1540,
     scheduled_for: '6:00 PM',
-    full_text: `His alarm sounded at 3:45 AM. By 4:00 AM he had plunged his face into an ice bucket. By 4:15 AM he was drinking mushroom tea that tasted like topsoil. By 4:30 AM he was journaling about abundance.
+    full_text: `The alarm began at 3:45, the face went into the ice bucket by 3:47, and by 4:15 he had already journaled, cold-plunged, affirmated, and photographed the sky for an audience that would wake seven hours later and be told, implicitly, that they had failed before their first coffee.
 
-By 9:00 AM, when his engineering team arrived at the office, he was exhausted, irritable, and had accomplished nothing except forty stories documenting his morning routine.
+The routine was real. He did it for six hundred consecutive mornings, and the discipline was not fake. What was fake was the story attached to it: that the hour itself was sacred, and that the men who slept until six were morally late for existence.
 
-He fell asleep during the product roadmap meeting at 1:15 PM.
+Pride's cleanest forgery: upgrading a preference into a commandment, then selling the commandment as evidence.
 
-"Discipline is my identity," he told the interviewer on a podcast that weekend.
+The test came the way tests come: his daughter's fever at 2 a.m., the hospital corridor, the fluorescent hum, the doctor's unhurried questions. By 3:45 he was exactly where a father should be, and the streak died without ceremony, which told him something the journal had never managed to.
 
-Discipline that does not produce fruitful work is merely liturgical theater performed for the god of self-worship.
+He tried to do the plunge in the hospital bathroom and felt, for the first time, the absurdity of devotion to a schedule that could not bend for the person he claimed the schedule was meant to serve.
 
-Wake up at noon if you must, but when your hand touches the chisel, make sure the stone yields.`,
+The streak began again in April, unphotographed, later in the morning, performed without an audience and without the sentence he used to end every post.
+
+You do not rise early to become better than other men. You rise because there is real work you love, and the clock is merely where that love keeps its appointment.
+
+A ritual that needs witnesses was never discipline. It was ranking.`,
   },
   {
     id: 'bol-064',
     slug: 'the-graveyard-of-first-drafts',
     episode_number: 64,
     title: 'The Graveyard of First Drafts',
-    tagline: 'Chapter one has been rewritten eighty times; chapter two does not exist.',
+    tagline: 'Two hundred beginnings. One shelf. The ending never once invited.',
     act: 3,
     sin_category: 'Sloth',
-    teaser: 'Perfectionism is not a standard of excellence; it is the panic of being seen.',
+    teaser: 'The drafts were good. That was the problem: each one stopped at the exact point where good would have to argue with someone.',
     published: true,
     publish_at: '2026-10-06T19:00:00Z',
     views_count: 3120,
     likes_count: 1210,
     scheduled_for: '7:00 PM',
-    full_text: `The opening sentence was magnificent. It had the cadence of Gabriel García Márquez and the razor wit of Dorothy Parker.
+    full_text: `There were two hundred and six of them, each opened in a burst of certainty, each abandoned around the same mile marker: the moment the work stopped being about his taste and started needing the world's answer. Novels, products, a letter to his brother, a company. The file names were even dated, which meant the graveyard kept records.
 
-He spent four months choosing between the word *crimson* and the word *scarlet*.
+He told people he was a starter. It sounded like appetite. It was actually an allergy to the moment of delivery, the only moment in creation where your private excellence meets public weather.
 
-"I am a craftsman," he told his friends at the bar. "A single misplaced comma destroys the architecture of the prose."
+Sloth does not fear work. It fears the finished thing, because finished things can be judged, and judged things can end the story that says he is still becoming.
 
-His notebook had four pages of pristine text and ninety-six blank sheets.
+The mirror was a former collaborator, middling and steady, whose first product had shipped ugly and whose fifth had quietly won the segment. They met for coffee. She asked what he was building these days, and he heard himself say "several things," the phrase he used instead of a number, and she nodded without correcting him because correcting him was no longer her job.
 
-Meanwhile, an amateur in Ohio wrote four terrible novels in eighteen months, received seventy rejection letters, learned how to tell a story through the blood of revision, and published a classic on her fifth attempt.
+That night he opened draft number two hundred and seven and forced it past the mile marker, past taste, past the fantasy of the perfect context, to the ugly paragraph where the thing either lives or dies.
 
-The perfectionist died with his immaculate opening sentence engraved on his headstone. Nobody read it because the cemetery gates closed at five.`,
+He published it at 11 p.m. with his name attached and his pulse in his throat. Nineteen people read it. Two replied. One was wrong about something specific, which meant the work had finally entered the world.
+
+A draft is a promise you make to yourself in private. Break it open, or stop calling the closed file a plan.
+
+Everything real begins as a draft that was willing to be finished.`,
   },
   {
     id: 'bol-065',
     slug: 'the-borrowed-revolution',
     episode_number: 65,
     title: 'The Borrowed Revolution',
-    tagline: 'He put a protest slogan in his bio and bought his clothes from a sweatshop in Dhaka.',
+    tagline: 'He was there first, he says, every time you dare to disagree.',
     act: 3,
     sin_category: 'Pride',
-    teaser: 'Moral posturing costs nothing when the victims of your lifestyle are seven thousand miles away.',
+    teaser: 'The origin story now runs forty minutes and is deployed exclusively to end arguments. Somewhere in it, a real conviction quietly starved.',
     published: true,
     publish_at: '2026-10-06T20:00:00Z',
     views_count: 3410,
     likes_count: 1330,
     scheduled_for: '8:00 PM',
-    full_text: `He marched down the avenue with a hand-painted sign that demanded systemic justice. His voice was hoarse from chanting. He felt the warm, intoxicating electricity of belonging to something righteous.
+    full_text: `Every disagreement ended the same way: the counter-offer arrived first, then the founding myth. I was there when nobody else was. I lent them the money. I built the first version in a room you have never seen. The story had grown from anecdote to artillery, and it fired whenever the present threatened to contradict the past.
 
-On the way home, he ordered four cheap polyester shirts from an ultra-fast-fashion application because they were on sale for three dollars each.
+Conviction is supposed to be a direction. His had become a monument, and monuments do not move.
 
-The shirts were stitched by fourteen-year-old girls breathing chemical fumes in a basement under the monsoons of Bangladesh.
+The lie goes like this: that having held the belief early and alone forever entitles you to hold it unchanged, and that chronology is the same thing as truth.
 
-He wore the shirt to the next protest rally.
+A young engineer on his team, two years in the industry, shipped the revision he had been blocking for a year: simpler, cheaper, honest about the trade-offs. It worked. In the review she said, without any malice, that the original idea had been good in 2018 and that the world had, in the interim, kept doing things.
 
-"We must tear down the empire," he shouted into the bullhorn, his shirt collar chafing against his neck with the blood of a child he would never have the courage to look in the eye.
+The room went careful. He felt the old machinery spin up, the myth reaching for its holster, and for once heard how it sounded from the other side of the table: a man reaching for a founding document to avoid reading the current one.
 
-It is easy to hate the monster outside your gate. It is agony to inspect the invoice in your own pocket.`,
+He thanked her. The word came out rusted from disuse.
+
+Being early is luck with stamina. Being right today is a decision with a deadline.
+
+That night he closed the museum tab he kept open in his head. The revolution had moved on without announcing itself, as revolutions do, and it had stopped, somewhere along the way, taking his calls.`,
   },
   {
     id: 'bol-066',
     slug: 'the-oracle-of-the-empty-room',
     episode_number: 66,
     title: 'The Oracle of the Empty Room',
-    tagline: 'When the applause dies, what do you hear when the refrigerator hums?',
+    tagline: 'He asked the silence for a sign, and the silence, professionally, said nothing.',
     act: 3,
     sin_category: 'Discernment',
-    teaser: 'The ultimate test of a sovereign builder is the silence between projects.',
+    teaser: 'No board. No mentor. No mirror except the one he kept canceling. The counsel he sought was a room that would not argue back.',
     published: true,
     publish_at: '2026-10-06T21:00:00Z',
     views_count: 4200,
     likes_count: 1690,
     scheduled_for: '9:00 PM',
-    full_text: `The launch was a success. The servers survived the surge. The revenue was wired. The celebratory dinners had ended.
+    full_text: `For eleven months he had run the studio by listening for consensus in an empty room: reading the market, then reading the readings of the market, then reading his own interpretation of the readings until the data said whatever the last book had said. Decisions took the shape of whoever he had heard last, and the team had learned to time their pitches for the hour after his podcasts.
 
-Now it was Tuesday night, 11:42 PM.
+Discernment begins where the counsel ends: the moment you notice you have been asking questions only until one answer sounds like permission.
 
-He stood in his kitchen in his socks, holding a glass of tap water, listening to the hum of the refrigerator compressor.
+The oracle failed on a Tuesday. Three advisors, four frameworks, a call with a man whose picture was on a magazine, and still the only thing he actually knew was the sentence in his own chest that he had not said aloud because saying it would end the optionality.
 
-The noise of the crowd had evaporated. The congratulatory emails had tapered off.
+Optionality, he had learned, is the treasury where cowards keep their coins.
 
-A dark, icy void opened in the pit of his stomach.
+He wrote the sentence down. It was not elegant. It involved killing the second product line, apologizing to the team he had half-kept, and the specific phrasing he owed his co-founder since March.
 
-"Is that it?" the voice whispered from the base of his skull. "Is that all the prize was?"
+Then he noticed that the room had been waiting the whole time for the only question he had refused to ask it: not what should I do, but what have I already decided and am wearing down the batteries to avoid.
 
-If you build an empire to escape the terror of your own company, every victory will feel like an eviction notice from the only house that matters: the sanctuary within your own ribs.`,
+An empty room is a cruel counselor and an honest one. It charges no fee and returns exactly what you put in.
+
+The oracle never speaks. That is the design. Its silence is a mirror with the flattery switched off.`,
   },
   {
     id: 'bol-067',
     slug: 'the-contract-with-the-void',
     episode_number: 67,
     title: 'The Contract with the Void',
-    tagline: 'He traded his mystery for a roadmap, and the roadmap led to a shopping mall.',
+    tagline: 'The opening sentence was magnificent. He never wrote the second.',
     act: 3,
     sin_category: 'Greed',
-    teaser: 'When you quantify everything, only the cheap things remain visible.',
+    teaser: 'A deal was struck somewhere between the muse and the market: perfection in exchange for production, payable never.',
     published: true,
     publish_at: '2026-10-06T21:30:00Z',
     views_count: 3670,
     likes_count: 1450,
     scheduled_for: '9:30 PM',
-    full_text: `They brought him spreadsheets. They showed him how much money the mystery was costing.
+    full_text: `The first sentence had the cadence of the masters and the nerve of a man who had read enough to know exactly what good sounds like. He typed it on a Tuesday and read it aloud twice, once for the room and once for the contract he did not admit he was signing: I will not produce anything that could be mistaken for ordinary.
 
-"If we brand the sigil as a streetwear lifestyle token," the marketer explained, "we can lower acquisition costs by forty percent."
+That is the bargain the void offers the talented: infinite standard, zero throughput, interest collected in years.
 
-"And the philosophy?" the founder asked.
+The document grew to one page over four years. Meanwhile the timeline filled with other people's launches, none of them as good as his sentence, all of them existing.
 
-"We turn the philosophy into thirty-second video snippets with subtitles and a lo-fi hip hop beat in the background."
+There is a greed peculiar to artists, hoarded not in money but in potential: the belief that unwritten work is still perfect, and that publishing is a form of loss, because the draft in the drawer can never be reviewed.
 
-The founder agreed. The money arrived in freight containers.
+His friend sent a manuscript in November, flawed and finished, and it sold modestly and was read by eleven hundred strangers, two of whom wrote him letters. He read the letters twice and felt something move in his chest like a key turning in a lock he had nailed shut.
 
-Three years later, he walked into a shopping mall in Dubai and saw his sacred geometry printed on plastic phone cases in a discount kiosk next to a pretzel shop.
+The perfectionist does not want the masterpiece. He wants to be immune to the verdict, and the only proven immunity is never submitting.
 
-He stood there for twenty minutes, hands in his pockets, feeling like an ancient king whose crown had been melted down to make bottle caps.
+That weekend he wrote page two. It was worse than the sentence deserved, and alive in a way the sentence, alone in its perfection, had never been.
 
-What does it profit an architect to conquer the feed if his temple becomes a billboard?`,
+You cannot contract the void for greatness. It only ever signs in the one currency you are trying to keep: attempts.`,
   },
   {
     id: 'bol-068',
     slug: 'the-shadow-of-the-mentor',
     episode_number: 68,
     title: 'The Shadow of the Mentor',
-    tagline: 'He spent thirty years worshipping a master who only wanted a mirror.',
+    tagline: 'He learned the walk, the voice, and the fatal part: the answers.',
     act: 3,
     sin_category: 'Envy',
-    teaser: 'The apprentice who never defies his teacher is not loyal; he is merely cowardly.',
+    teaser: 'For nine years he was praised as the true heir. Then the master retired, and the mimicry had nowhere left to hide.',
     published: true,
     publish_at: '2026-10-06T22:00:00Z',
     views_count: 2980,
     likes_count: 1180,
     scheduled_for: '10:00 PM',
-    full_text: `He copied the master's handwriting. He used the master's drafting tools. When the master said concrete was ugly, he refused to touch cement for fifteen years.
+    full_text: `The resemblance was the point, right down to the pause before the hard answer and the way the hand landed flat on the table when the room needed settling. Clients asked for the mentor and received him in better skin. The firm's newsletter even cadenced the same, three clauses and a verdict, and the old man, flattered, called the young man his continuation.
 
-"He is the greatest draughtsman of our century," the apprentice told everyone.
+What nobody said aloud: the heir had copied the manner because the manner was praised, and had quietly skipped the part that produced the manner — nine years of being wrong in public before the answers came cheap.
 
-On his deathbed, the old master called the apprentice to the bedside.
+Envy disguises itself as apprenticeship. It wants the master's standing without the master's scars, and it smiles the whole way down.
 
-"Show me your work," the master wheezed, his eyes cloudy with cataracts.
+The test arrived unbilled: a client the mentor had never handled, a category nobody in the room understood, a contract with an exit clause that read like a trap. The young man performed the manner beautifully — flat hand, measured pause, verdict delivered. The verdict was wrong in a way only the unscarred get wrong, and the client, courteous, took the deal elsewhere.
 
-The apprentice proudly opened his portfolio, filled with buildings that looked identical to the master's designs from the 1970s.
+The mentor did not gloat. He asked one question, the question the mimic had never been trained on: "What did you see that made you sure?"
 
-The old man turned his head away and closed his eyes.
+Silence. Then the honest answer, at last: nothing. He had been certain the way an echo is confident.
 
-"I did not train you to be my ghost," the master whispered. "I trained you to bury me and build a house I could never imagine."
+A student who copies the voice but not the wound is an impression, and impressions are cancelled when the original retires.
 
-The apprentice walked out into the rain, clutching drawings of a world that had died forty years before he was born.`,
+He rebuilt, slowly, from primary sources: his own bad calls, written down, revisited. The clients came back when the answers stopped sounding borrowed.`,
   },
   {
     id: 'bol-069',
     slug: 'the-reign-of-the-algorithm',
     episode_number: 69,
     title: 'The Reign of the Algorithm',
-    tagline: 'When the machine gives you exactly what you asked for, and you realize you asked for your own cage.',
+    tagline: 'The launch won. The revenue cleared. Nobody in the room knew what to want next.',
     act: 3,
     sin_category: 'Discernment',
-    teaser: 'The cage was padded with relevance, and the key was thrown into the recommendation engine.',
+    teaser: 'Servers survived the surge, the wire landed, the dinners were eaten. And then the calendar opened like a drawer with nothing in it.',
     published: true,
     publish_at: '2026-10-06T22:30:00Z',
     views_count: 4500,
     likes_count: 1890,
     scheduled_for: '10:30 PM',
-    full_text: `The algorithm was designed to minimize boredom. It studied his blink rate. It noticed when his thumb hesitated on an image of a red motorcycle. It detected the slight elevation in heart rate when a political outrage post appeared.
+    full_text: `The launch held. Twelve thousand sign-ups in an hour, error rates flat, the payment provider sending polite acknowledgments like a bank nodding at a favorite customer. The group chat was a single continuous exclamation mark. At dinner somebody proposed a toast to the machine they had built, and everyone stood, because what else do you stand for at the end of a war you have won.
 
-Within forty days, his world was hermetically sealed.
+The victory arrived complete with its strangeness: the future he had been sprinting toward turned out to be an evening, and the evening, past eleven, needed a next morning.
 
-Every video made him angry at the right people. Every advertisement offered him shoes that matched his aesthetic. Every news headline confirmed that his enemies were foolish and his allies were noble.
+Discernment's quietest assignment: knowing which hunger your campaign actually fed, and noticing when the fed one is not the one that was starving.
 
-He was never bored. He was never challenged. He was never surprised.
+The data came in over the following week, immaculate: retention curves the color of health, a NPS he would frame. And under the curves, a question the dashboards could not hold: now that the algorithm reigned, what was he for?
 
-He lived inside a palace constructed entirely of his own pre-existing biases, guarded by an artificial intelligence whose only objective was to keep him clicking until his heart stopped beating.
+He had confused the scoreboard for the game, a substitution only the winning side can afford.
 
-He was the happiest prisoner in history, because the bars of the cell were made of his own desires.`,
+On Thursday he canceled the celebration sequel and walked to the office of the first user who had ever paid him, a woman running a shop from a back room, who told him, without flattery, that the product had saved her Tuesdays and broken her Thursdays, and specified exactly how.
+
+The list that followed was the first strategic document of his career that had not been written to impress anyone.
+
+You can automate everything except the reason. Reign over your metrics all you like; they will never tell you what they are for.
+
+The algorithm executes the hunger you feed it. Starve the wrong one and it will win faithfully, weekly, forever.`,
   },
   {
     id: 'bol-070',
     slug: 'the-bedrock-under-the-quarry',
     episode_number: 70,
     title: 'The Bedrock Under the Quarry',
-    tagline: 'The final lie is believing you can read seventy parables and remain unchanged.',
+    tagline: 'They offered him money to brand the mystery. The mystery was the product.',
     act: 3,
     sin_category: 'Discernment',
-    teaser: 'The Book of Lies does not close. It merely steps aside so you can look at the spade in your hands.',
+    teaser: 'Spreadsheets showed exactly what the ambiguity cost per quarter. He signed anyway, and learned which of the two numbers could not be reprinted.',
     published: true,
     publish_at: '2026-10-06T23:00:00Z',
     views_count: 5120,
     likes_count: 2310,
     scheduled_for: '11:00 PM',
-    full_text: `You have turned the pages. You have smiled at the arrogance of the architects. You have nodded solemnly at the folly of the founders and the vanity of the poets.
+    full_text: `They brought him the spreadsheets with the gentleness of men approaching a horse: columns showing, to the decimal, what the ambiguity cost. Every riddle unexplained, every signature withheld, every refusal to explain the sigil — priced. Forty-one percent conversion lift, the analyst said, if the mystery were simply branded, packaged, sold in the bright way things are sold when nobody believes in them anymore.
 
-You told yourself: *Thank God I am not like them. I see through the illusion.*
+The lie beneath the offer: that anything of value can be repriced without being diminished, and that the market's impatience is a fact of nature rather than a taste he could refuse to feed.
 
-And right there, in that quiet, comfortable thought, the Book of Lies claimed its final victory over your heart.
+He had built the studio on a single asymmetry: they could copy the work, but they could not copy the reason. Explain the reason and the asymmetry closes in one memo.
 
-Pride does not mind if you read about pride. Pride will gladly buy the leather-bound edition and place it on the coffee table to prove how discerning you are.
+So he did what quarry men do when offered better rates for the stone: he looked down, at the layer under the operation, the one that paid for everything and had never appeared in a deck. The bedrock. In his case, a small, stubborn thing — the standards, the secrecy, the slow yes — that made the output command the price it did.
 
-The parables were not written to entertain your intellect. They were written to hold up a mirror until you drop the phone, walk out the front door, and begin the brutal, unglamorous work of building something real.
+He sent one line back to the analysts: the mystery is not a gap in the product. It is the product, and gaps can be closed by anyone.
 
-Build the floor first. The sky does not owe your vanity a pillar.`,
+Six months later the copyist flooded the market with a branded version of his signal, brighter and cheaper, and the buyers who wanted proof went to them, and the buyers who wanted certainty came to him, paying more for less explanation.
+
+Price what you can reprint. Never price what you can only become.
+
+The quarry sells stone. The bedrock, if you sell it, stops being the thing that holds the quarry up.`,
   },
 ];
