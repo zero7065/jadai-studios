@@ -30,7 +30,6 @@ export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const { currency, setCurrency } = useCurrency();
   const [previewTemplate, setPreviewTemplate] = useState<TemplateItem | null>(null);
-  const [purchasedTemplate, setPurchasedTemplate] = useState<TemplateItem | null>(null);
   const { showToast } = useToast();
 
   if (hasError) return <DefensiveFallback />;
@@ -85,18 +84,22 @@ export default function MarketplacePage() {
         }),
       });
 
-      await res.json();
-      setPurchasedTemplate(template);
-      setPreviewTemplate(null);
+      const data = await res.json();
+
+      if (data?.success && data.authorization_url) {
+        setPreviewTemplate(null);
+        showToast(`Redirecting to secure Paystack checkout for ${template.name}...`, 'info', 'Checkout Ready');
+        window.location.href = data.authorization_url;
+        return;
+      }
+
+      throw new Error(data?.error || 'Checkout could not be initialized');
+    } catch (err: any) {
       showToast(
-        `Acquisition approved! Repository link unlocked for ${template.name}.`,
-        'success',
-        'Payload Dispatched'
+        err?.message || `Checkout unavailable for ${template.name}. Please try again shortly.`,
+        'error',
+        'Transaction Failed'
       );
-    } catch {
-      setPurchasedTemplate(template);
-      setPreviewTemplate(null);
-      showToast(`Repository token simulated for ${template.name}.`, 'success');
     }
   };
 

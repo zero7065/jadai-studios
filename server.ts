@@ -1,8 +1,8 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { createServer as createViteServer } from 'vite';
 import { getPublicHealth } from './lib/diagnostics/health';
 import { runSelfCheck } from './lib/diagnostics/self-check';
 import { runDiagnosticScan } from './lib/diagnostics/scanner';
@@ -11,30 +11,183 @@ import { getModuleBySlug } from './lib/modules/modules.config';
 import { supabaseAdmin } from './lib/supabase/admin';
 import { invalidateAiCache } from './lib/ai/cache';
 import { invalidateSettingsCache } from './lib/settings';
-import { initializePaystackTransaction, verifyPaystackWebhookSignature } from './lib/paystack';
+import {
+  initializePaystackTransaction,
+  verifyPaystackWebhookSignature,
+  getPaystackSecretKey,
+  STARTUP_PAYSTACK_PLANS,
+  PAYSTACK_PLANS,
+  tierForPlan,
+} from './lib/paystack';
 import { generateGroundedContent } from './lib/ai/grounded';
 import { generateTextWatermarkFooter } from './lib/watermark';
 import { isTransmissionCadenceTime } from './lib/content/delivery';
 import { signalRouter } from './lib/signal/api-router';
+import { checkRateLimit } from './lib/utils/rateLimit';
+import {
+  signAdminToken,
+  verifyAdminToken,
+  verifyPassword,
+  parseCookies,
+  buildAdminCookie,
+  buildClearAdminCookie,
+  ADMIN_COOKIE_NAME,
+} from './lib/auth/admin-session';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function startServer() {
-  const app = express();
-  const port = 3000;
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'jadaistudiosoffcl@gmail.com').toLowerCase();
+
+function validateEnv(): void {
+  const problems: string[] = [];
   const isProd = process.env.NODE_ENV === 'production';
 
-  app.use(express.json());
+  if (isProd) {
+    if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.trim().length < 32) {
+      problems.push('SESSION_SECRET must be a random string of at least 32 characters');
+    }
+    if (!process.env.ADMIN_PASSWORD_HASH) {
+      problems.push('ADMIN_PASSWORD_HASH is required (generate with: npm run gen:admin-hash)');
+    }
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('demo-placeholder')) {
+      problems.push('NEXT_PUBLIC_SUPABASE_URL is not configured');
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY.includes('placeholder')) {
+      problems.push('SUPABASE_SERVICE_ROLE_KEY is not configured');
+    }
+    if (!process.env.CRON_SECRET) {
+      problems.push('CRON_SECRET is required in production (worker endpoints fail closed)');
+    }
+  }
+
+  if (problems.length > 0) {
+    console.error('[JADAI] Fatal environment validation failure:');
+    for (const p of problems) console.error(`  - ${p}`);
+    process.exit(1);
+  }
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getCronAuth(req: express.Request): boolean {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    // Fail closed in production, allow in local development.
+    return process.env.NODE_ENV !== 'production';
+  }
+  const header = req.headers.authorization || '';
+  return header === `Bearer ${cronSecret}`;
+}
+
+async function startServer() {
+  validateEnv();
+
+  const app = express();
+  const port = parseInt(process.env.PORT || '3000', 10);
+  const isProd = process.env.NODE_ENV === 'production';
 
   // ---------------------------------------------------------------------------
-  // 1. PUBLIC HEALTH ENDPOINT
+  // SECURITY, CORS & BODY PARSING
   // ---------------------------------------------------------------------------
-  app.get('/api/health', (req, res) => {
+  const allowedOrigins = new Set(
+    (
+      process.env.CORS_ORIGINS ||
+      'https://jadai.dev,https://www.jadai.dev,http://localhost:3000'
+    )
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean)
+  );
+
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    res.setHeader('X-Powered-By', 'Jadai Studios');
+    if (isProd) {
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.has(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Vary', 'Origin');
+    }
+    if (req.method === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Cron-Secret');
+      res.setHeader('Access-Control-Max-Age', '86400');
+      return res.status(204).end();
+    }
+    next();
+  });
+
+  // Paystack webhook needs the RAW body for HMAC verification, so it skips JSON parsing.
+  app.use((req, res, next) => {
+    if (req.originalUrl === '/api/paystack/webhook') return next();
+    return express.json({ limit: '1mb' })(req, res, next);
+  });
+
+  const rateLimit =
+    (bucket: string, opts: { max?: number; role?: 'anonymous' | 'authenticated' | 'admin' } = {}) =>
+    (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const result = checkRateLimit(`${bucket}:${req.ip || 'unknown'}`, opts.role || 'anonymous', opts.max);
+      if (Number.isFinite(result.limit)) {
+        res.setHeader('X-RateLimit-Limit', String(result.limit));
+        res.setHeader('X-RateLimit-Remaining', String(result.remaining));
+      }
+      if (!result.allowed) {
+        return res.status(429).json({ success: false, error: result.error || 'Too many requests' });
+      }
+      next();
+    };
+
+  const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const header = req.headers.authorization;
+    let token = header && header.startsWith('Bearer ') ? header.slice(7) : undefined;
+    if (!token) {
+      token = parseCookies(req.headers.cookie)[ADMIN_COOKIE_NAME];
+    }
+    const session = verifyAdminToken(token);
+    if (!session) {
+      return res.status(401).json({ success: false, error: 'Admin authentication required' });
+    }
+    (req as any).adminEmail = session.email;
+    next();
+  };
+
+  // Guard every admin route except login/logout (registered before the admin routes below).
+  app.use('/api/admin', (req, res, next) => {
+    if (req.path === '/login' || req.path === '/logout') return next();
+    return requireAdmin(req, res, next);
+  });
+
+  // ---------------------------------------------------------------------------
+  // 1. PUBLIC HEALTH ENDPOINT (also the keep-alive probe — touches the DB so
+  //    Supabase free projects never idle-pause)
+  // ---------------------------------------------------------------------------
+  app.get('/api/health', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    res.json(getPublicHealth());
+    let db: 'up' | 'down' = 'down';
+    try {
+      await supabaseAdmin.from('modules').select('slug', { head: true, count: 'exact' });
+      db = 'up';
+    } catch {
+      db = 'down';
+    }
+    res.json({ ...getPublicHealth(), db });
   });
 
   // ---------------------------------------------------------------------------
@@ -109,14 +262,47 @@ async function startServer() {
     }
   });
 
+  const CUSTOMIZATION_KEY = 'site_customization';
   let serverCustomizationCache: any = null;
-  app.get('/api/admin/customization', (req, res) => {
-    res.json({ success: true, data: serverCustomizationCache });
+  let serverCustomizationCacheAt = 0;
+
+  app.get('/api/admin/customization', async (req, res) => {
+    try {
+      if (serverCustomizationCache && Date.now() - serverCustomizationCacheAt < 15000) {
+        return res.json({ success: true, data: serverCustomizationCache });
+      }
+      const { data } = await supabaseAdmin
+        .from('admin_settings')
+        .select('value')
+        .eq('key', CUSTOMIZATION_KEY)
+        .maybeSingle();
+      const parsed = typeof data?.value === 'string' ? JSON.parse(data.value) : data?.value || null;
+      serverCustomizationCache = parsed;
+      serverCustomizationCacheAt = Date.now();
+      res.json({ success: true, data: parsed });
+    } catch {
+      res.json({ success: true, data: serverCustomizationCache });
+    }
   });
 
-  app.post('/api/admin/customization', (req, res) => {
-    serverCustomizationCache = { ...serverCustomizationCache, ...req.body };
-    res.json({ success: true, message: 'Customization persisted successfully', data: serverCustomizationCache });
+  app.post('/api/admin/customization', async (req, res) => {
+    try {
+      const merged = { ...(serverCustomizationCache || {}), ...(req.body || {}) };
+      const { error } = await supabaseAdmin.from('admin_settings').upsert({
+        key: CUSTOMIZATION_KEY,
+        value: JSON.stringify(merged),
+        category: 'appearance',
+        updated_at: new Date().toISOString(),
+        updated_by: (req as any).adminEmail || 'admin',
+      });
+      if (error) throw new Error(error.message);
+      serverCustomizationCache = merged;
+      serverCustomizationCacheAt = Date.now();
+      invalidateSettingsCache();
+      res.json({ success: true, message: 'Customization persisted successfully', data: merged });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || 'Customization save failed' });
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -309,58 +495,167 @@ async function startServer() {
   // ---------------------------------------------------------------------------
   // 4. ADMIN AUTHENTICATION & RECOVERY
   // ---------------------------------------------------------------------------
-  app.post('/api/admin/login', (req, res) => {
-    const { email, password, passcode } = req.body;
-    const adminEmail = 'jadaistudiosoffcl@gmail.com';
-    const secret = password || passcode;
+  app.post('/api/admin/login', rateLimit('admin_login', { max: 5 }), (req, res) => {
+    try {
+      const { email, password, passcode } = req.body || {};
+      const secret = typeof password === 'string' ? password : typeof passcode === 'string' ? passcode : '';
 
-    if (!secret) {
-      return res.status(400).json({ success: false, error: 'Passcode required' });
+      if (!secret) {
+        return res.status(400).json({ success: false, error: 'Password required' });
+      }
+
+      const submittedEmail = (typeof email === 'string' && email.trim()) || ADMIN_EMAIL;
+      if (submittedEmail.toLowerCase() !== ADMIN_EMAIL) {
+        return res.status(401).json({ success: false, error: 'Invalid admin credentials' });
+      }
+
+      const storedHash = process.env.ADMIN_PASSWORD_HASH;
+      if (!storedHash) {
+        if (isProd) {
+          return res.status(503).json({ success: false, error: 'Admin auth not configured on server' });
+        }
+        const devPassword = process.env.ADMIN_DEV_PASSWORD;
+        if (!devPassword || secret !== devPassword) {
+          return res.status(401).json({ success: false, error: 'Set ADMIN_PASSWORD_HASH (or ADMIN_DEV_PASSWORD locally)' });
+        }
+      } else if (!verifyPassword(secret, storedHash)) {
+        return res.status(401).json({ success: false, error: 'Invalid admin credentials' });
+      }
+
+      const { token, expiresAt } = signAdminToken(ADMIN_EMAIL);
+      res.setHeader('Set-Cookie', buildAdminCookie(token, expiresAt));
+      return res.json({ success: true, role: 'admin', email: ADMIN_EMAIL, token, expiresAt: expiresAt.toISOString() });
+    } catch (err: any) {
+      console.error('[ADMIN LOGIN] error:', err?.message);
+      res.status(500).json({ success: false, error: 'Login failed' });
     }
-
-    if (email === adminEmail || !email) {
-      res.setHeader('Set-Cookie', 'jadai_admin_session=active; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400');
-      return res.json({ success: true, role: 'admin', email: adminEmail });
-    }
-
-    res.status(401).json({ success: false, error: 'Invalid admin credentials' });
   });
 
-  app.post('/api/admin/recovery', (req, res) => {
-    const { passcode, command, payload } = req.body;
-    if (passcode !== '6057') {
-      return res.status(401).json({ success: false, error: 'ACCESS DENIED: Passcode rejected' });
-    }
-
+  // Recovery terminal commands require a full admin session — no magic passcode.
+  app.post('/api/admin/recovery', rateLimit('admin_recovery', { max: 10 }), (req, res) => {
+    const { command, payload } = req.body || {};
     res.json({
       success: true,
-      message: 'Level 0 Recovery command executed successfully',
+      message: 'Recovery command executed',
       command,
       payload,
+      executedBy: (req as any).adminEmail,
     });
   });
 
   app.post('/api/admin/logout', (req, res) => {
-    res.setHeader('Set-Cookie', 'jadai_admin_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0');
+    res.setHeader('Set-Cookie', buildClearAdminCookie());
+    try {
+      delete req.headers.cookie;
+    } catch {}
     res.json({ success: true, message: 'Logged out' });
   });
 
   // ---------------------------------------------------------------------------
   // 5. PAYSTACK PAYMENTS & WEBHOOKS
   // ---------------------------------------------------------------------------
-  app.post('/api/paystack/initialize', async (req, res) => {
-    try {
-      const { email, amountKobo, planId, plan, currency, userId } = req.body;
-      const targetPlan = (plan || planId || 'playground').toLowerCase();
-      const isSignal = targetPlan === 'signal';
-      const defaultAmount = isSignal ? 2500000 : 1500000;
-      const origin = req.headers.origin || 'http://localhost:3000';
+  /**
+   * Applies a verified payment to a user profile + records the subscription.
+   * Returns the assigned canonical tier, or null when no user matched.
+   */
+  async function grantSubscription(params: {
+    plan: string;
+    reference: string;
+    userId?: string | null;
+    email?: string | null;
+    paidMinor: number;
+    currency: string;
+    interval?: string;
+  }): Promise<string | null> {
+    const tier = tierForPlan(params.plan);
 
+    let profileId: string | null = params.userId || null;
+    if (!profileId && params.email) {
+      const { data: profile } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id')
+        .eq('email', params.email.toLowerCase().trim())
+        .maybeSingle();
+      profileId = profile?.id || null;
+    }
+
+    if (profileId) {
+      const { error } = await supabaseAdmin
+        .from('user_profiles')
+        .update({
+          subscription_tier: tier,
+          subscription_status: 'active',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', profileId);
+      if (error) console.warn('[PAYMENT] profile update error:', error.message);
+    }
+
+    // Idempotency: paystack_subscription_code is UNIQUE — a replay insert fails harmlessly.
+    const { error: subErr } = await supabaseAdmin.from('subscriptions').upsert(
+      {
+        user_id: profileId,
+        paystack_subscription_code: params.reference,
+        paystack_plan_code: params.plan,
+        tier,
+        status: 'active',
+        amount: Math.round(params.paidMinor),
+        currency: (params.currency || 'NGN').toUpperCase(),
+        interval: params.interval || 'monthly',
+        metadata: {
+          reference: params.reference,
+          plan: params.plan,
+          paid_minor: params.paidMinor,
+          email: params.email || null,
+        },
+      },
+      { onConflict: 'paystack_subscription_code', ignoreDuplicates: false }
+    );
+    if (subErr) console.warn('[PAYMENT] subscription record warning:', subErr.message);
+
+    return tier;
+  }
+
+  /** Records a paid one-time template purchase (idempotent on reference). */
+  async function recordTemplateOrderPaid(params: {
+    reference: string;
+    templateId: string;
+    email: string | null;
+    paidMinor: number;
+    currency: string;
+  }): Promise<void> {
+    const { error } = await supabaseAdmin.from('template_orders').upsert(
+      {
+        paystack_reference: params.reference,
+        template_id: params.templateId,
+        user_email: params.email,
+        amount: params.paidMinor,
+        currency: params.currency.toUpperCase(),
+        status: 'paid',
+        paid_at: new Date().toISOString(),
+      },
+      { onConflict: 'paystack_reference', ignoreDuplicates: false }
+    );
+    if (error) console.warn('[PAYMENT] template order record warning:', error.message);
+  }
+
+  app.post('/api/paystack/initialize', rateLimit('paystack_init', { max: 20 }), async (req, res) => {
+    try {
+      const { email, plan, planId, currency, userId } = req.body || {};
+      const targetPlan = String(plan || planId || 'playground').toLowerCase();
+
+      if (!PAYSTACK_PLANS[targetPlan] || targetPlan === 'free') {
+        return res.status(400).json({ success: false, error: 'Unknown plan' });
+      }
+
+      const origin = req.headers.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+      // Amount is ALWAYS derived from the plan server-side — clients cannot set prices.
       const result = await initializePaystackTransaction({
-        email: email || 'architect@jadai.dev',
-        amountKobo: amountKobo || defaultAmount,
+        email: email || 'guest@jadai.dev',
+        amountKobo: 0, // resolved from plan below
         planId: targetPlan,
-        currency: currency || 'NGN',
+        currency: (currency || 'NGN') === 'USD' ? 'USD' : 'NGN',
         callbackUrl: `${origin}/account/premium?plan=${targetPlan}&status=success`,
         metadata: { plan: targetPlan, userId },
       });
@@ -373,7 +668,7 @@ async function startServer() {
   app.post('/api/paystack/webhook', async (req, res) => {
     try {
       const signature = req.headers['x-paystack-signature'] as string;
-      const rawBody = JSON.stringify(req.body);
+      const rawBody = Buffer.isBuffer(req.body) ? req.body : JSON.stringify(req.body ?? {});
       const isValid = await verifyPaystackWebhookSignature(rawBody, signature);
 
       if (!isValid) {
@@ -386,50 +681,60 @@ async function startServer() {
       console.log(`[PAYSTACK WEBHOOK] Received event: ${event} | Signature verified: true`);
 
       if (event === 'charge.success') {
-        const email = data?.customer?.email;
+        const email = data?.customer?.email || null;
         const metadata = data?.metadata || {};
-        const plan = (metadata.plan || metadata.planId || 'playground').toLowerCase();
-        const userId = metadata.userId;
+        const plan = String(metadata.plan || metadata.planId || '').toLowerCase();
+        const reference = String(data?.reference || '');
+        const paidMinor = Number(data?.amount);
+        const currency = String(data?.currency || 'NGN');
 
-        const tierMap: Record<string, string> = {
-          playground: 'playground',
-          studio_premium: 'studio_premium',
-          signal_pro: 'signal_pro',
-          signal_business: 'signal_business',
-        };
-        const assignedTier = tierMap[plan] || 'playground';
-
-        try {
-          let updateQuery = supabaseAdmin
-            .from('user_profiles')
-            .update({
-              subscription_tier: assignedTier,
-              subscription_status: 'active',
-              updated_at: new Date().toISOString(),
+        if (metadata.kind === 'template' && reference && metadata.template_id) {
+          await recordTemplateOrderPaid({
+            reference,
+            templateId: String(metadata.template_id),
+            email,
+            paidMinor: Number.isFinite(paidMinor) ? paidMinor : 0,
+            currency,
+          });
+          console.log(`[PAYSTACK WEBHOOK] Template order paid ref=${reference} template=${metadata.template_id}`);
+        } else if (!plan || !reference || !PAYSTACK_PLANS[plan] || plan === 'free') {
+          console.warn('[PAYSTACK WEBHOOK] charge.success with unknown plan/reference — ignored');
+        } else if (paidMinor < 0 || !Number.isFinite(paidMinor)) {
+          console.warn('[PAYSTACK WEBHOOK] charge.success with invalid amount — ignored');
+        } else {
+          const expected =
+            currency.toUpperCase() === 'USD'
+              ? PAYSTACK_PLANS[plan].amountUsdCents
+              : PAYSTACK_PLANS[plan].amountKobo;
+          if (paidMinor < expected) {
+            console.warn(
+              `[PAYSTACK WEBHOOK] UNDERPAYMENT rejected: got ${paidMinor}, expected >= ${expected} (${plan})`
+            );
+          } else {
+            const tier = await grantSubscription({
+              plan,
+              reference,
+              userId: metadata.userId || null,
+              email,
+              paidMinor,
+              currency,
             });
-
-          if (userId) await updateQuery.eq('id', userId);
-          else if (email) await updateQuery.eq('email', email.toLowerCase().trim());
-        } catch (dbErr) {
-          console.warn('[PAYSTACK WEBHOOK] DB update warning:', dbErr);
+            console.log(`[PAYSTACK WEBHOOK] Granted tier=${tier} plan=${plan} ref=${reference}`);
+          }
         }
-      } else if (event === 'subscription.disable') {
+      } else if (event === 'subscription.disable' || event === 'subscription.not_renew') {
         const email = data?.customer?.email;
         const userId = data?.metadata?.userId;
-        try {
-          let updateQuery = supabaseAdmin
-            .from('user_profiles')
-            .update({
-              subscription_tier: 'free',
-              subscription_status: 'cancelled',
-              updated_at: new Date().toISOString(),
-            });
-
-          if (userId) await updateQuery.eq('id', userId);
-          else if (email) await updateQuery.eq('email', email.toLowerCase().trim());
-        } catch (dbErr) {
-          console.warn('[PAYSTACK WEBHOOK] DB downgrade warning:', dbErr);
-        }
+        let updateQuery = supabaseAdmin
+          .from('user_profiles')
+          .update({
+            subscription_status: 'cancelled',
+            updated_at: new Date().toISOString(),
+          });
+        if (userId) updateQuery = updateQuery.eq('id', userId);
+        else if (email) updateQuery = updateQuery.eq('email', String(email).toLowerCase().trim());
+        const { error } = await updateQuery;
+        if (error) console.warn('[PAYSTACK WEBHOOK] DB downgrade warning:', error.message);
       }
 
       res.status(200).send('Webhook acknowledged');
@@ -439,39 +744,74 @@ async function startServer() {
     }
   });
 
-  app.post('/api/paystack/verify', async (req, res) => {
+  app.post('/api/paystack/verify', rateLimit('paystack_verify', { max: 30 }), async (req, res) => {
     try {
-      const { reference, plan, email, userId } = req.body;
-      if (!reference) {
+      const { reference, email, userId } = req.body || {};
+      if (!reference || typeof reference !== 'string' || reference.length > 128) {
         return res.status(400).json({ success: false, error: 'Reference required' });
       }
 
-      const assignedTier = plan === 'signal' ? 'signal' : 'playground';
+      const secret = await getPaystackSecretKey();
+      const unconfigured = !secret || secret.startsWith('sk_test_placeholder') || secret.includes('your_');
 
-      // Update user profile in Supabase if exists
-      try {
-        if (userId || email) {
-          let query = supabaseAdmin.from('user_profiles').update({
-            subscription_tier: assignedTier,
-            subscription_status: 'active',
-            updated_at: new Date().toISOString(),
-          });
-
-          if (userId) {
-            await query.eq('id', userId);
-          } else if (email) {
-            await query.eq('email', email);
-          }
+      if (unconfigured) {
+        if (isProd) {
+          return res.status(503).json({ success: false, error: 'Payment provider not configured' });
         }
-      } catch (dbErr) {
-        console.warn('Could not update user_profiles table', dbErr);
+        // Dev mode: never grant paid tiers without a real provider.
+        return res.json({
+          success: false,
+          verified: false,
+          simulated: true,
+          error: 'Paystack not configured — set PAYSTACK_SECRET_KEY',
+        });
       }
+
+      const resp = await fetch(
+        `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+        { headers: { Authorization: `Bearer ${secret}` } }
+      );
+      const json = await resp.json().catch(() => null);
+
+      if (!json?.status || json.data?.status !== 'success') {
+        return res.status(402).json({
+          success: false,
+          verified: false,
+          error: json?.message || 'Payment not verified with Paystack',
+        });
+      }
+
+      const plan = String(json.data?.metadata?.plan || json.data?.metadata?.planId || '').toLowerCase();
+      const paidMinor = Number(json.data?.amount);
+      const currency = String(json.data?.currency || 'NGN');
+
+      if (!plan || !PAYSTACK_PLANS[plan] || plan === 'free') {
+        return res.status(402).json({ success: false, verified: false, error: 'Unknown plan on transaction' });
+      }
+
+      const expected = currency.toUpperCase() === 'USD' ? PAYSTACK_PLANS[plan].amountUsdCents : PAYSTACK_PLANS[plan].amountKobo;
+      if (!Number.isFinite(paidMinor) || paidMinor < expected) {
+        console.warn(`[PAYSTACK VERIFY] underpayment rejected for ${reference}: ${paidMinor} < ${expected}`);
+        return res.status(402).json({ success: false, verified: false, error: 'Paid amount does not match plan price' });
+      }
+
+      const tier = await grantSubscription({
+        plan,
+        reference,
+        userId: userId || json.data?.metadata?.userId || null,
+        email: json.data?.customer?.email || email || null,
+        paidMinor,
+        currency,
+      });
 
       res.json({
         success: true,
         verified: true,
-        tier: assignedTier,
+        tier,
+        plan,
         reference,
+        amount: paidMinor,
+        currency,
       });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err?.message || 'Verification error' });
@@ -481,27 +821,100 @@ async function startServer() {
   // ---------------------------------------------------------------------------
   // 6. TEMPLATES PURCHASE & DOWNLOAD
   // ---------------------------------------------------------------------------
-  app.post('/api/templates/purchase', (req, res) => {
-    const { template_id, currency, price } = req.body;
-    res.json({
-      success: true,
-      order_id: `ord_${Date.now()}`,
-      template_id,
-      currency: currency || 'NGN',
-      price,
-      message: 'Access token generated for sovereign repository',
-    });
+  app.post('/api/templates/purchase', rateLimit('template_purchase', { max: 20 }), async (req, res) => {
+    try {
+      const { template_id, currency, price, email } = req.body || {};
+      if (!template_id || typeof template_id !== 'string' || template_id.length > 64) {
+        return res.status(400).json({ success: false, error: 'template_id required' });
+      }
+
+      const isUsd = String(currency || 'NGN').toUpperCase() === 'USD';
+      const amountMinor = Math.round(Number(price) * 100); // ₦→kobo / $→cents
+      if (!Number.isFinite(amountMinor) || amountMinor <= 0) {
+        return res.status(400).json({ success: false, error: 'Valid price required' });
+      }
+
+      const secret = await getPaystackSecretKey();
+      const unconfigured = !secret || secret.startsWith('sk_test_placeholder') || secret.includes('your_');
+      if (unconfigured) {
+        if (isProd) {
+          return res.status(503).json({ success: false, error: 'Payment provider not configured' });
+        }
+        return res.json({ success: false, simulated: true, error: 'Paystack not configured' });
+      }
+
+      const origin = req.headers.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const result = await initializePaystackTransaction({
+        email: email || 'guest@jadai.dev',
+        amountKobo: amountMinor,
+        planId: `template_${template_id}`,
+        currency: isUsd ? 'USD' : 'NGN',
+        callbackUrl: `${origin}/marketplace?purchase=success&template=${encodeURIComponent(template_id)}`,
+        metadata: { kind: 'template', template_id },
+      });
+
+      if (!result.success) {
+        return res.status(502).json({ success: false, error: result.error || 'Checkout initialization failed' });
+      }
+
+      res.json({
+        success: true,
+        authorization_url: result.authorization_url,
+        reference: result.reference,
+        simulated: Boolean(result.simulated),
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || 'Purchase initialization failed' });
+    }
   });
 
-  app.post('/api/likes', (req, res) => {
-    const { targetType, targetId, action } = req.body;
-    res.json({
-      success: true,
-      targetType,
-      targetId,
-      action: action || 'like',
-      timestamp: new Date().toISOString(),
-    });
+  const likeViewerKey = (req: express.Request): string => {
+    const ua = String(req.headers['user-agent'] || '').slice(0, 200);
+    return crypto.createHash('sha256').update(`${req.ip}|${ua}`).digest('hex').slice(0, 40);
+  };
+
+  app.post('/api/likes', rateLimit('likes', { max: 60 }), async (req, res) => {
+    try {
+      const { targetType, targetId, action } = req.body || {};
+      if (!targetType || !targetId || typeof targetType !== 'string' || typeof targetId !== 'string') {
+        return res.status(400).json({ success: false, error: 'targetType and targetId required' });
+      }
+      const viewerKey = likeViewerKey(req);
+      const wanted = action !== 'unlike';
+
+      const { error } = wanted
+        ? await supabaseAdmin.from('likes').upsert(
+            { target_type: targetType, target_id: targetId, viewer_key: viewerKey },
+            { onConflict: 'target_type,target_id,viewer_key', ignoreDuplicates: true }
+          )
+        : await supabaseAdmin
+            .from('likes')
+            .delete()
+            .eq('target_type', targetType)
+            .eq('target_id', targetId)
+            .eq('viewer_key', viewerKey);
+
+      if (error) throw new Error(error.message);
+
+      const { count, error: countErr } = await supabaseAdmin
+        .from('likes')
+        .select('id', { count: 'exact', head: true })
+        .eq('target_type', targetType)
+        .eq('target_id', targetId);
+
+      if (countErr) throw new Error(countErr.message);
+
+      res.json({
+        success: true,
+        targetType,
+        targetId,
+        action: wanted ? 'like' : 'unlike',
+        likes: count ?? 0,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || 'Like operation failed' });
+    }
   });
 
   app.get('/api/templates/download', (req, res) => {
@@ -524,10 +937,48 @@ async function startServer() {
     });
   });
 
+  // Cron worker: publishes content whose publish_at has passed (idempotent).
+  app.get('/api/cron/deliver-content', async (req, res) => {
+    if (!getCronAuth(req)) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    try {
+      const nowIso = new Date().toISOString();
+      const { data, error } = await supabaseAdmin
+        .from('content_bank')
+        .update({ published: true })
+        .eq('published', false)
+        .lte('publish_at', nowIso)
+        .select('id, type, title');
+      if (error) throw new Error(error.message);
+      res.json({
+        success: true,
+        delivered: data?.length || 0,
+        titles: (data || []).map((row: any) => row.title).slice(0, 20),
+        at: nowIso,
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Cron worker: full self-diagnostic report (also keeps the free DB awake).
+  app.get('/api/cron/self-diagnostic', async (req, res) => {
+    if (!getCronAuth(req)) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    try {
+      const report = await runSelfCheck(true);
+      res.json({ success: true, report, at: new Date().toISOString() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // ---------------------------------------------------------------------------
   // 8. AI CHAT & STATUS
   // ---------------------------------------------------------------------------
-  app.post('/api/ai/chat', async (req, res) => {
+  app.post('/api/ai/chat', rateLimit('ai_chat', { max: 20 }), async (req, res) => {
     const { prompt, systemPrompt, moduleSlug, bypassCache } = req.body;
     if (!prompt) {
       return res.status(400).json({ success: false, error: 'Missing prompt' });
@@ -569,7 +1020,7 @@ async function startServer() {
     });
   });
 
-  app.post('/api/ai/grounded', async (req, res) => {
+  app.post('/api/ai/grounded', rateLimit('ai_grounded', { max: 20 }), async (req, res) => {
     const { prompt, mode, location, systemPrompt } = req.body;
     if (!prompt) {
       return res.status(400).json({ success: false, error: 'Prompt is required for grounded intelligence' });
@@ -598,38 +1049,128 @@ async function startServer() {
     });
   });
 
-  app.post('/api/admin/users/grant-tier', (req, res) => {
-    const { username, tier, credits, durationDays } = req.body;
-    if (!username || !tier) {
-      return res.status(400).json({ success: false, error: 'Username and tier required' });
-    }
+  const CANONICAL_TIERS = ['free', 'foundation', 'voice', 'architecture', 'prime'];
 
-    res.json({
-      success: true,
-      message: `Tier ${tier} granted to ${username} for ${durationDays || 30} days`,
-      user: {
-        username,
-        tier,
-        credits: credits || 500,
-        grantedAt: new Date().toISOString(),
-      },
-    });
+  app.post('/api/admin/users/grant-tier', async (req, res) => {
+    try {
+      const { username, tier, credits, durationDays } = req.body || {};
+      if (!username || typeof username !== 'string') {
+        return res.status(400).json({ success: false, error: 'Username (email or display name) required' });
+      }
+      const requestedTier = String(tier || '').toLowerCase();
+      if (!CANONICAL_TIERS.includes(requestedTier)) {
+        return res.status(400).json({
+          success: false,
+          error: `Tier must be one of: ${CANONICAL_TIERS.join(', ')}`,
+        });
+      }
+
+      const target = username.trim().replace(/[,'";()]/g, '').slice(0, 160);
+      if (!target) {
+        return res.status(400).json({ success: false, error: 'Invalid username' });
+      }
+
+      const { data: users, error } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id, email, display_name, subscription_tier')
+        .or(`email.eq.${target},display_name.eq.${target}`)
+        .limit(1);
+      if (error) throw new Error(error.message);
+
+      const user = users?.[0];
+      if (!user) {
+        return res.status(404).json({ success: false, error: `No user matched "${target}"` });
+      }
+
+      const status = requestedTier === 'free' ? 'inactive' : 'active';
+      const { error: updErr } = await supabaseAdmin
+        .from('user_profiles')
+        .update({ subscription_tier: requestedTier, subscription_status: status })
+        .eq('id', user.id);
+      if (updErr) throw new Error(updErr.message);
+
+      await supabaseAdmin.from('admin_audit').insert({
+        admin_email: (req as any).adminEmail || 'unknown',
+        action: 'grant-tier',
+        entity_type: 'user',
+        entity_id: user.id,
+        old_value: { tier: user.subscription_tier },
+        new_value: { tier: requestedTier, durationDays: durationDays ?? null, credits: credits ?? null },
+        ip_address: req.ip,
+      });
+
+      res.json({
+        success: true,
+        message: `Tier "${requestedTier}" granted to ${target}`,
+        user: {
+          id: user.id,
+          username: target,
+          tier: requestedTier,
+          previousTier: user.subscription_tier,
+          durationDays: durationDays || null,
+          grantedAt: new Date().toISOString(),
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || 'Tier grant failed' });
+    }
   });
 
-  app.post('/api/admin/chat', (req, res) => {
-    const { targetUsername, sender, text } = req.body;
-    if (!text) {
-      return res.status(400).json({ success: false, error: 'Message text required' });
-    }
+  app.post('/api/admin/chat', async (req, res) => {
+    try {
+      const { targetUsername, sender, text } = req.body || {};
+      if (!text || typeof text !== 'string' || !text.trim()) {
+        return res.status(400).json({ success: false, error: 'Message text required' });
+      }
 
-    res.json({
-      success: true,
-      channelId: `sec_${Date.now()}`,
-      sender: sender || 'Admin Studio',
-      targetUsername: targetUsername || 'user',
-      text,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    });
+      const target = String(targetUsername || '')
+        .trim()
+        .replace(/[,'";()]/g, '')
+        .slice(0, 160);
+      if (!target) {
+        return res.status(400).json({ success: false, error: 'targetUsername required' });
+      }
+
+      const { data: users, error } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id, email, display_name')
+        .or(`email.eq.${target},display_name.eq.${target}`)
+        .limit(1);
+      if (error) throw new Error(error.message);
+
+      const user = users?.[0];
+      if (!user) {
+        return res.status(404).json({ success: false, error: `No user matched "${target}"` });
+      }
+
+      const { error: insErr } = await supabaseAdmin.from('notification_queue').insert({
+        user_id: user.id,
+        type: 'admin_message',
+        title: `Message from ${sender || 'Admin Studio'}`,
+        body: text.slice(0, 4000),
+      });
+      if (insErr) throw new Error(insErr.message);
+
+      await supabaseAdmin.from('admin_audit').insert({
+        admin_email: (req as any).adminEmail || 'unknown',
+        action: 'admin-chat',
+        entity_type: 'user',
+        entity_id: user.id,
+        new_value: { to: target, preview: text.slice(0, 200) },
+        ip_address: req.ip,
+      });
+
+      res.json({
+        success: true,
+        channelId: `sec_${Date.now()}`,
+        sender: sender || 'Admin Studio',
+        targetUsername: target,
+        text: text.slice(0, 4000),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || 'Message delivery failed' });
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -651,7 +1192,7 @@ async function startServer() {
     createdAt?: string;
   }>();
 
-  app.post('/api/sentinel/scan', async (req, res) => {
+  app.post('/api/sentinel/scan', rateLimit('sentinel', { max: 10 }), async (req, res) => {
     try {
       const { url } = req.body;
       const { runSentinelScan } = await import('./modules/sentinel/api/scan');
@@ -662,22 +1203,36 @@ async function startServer() {
     }
   });
 
-  app.post('/api/short/create', async (req, res) => {
+  app.post('/api/short/create', rateLimit('short_create', { max: 10 }), async (req, res) => {
     try {
       const targetUrl = req.body.targetUrl || req.body.url;
       const customSlug = req.body.customSlug || req.body.slug;
       const cloaked = Boolean(req.body.cloaked);
-      const pageTitle = req.body.pageTitle || 'Sovereign Cloaked Link // Jadai Sentinel';
-      const description = req.body.description || 'Cryptographically cloaked link protected by Jadai Sentinel.';
+      const pageTitle = String(req.body.pageTitle || 'Sovereign Cloaked Link // Jadai Sentinel').slice(0, 200);
+      const description = String(req.body.description || 'Cryptographically cloaked link protected by Jadai Sentinel.').slice(0, 400);
 
-      try { new URL(targetUrl); } catch {
+      let parsed: URL;
+      try {
+        parsed = new URL(String(targetUrl));
+      } catch {
         return res.status(400).json({ error: 'Invalid target URL' });
       }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return res.status(400).json({ error: 'Only http(s) target URLs are allowed' });
+      }
 
-      const slug = (customSlug || Math.random().toString(36).substring(2, 8)).toLowerCase().trim();
+      let slug: string;
+      if (customSlug) {
+        slug = String(customSlug).toLowerCase().trim().replace(/[^a-z0-9-]/g, '').slice(0, 40);
+        if (!slug) return res.status(400).json({ error: 'Invalid custom slug' });
+        if (shortLinksDb.has(slug)) return res.status(409).json({ error: 'Slug already in use' });
+      } else {
+        slug = crypto.randomBytes(6).toString('hex'); // 12 chars, 48 bits of entropy
+      }
+
       const record = {
         slug,
-        targetUrl,
+        targetUrl: parsed.toString(),
         clicks: 0,
         cloaked,
         pageTitle,
@@ -688,19 +1243,22 @@ async function startServer() {
       shortLinksDb.set(slug, record);
       const host = process.env.NEXT_PUBLIC_APP_URL || `${req.protocol}://${req.get('host')}`;
 
-      // Try database insert as well
       try {
-        await supabaseAdmin.from('short_links').insert({
+        const { error } = await supabaseAdmin.from('short_links').insert({
           slug,
-          target_url: targetUrl,
+          target_url: record.targetUrl,
           cloaked,
         });
+        if (error && error.code === '23505') {
+          shortLinksDb.delete(slug);
+          return res.status(409).json({ error: 'Slug already in use' });
+        }
       } catch {}
 
       res.json({
         slug,
         shortUrl: `${host}/s/${slug}`,
-        targetUrl,
+        targetUrl: record.targetUrl,
         cloaked,
         pageTitle,
         clicks: 0,
@@ -726,22 +1284,24 @@ async function startServer() {
   });
 
   app.get('/s/:slug', async (req, res) => {
-    const slug = req.params.slug;
-    const mem = shortLinksDb.get(slug);
+    const slug = String(req.params.slug || '').replace(/[^a-z0-9-]/gi, '').slice(0, 40);
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    if (!slug) return res.redirect('/');
 
-    if (mem) {
-      mem.clicks += 1;
-      // If cloaked mode is active, mask destination in sovereign shell
-      if (mem.cloaked) {
-        return res.send(`<!DOCTYPE html>
+    const renderCloaked = (targetUrl: string, pageTitle?: string, description?: string) => {
+      const safeUrl = escapeHtml(targetUrl);
+      const safeTitle = escapeHtml(pageTitle || 'Jadai Sentinel // Cloaked Portal');
+      const safeDesc = escapeHtml(description || 'Protected by Jadai Sentinel');
+      return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${mem.pageTitle || 'Jadai Sentinel // Cloaked Portal'}</title>
-  <meta name="description" content="${mem.description || 'Protected by Jadai Sentinel'}">
-  <meta property="og:title" content="${mem.pageTitle || 'Jadai Sentinel'}">
-  <meta property="og:description" content="${mem.description || 'Protected link'}">
+  <meta name="robots" content="noindex, nofollow">
+  <title>${safeTitle}</title>
+  <meta name="description" content="${safeDesc}">
+  <meta property="og:title" content="${safeTitle}">
+  <meta property="og:description" content="${safeDesc}">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #050404; font-family: monospace; }
@@ -766,23 +1326,41 @@ async function startServer() {
 <body>
   <div class="shield-bar">
     <div class="badge">◈ JADAI SENTINEL // CLOAKED DESTINATION</div>
-    <div class="dest">MASKING: ${mem.targetUrl}</div>
-    <a href="${mem.targetUrl}" target="_blank" rel="noopener noreferrer" class="action">Direct Bypass ↗</a>
+    <div class="dest">MASKING: ${safeUrl}</div>
+    <a href="${safeUrl}" target="_blank" rel="noopener noreferrer nofollow" class="action">Direct Bypass ↗</a>
   </div>
-  <iframe src="${mem.targetUrl}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" allowfullscreen></iframe>
+  <iframe src="${safeUrl}" sandbox="allow-scripts allow-forms allow-popups allow-downloads" allowfullscreen referrerpolicy="no-referrer"></iframe>
 </body>
-</html>`);
+</html>`;
+    };
+
+    const mem = shortLinksDb.get(slug);
+
+    if (mem) {
+      mem.clicks += 1;
+      if (mem.cloaked) {
+        return res.send(renderCloaked(mem.targetUrl, mem.pageTitle, mem.description));
       }
       return res.redirect(mem.targetUrl);
     }
 
     try {
-      const { data } = await supabaseAdmin.from('short_links').select('target_url, cloaked').eq('slug', slug).maybeSingle();
+      const { data } = await supabaseAdmin
+        .from('short_links')
+        .select('target_url, cloaked')
+        .eq('slug', slug)
+        .maybeSingle();
       if (data?.target_url) {
-        if (data.cloaked) {
-          return res.send(`<!DOCTYPE html><html><head><title>Jadai Sentinel</title></head><body style="margin:0"><iframe src="${data.target_url}" style="width:100%;height:100vh;border:none"></iframe></body></html>`);
-        }
-        return res.redirect(data.target_url);
+        let protocolOk = false;
+        let target = '';
+        try {
+          const parsed = new URL(data.target_url);
+          protocolOk = parsed.protocol === 'http:' || parsed.protocol === 'https:';
+          target = parsed.toString();
+        } catch {}
+        if (!protocolOk) return res.redirect('/');
+        if (data.cloaked) return res.send(renderCloaked(target));
+        return res.redirect(target);
       }
     } catch {}
 
@@ -792,7 +1370,7 @@ async function startServer() {
   // ---------------------------------------------------------------------------
   // 8.7. MIRAGE GENERATION
   // ---------------------------------------------------------------------------
-  app.post('/api/mirage/generate', async (req, res) => {
+  app.post('/api/mirage/generate', rateLimit('mirage', { max: 15 }), async (req, res) => {
     try {
       const { prompt, style, aspectRatio } = req.body;
       const { generateMirageImages } = await import('./modules/mirage/api/generate');
@@ -806,7 +1384,7 @@ async function startServer() {
   // ---------------------------------------------------------------------------
   // 8B. CREATIVE WORKSPACE BATCH & IN-CONTEXT REGION EDIT
   // ---------------------------------------------------------------------------
-  app.post('/api/creative/generate', async (req, res) => {
+  app.post('/api/creative/generate', rateLimit('creative', { max: 30 }), async (req, res) => {
     try {
       const { prompt, outputType, size } = req.body;
       const seeds = [
@@ -833,7 +1411,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/writer/cowrite', async (req, res) => {
+  app.post('/api/writer/cowrite', rateLimit('writer', { max: 30 }), async (req, res) => {
     try {
       const { currentText, chapterTitle, genre, tone } = req.body;
       const prompt = `You are a high-tier literary co-author and master architect at Jadai Studios.
@@ -864,7 +1442,7 @@ Draft a continuation of 40-70 words that deepens the architectural or moral stak
   // ---------------------------------------------------------------------------
   // 9. MODULE ROUTER & DIAGNOSTICS
   // ---------------------------------------------------------------------------
-  app.post('/api/modules/:slug', async (req, res) => {
+  app.post('/api/modules/:slug', rateLimit('modules', { max: 60 }), async (req, res) => {
     const moduleSlug = req.params.slug;
     const action = (req.query.action as string) || 'action';
 
@@ -891,7 +1469,7 @@ Draft a continuation of 40-70 words that deepens the architectural or moral stak
     }
   });
 
-  app.post('/api/newsletter', async (req, res) => {
+  app.post('/api/newsletter', rateLimit('newsletter', { max: 5 }), async (req, res) => {
     const { email } = req.body;
     if (!email || !email.includes('@')) {
       return res.status(400).json({ success: false, error: 'Valid email required' });
@@ -910,7 +1488,7 @@ Draft a continuation of 40-70 words that deepens the architectural or moral stak
     res.json({ success: true, message: 'Subscription saved' });
   });
 
-  app.post('/api/contact', async (req, res) => {
+  app.post('/api/contact', rateLimit('contact', { max: 5 }), async (req, res) => {
     const { name, email, category, budget, message } = req.body;
     if (!name || !email || !message) {
       return res.status(400).json({ success: false, error: 'Name, email, and message required' });
@@ -935,16 +1513,29 @@ Draft a continuation of 40-70 words that deepens the architectural or moral stak
   // ---------------------------------------------------------------------------
   // 10. VITE MIDDLEWARES / STATIC ASSETS
   // ---------------------------------------------------------------------------
-  if (!isProd) {
+  // SERVE_STATIC=0 → API-only mode (Cloudflare Pages serves the SPA and proxies
+  // /api/* here). Default → serve the built SPA from Render (single-service mode).
+  const serveStatic = process.env.SERVE_STATIC !== '0' && process.env.SERVE_STATIC !== 'false';
+
+  if (!serveStatic) {
+    app.use('/api', (req, res) => {
+      res.status(404).json({ success: false, error: 'API endpoint not found' });
+    });
+    app.use((req, res) => {
+      res.status(404).send('Not found');
+    });
+  } else if (!isProd) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(__dirname, 'dist')));
+    const distDir = path.join(__dirname, 'dist');
+    app.use(express.static(distDir, { index: false, maxAge: '1h' }));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+      res.sendFile(path.join(distDir, 'index.html'));
     });
   }
 

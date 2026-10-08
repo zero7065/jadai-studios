@@ -83,6 +83,8 @@ export function resetClientToolUsage(): void {
 
 /**
  * Validates whether user tier or usage count satisfies access to feature.
+ * Requirements are TIER_LEVELS thresholds so canonical DB tiers
+ * (foundation/voice/architecture/prime) and legacy aliases resolve correctly.
  */
 export function checkAccessToFeature(
   feature: AppFeature,
@@ -107,19 +109,11 @@ export function checkAccessToFeature(
 
   const currentTier = (options?.userTier || 'free').toLowerCase();
   const isSubscribed = Boolean(options?.isSubscribed);
+  const subscribedLevel = isSubscribed ? TIER_LEVELS[currentTier] ?? 0 : 0;
 
-  // 1. PLAYGROUND TOOLS (FORGE, ORACLE, MIRAGE, SENTINEL)
+  // 1. PLAYGROUND TOOLS (FORGE, ORACLE, MIRAGE, SENTINEL) — requires level >= 2 (voice)
   if (feature === 'playground') {
-    const hasPlaygroundTier =
-      isSubscribed &&
-      (currentTier === 'playground' ||
-        currentTier === 'signal_pro' ||
-        currentTier === 'signal_business' ||
-        currentTier === 'prime' ||
-        currentTier === 'voice' ||
-        currentTier === 'architecture');
-
-    if (hasPlaygroundTier) {
+    if (subscribedLevel >= TIER_LEVELS.voice) {
       return { allowed: true };
     }
 
@@ -141,18 +135,9 @@ export function checkAccessToFeature(
     };
   }
 
-  // 2. STUDIO PREMIUM (Full Book of Lies, High-res Downloads)
+  // 2. STUDIO PREMIUM (Full Book of Lies, High-res Downloads) — requires level >= 1 (foundation)
   if (feature === 'studio_premium') {
-    const hasStudioTier =
-      isSubscribed &&
-      (currentTier === 'studio_premium' ||
-        currentTier === 'playground' ||
-        currentTier === 'signal_pro' ||
-        currentTier === 'signal_business' ||
-        currentTier === 'prime' ||
-        currentTier === 'foundation');
-
-    if (hasStudioTier) {
+    if (subscribedLevel >= TIER_LEVELS.foundation) {
       return { allowed: true };
     }
 
@@ -166,17 +151,9 @@ export function checkAccessToFeature(
     };
   }
 
-  // 3. SIGNAL PRO (Outbound lead velocity radar)
+  // 3. SIGNAL PRO (Outbound lead velocity radar) — requires level >= 3 (signal_pro)
   if (feature === 'signal') {
-    const hasSignalTier =
-      isSubscribed &&
-      (currentTier === 'signal_pro' ||
-        currentTier === 'signal_business' ||
-        currentTier === 'signal' ||
-        currentTier === 'prime' ||
-        currentTier === 'architecture');
-
-    if (hasSignalTier) {
+    if (subscribedLevel >= TIER_LEVELS.signal_pro) {
       return { allowed: true };
     }
 

@@ -19,7 +19,8 @@ export interface RateLimitResult {
 
 export function checkRateLimit(
   identifier: string,
-  role: 'anonymous' | 'authenticated' | 'admin' = 'anonymous'
+  role: 'anonymous' | 'authenticated' | 'admin' = 'anonymous',
+  maxOverride?: number
 ): RateLimitResult {
   // Admin is unlimited
   if (role === 'admin') {
@@ -33,7 +34,8 @@ export function checkRateLimit(
 
   const now = Date.now();
   const windowMs = 60 * 1000; // 1 minute window
-  const maxRequests = role === 'authenticated' ? 600 : 60;
+  const maxRequests =
+    typeof maxOverride === 'number' && maxOverride > 0 ? maxOverride : role === 'authenticated' ? 600 : 60;
 
   const current = memoryStore.get(identifier);
 

@@ -41,21 +41,6 @@ export const AdminPasscodeModal: React.FC<AdminPasscodeModalProps> = ({
     setError('');
     StudioAudio.playClick();
 
-    // Check emergency codes (6057, jadai) or verify with server API
-    if (code === '6057' || code.toLowerCase() === 'jadai' || code.toLowerCase() === 'jadai2026') {
-      try {
-        sessionStorage.setItem('jadai_admin_unlocked', 'true');
-        localStorage.setItem('jadai_admin_unlocked', 'true');
-      } catch {}
-      StudioAudio.playSuccessArpeggio();
-      setTimeout(() => {
-        setLoading(false);
-        onSuccess();
-        onClose();
-      }, 300);
-      return;
-    }
-
     try {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
@@ -77,8 +62,8 @@ export const AdminPasscodeModal: React.FC<AdminPasscodeModalProps> = ({
       } else {
         throw new Error(data.error || 'Invalid admin code');
       }
-    } catch {
-      setError('Invalid admin code. Access denied.');
+    } catch (err: any) {
+      setError(err?.message || 'Invalid admin code. Access denied.');
       StudioAudio.playError();
       setLoading(false);
     }

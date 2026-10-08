@@ -721,6 +721,43 @@ ON CONFLICT (slug) DO UPDATE SET
     required_tier = EXCLUDED.required_tier;
 
 -- -----------------------------------------------------------------------------
+-- LIKES (server-mediated; API uses the service role, so RLS stays closed to anon)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS likes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    user_id UUID REFERENCES user_profiles(id) ON DELETE SET NULL,
+    viewer_key TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (target_type, target_id, viewer_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_likes_target ON likes(target_type, target_id);
+
+ALTER TABLE likes ENABLE ROW LEVEL SECURITY;
+
+-- -----------------------------------------------------------------------------
+-- TEMPLATE ORDERS (one-time Paystack purchases; idempotent on reference)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS template_orders (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    template_id TEXT NOT NULL,
+    user_email TEXT,
+    amount INT NOT NULL DEFAULT 0,
+    currency TEXT NOT NULL DEFAULT 'NGN',
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'failed', 'refunded')),
+    paystack_reference TEXT UNIQUE,
+    paid_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_template_orders_email ON template_orders(user_email);
+CREATE INDEX IF NOT EXISTS idx_template_orders_template ON template_orders(template_id);
+
+ALTER TABLE template_orders ENABLE ROW LEVEL SECURITY;
+
+-- -----------------------------------------------------------------------------
 -- SEED DATA: ADMIN SETTINGS
 -- -----------------------------------------------------------------------------
 INSERT INTO admin_settings (key, value, category, description, updated_by) VALUES

@@ -17,10 +17,10 @@ export const RecoveryTerminalModal: React.FC<RecoveryTerminalModalProps> = ({
   const [outputLines, setOutputLines] = useState<string[]>([]);
   const [shake, setShake] = useState(false);
 
-  // Recovery State
+  // Recovery State — session-local passcode (never a hardcoded shared secret)
   const [credentials, setCredentials] = useState({
     email: 'jadaistudiosoffcl@gmail.com',
-    recoveryCode: '6057',
+    recoveryCode: Math.floor(1000 + Math.random() * 9000).toString(),
   });
 
   const [inputVal, setInputVal] = useState('');
@@ -279,7 +279,7 @@ export const RecoveryTerminalModal: React.FC<RecoveryTerminalModalProps> = ({
       {/* Terminal Footer */}
       <footer className="relative z-20 border-t border-[#39FF14]/30 pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[10px] opacity-75">
         <span>STATUS: SOVEREIGN OPERATIONAL • JOS, NIGERIA</span>
-        <span>DEFAULT PASSCODE: 6057 • TYPE 5 TO EXIT</span>
+        <span>PASSCODE: SESSION-LOCAL • TYPE 5 TO EXIT</span>
       </footer>
     </div>
   );

@@ -120,14 +120,61 @@ export const PAYSTACK_PLANS: Record<string, PaystackTierPlan> = {
   signal: STARTUP_PAYSTACK_PLANS.signal_pro,
   voice: STARTUP_PAYSTACK_PLANS.playground,
   foundation: STARTUP_PAYSTACK_PLANS.studio_premium,
-  architecture: STARTUP_PAYSTACK_PLANS.signal_business,
+  architecture: STARTUP_PAYSTACK_PLANS.signal_pro,
   prime: STARTUP_PAYSTACK_PLANS.signal_business,
 };
+
+/**
+ * Canonical subscription tiers — MUST match the DB CHECK constraint on
+ * user_profiles.subscription_tier / subscriptions.tier:
+ *   free | foundation | voice | architecture | prime
+ *
+ * Price ladder: foundation(₦4k) < voice(₦8k) < architecture(₦15k) < prime(₦45k)
+ */
+export const PLAN_TO_TIER: Record<string, string> = {
+  free: 'free',
+  studio_premium: 'foundation',
+  playground: 'voice',
+  signal_pro: 'architecture',
+  signal_business: 'prime',
+  // legacy aliases
+  foundation: 'foundation',
+  voice: 'voice',
+  architecture: 'architecture',
+  prime: 'prime',
+  signal: 'architecture',
+};
+
+export function tierForPlan(plan?: string | null): string {
+  const key = String(plan || 'playground').toLowerCase();
+  return PLAN_TO_TIER[key] || 'voice';
+}
+
+/**
+ * Validates that a Paystack-verified charge actually paid the plan's price.
+ * `paidMinor` is amount in kobo (NGN) or cents (USD) as reported by Paystack.
+ */
+export function chargeCoversPlan(plan: string, paidMinor: number, currency?: string): boolean {
+  const matched = PAYSTACK_PLANS[String(plan || '').toLowerCase()];
+  if (!matched) return false;
+  if (!Number.isFinite(paidMinor) || paidMinor < 0) return false;
+  const expected = String(currency || '').toUpperCase() === 'USD' ? matched.amountUsdCents : matched.amountKobo;
+  return paidMinor >= expected;
+}
 
 /**
  * Resolves the Paystack secret key dynamically from admin_settings or env
  */
 export async function getPaystackSecretKey(): Promise<string | undefined> {
+  const sanitize = (key?: string | null): string | undefined => {
+    if (!key || typeof key !== 'string') return undefined;
+    const trimmed = key.trim();
+    const lower = trimmed.toLowerCase();
+    if (!trimmed.startsWith('sk_')) return undefined;
+    if (lower.includes('mock') || lower.includes('placeholder') || lower.includes('your_')) return undefined;
+    return trimmed;
+  };
+
   if (isSupabaseConfigured) {
     try {
       const { data } = await supabaseAdmin
@@ -136,15 +183,14 @@ export async function getPaystackSecretKey(): Promise<string | undefined> {
         .eq('key', 'paystack_secret_key')
         .maybeSingle();
 
-      if (data?.value && typeof data.value === 'string' && data.value.startsWith('sk_')) {
-        return data.value;
-      }
+      const fromDb = sanitize(typeof data?.value === 'string' ? data.value : undefined);
+      if (fromDb) return fromDb;
     } catch {
       // Non-blocking fallback
     }
   }
 
-  return process.env.PAYSTACK_SECRET_KEY;
+  return sanitize(process.env.PAYSTACK_SECRET_KEY);
 }
 
 /**
@@ -244,19 +290,19 @@ export async function initializePaystackTransaction(
 }
 
 /**
- * Verifies Paystack Webhook signature using HMAC-SHA512.
+ * Verifies Paystack Webhook signature using HMAC-SHA512 (timing-safe).
  */
 export async function verifyPaystackWebhookSignature(
-  rawBody: string,
+  rawBody: string | Buffer,
   signatureHeader?: string
 ): Promise<boolean> {
   const secretKey = await getPaystackSecretKey();
   if (!secretKey || !signatureHeader) return false;
 
-  const hash = crypto
-    .createHmac('sha512', secretKey)
-    .update(rawBody)
-    .digest('hex');
+  const hash = crypto.createHmac('sha512', secretKey).update(rawBody).digest('hex');
 
-  return hash === signatureHeader;
+  const a = Buffer.from(hash);
+  const b = Buffer.from(String(signatureHeader));
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }

@@ -110,8 +110,8 @@ export async function checkToolAccess(
     }
   }
 
-  // If tier is playground, signal, or prime -> unlimited access
-  if (['playground', 'signal', 'prime', 'architecture', 'voice', 'foundation'].includes(userTier)) {
+  // Paid tiers (canonical DB values + legacy aliases) unlock all gated tools
+  if (['foundation', 'voice', 'architecture', 'prime', 'playground', 'studio_premium', 'signal', 'signal_pro', 'signal_business'].includes(userTier)) {
     return {
       allowed: true,
       usageCount: 0,

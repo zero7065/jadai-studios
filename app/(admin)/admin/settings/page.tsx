@@ -69,7 +69,9 @@ export default function AdminSettingsPage() {
   const [oracleDailyLimit, setOracleDailyLimit] = useState(50);
   const [contactEmail, setContactEmail] = useState('jadaistudiosoffcl@gmail.com');
   const [contactWhatsapp, setContactWhatsapp] = useState('+234 810 000 0000');
-  const [recoveryCode, setRecoveryCode] = useState('6057');
+  const [recoveryCode, setRecoveryCode] = useState(() =>
+    Math.floor(1000 + Math.random() * 9000).toString()
+  );
 
   const handleToggleReveal = (id: string) => {
     StudioAudio.playClick();

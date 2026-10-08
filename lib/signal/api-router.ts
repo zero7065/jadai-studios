@@ -211,8 +211,13 @@ signalRouter.post('/subscribe', async (req, res) => {
 const handleScoutWorker = async (req: any, res: any) => {
   const auth = req.headers?.authorization;
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && auth && auth !== `Bearer ${cronSecret}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  if (cronSecret) {
+    // Fail closed: header must be present AND match.
+    if (auth !== `Bearer ${cronSecret}`) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  } else if (process.env.NODE_ENV === 'production') {
+    return res.status(503).json({ error: 'CRON_SECRET not configured' });
   }
 
   try {

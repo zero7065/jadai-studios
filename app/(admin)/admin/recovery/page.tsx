@@ -31,7 +31,7 @@ export default function AdminRecoveryPage() {
           </p>
 
           <div className="p-3.5 rounded bg-[#050404] border border-[rgba(192,57,43,0.2)] font-mono text-xs space-y-1 text-[#8a6e2a]">
-            <div>Default Security Passcode: <span className="text-[#39FF14] font-bold">6057</span></div>
+            <div>Security Passcode: <span className="text-[#39FF14] font-bold">SESSION-LOCAL</span></div>
             <div>Protocol: Level 0 Sovereign Shell Interface</div>
           </div>
 
