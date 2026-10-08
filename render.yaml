@@ -1,0 +1,32 @@
+# JADAI STUDIOS — Render free-tier API service
+# Frontend: Cloudflare Pages (static, dist/)  →  proxies /api/* and /s/* here.
+# Alternative: set SERVE_STATIC=1 to let this service serve the SPA too (no Pages needed).
+services:
+  - type: web
+    name: jadai-api
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVE_STATIC
+        value: "0"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        value: jadaistudiosoffcl@gmail.com
+      # Set these in the Render dashboard (sensitive / user-specific):
+      #   ADMIN_PASSWORD_HASH   (npm run gen:admin-hash)
+      #   SUPABASE_SERVICE_ROLE_KEY
+      #   NEXT_PUBLIC_SUPABASE_URL
+      #   NEXT_PUBLIC_SUPABASE_ANON_KEY
+      #   PAYSTACK_SECRET_KEY
+      #   NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+      #   GROQ_API_KEY / GEMINI_API_KEY
+      #   NEXT_PUBLIC_APP_URL=https://jadai.dev

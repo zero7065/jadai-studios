@@ -1,10 +1,10 @@
 /**
  * Jadai Studios - PWA Service Worker
- * Version: jadai-v1
+ * Version: jadai-v2
  * Non-negotiable: explicit CACHE_VERSION, safe invalidation, no stuck caching.
  */
 
-const CACHE_VERSION = 'jadai-v1';
+const CACHE_VERSION = 'jadai-v2';
 const STATIC_CACHE = `jadai-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `jadai-runtime-${CACHE_VERSION}`;
 

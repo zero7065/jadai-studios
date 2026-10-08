@@ -1,0 +1,5 @@
+# JADAI STUDIOS — Cloudflare Pages routing
+# API + short links live on Render; everything else is the static SPA.
+
+/api/*   https://api.jadai.dev/api/:splat   200
+/s/*     https://api.jadai.dev/s/:splat     200

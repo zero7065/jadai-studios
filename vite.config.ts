@@ -1,11 +1,26 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, loadEnv} from 'vite';
 
 const projectRoot = typeof import.meta.dirname !== 'undefined' ? import.meta.dirname : path.resolve('.');
 
-export default defineConfig(() => {
+export default defineConfig(({mode}) => {
+  // Load ALL env vars (no prefix filter) so server .env values reach `define` below.
+  const env = loadEnv(mode, projectRoot, '');
+
+  // Browser code reads process.env.NEXT_PUBLIC_* directly — Vite does not inject
+  // these automatically (that's a Next.js behaviour), so define them explicitly.
+  const clientEnv: Record<string, string> = {};
+  for (const key of [
+    'NEXT_PUBLIC_APP_URL',
+    'NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_SUPABASE_URL',
+  ]) {
+    clientEnv[`process.env.${key}`] = JSON.stringify(env[key] || '');
+  }
+
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -13,6 +28,7 @@ export default defineConfig(() => {
         '@': projectRoot,
       },
     },
+    define: clientEnv,
     build: {
       outDir: 'dist',
       emptyOutDir: true,
