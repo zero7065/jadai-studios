@@ -101,7 +101,7 @@ export const PostComposer: React.FC<PostComposerProps> = ({
       setSelectedSticker(null);
       setShowStickerPicker(false);
     } catch (err) {
-      showToast('Failed to publish post. Please retry.', 'error');
+      showToast("The transmission didn't reach the stream, and nothing was posted. Your draft is still here — send it again.", 'error');
     } finally {
       setIsSubmitting(false);
     }

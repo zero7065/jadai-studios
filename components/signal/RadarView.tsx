@@ -154,7 +154,7 @@ export const RadarView: React.FC<RadarViewProps> = ({ onNavigate }) => {
         showToast(`Tracking ${newSource.toUpperCase()} query: ${data.tracker.query}`, 'success', 'Tracker Active');
       }
     } catch {
-      showToast('Failed to add tracker', 'error');
+      showToast("The tracker wasn't armed — nothing is being watched yet. Check the query and try again.", 'error');
     } finally {
       setAddingTracker(false);
     }

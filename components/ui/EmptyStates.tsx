@@ -27,9 +27,9 @@ export const EmptyBookOfLies: React.FC = () => (
       ⬡
     </div>
     <div className="space-y-1">
-      <h3 className="text-lg font-display text-[#f5f3f0]">The Transmission Is Encrypted</h3>
+      <h3 className="text-lg font-display text-[#f5f3f0]">No Signal on This Frequency</h3>
       <p className="text-xs font-mono text-[#8a6e2a]">
-        The first episode drops at 9:47 PM. Stand by the signal.
+        Nothing in the canon matches your current filters. Clear them to return to all seventy parables.
       </p>
     </div>
   </GlassCard>

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 
 import DefensiveFallback from '@/components/ui/DefensiveFallback';
+import { useToast } from '@/components/providers/ToastProvider';
 
 const SINS = ['All', 'Pride', 'Envy', 'Wrath', 'Sloth', 'Greed', 'Gluttony', 'Lust', 'Discernment'] as const;
 const ACTS = ['All', '1', '2', '3'] as const;
@@ -33,6 +34,7 @@ export default function BookOfLiesPage() {
   const [selectedAct, setSelectedAct] = useState<string>('All');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [activeReadingEpisode, setActiveReadingEpisode] = useState<BookOfLiesEpisode | null>(null);
+  const { showToast } = useToast();
 
   let episodes: BookOfLiesEpisode[] = [];
   try {
@@ -170,7 +172,7 @@ You cannot outsmart arithmetic with charisma. Build the floor.`,
   const handleSaveAuthorEpisode = (e: React.FormEvent) => {
     e.preventDefault();
     if (!authorTitle.trim() || !authorStory.trim()) {
-      alert('Please provide a title and story text.');
+      showToast('A parable needs both a title and a text — name yours, then inscribe it.', 'error');
       return;
     }
 
@@ -202,7 +204,7 @@ You cannot outsmart arithmetic with charisma. Build the floor.`,
       // Immediately open in reader so user experiences their own story!
       setActiveReadingEpisode(newEpisode);
     } catch {
-      alert('Failed to save story locally.');
+      showToast("Your episode wasn't stored on this device — your text is still in the editor. Check storage and save again.", 'error');
     }
   };
 
@@ -345,7 +347,7 @@ You cannot outsmart arithmetic with charisma. Build the floor.`,
           onClick={() => {
             navigator.clipboard.writeText(window.location.href);
             StudioAudio.playClick();
-            alert('Canon link copied to clipboard.');
+            showToast('Canon link copied — pass the codex on.', 'success');
           }}
           className="p-2.5 rounded-full text-[#8a6e2a] hover:text-[#C9A84C] hover:bg-white/5 transition-colors cursor-pointer"
           title="Copy Link"

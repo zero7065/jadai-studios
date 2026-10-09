@@ -34,7 +34,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({
       showToast('Copied to clipboard', 'success', 'Developer Workspace');
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      showToast('Unable to copy code to clipboard', 'error');
+      showToast('Clipboard refused the snippet — select the code and copy it manually.', 'error');
     }
   };
 

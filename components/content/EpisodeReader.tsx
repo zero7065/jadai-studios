@@ -115,7 +115,7 @@ export const EpisodeReader: React.FC<EpisodeReaderProps> = ({
       setTimeout(() => setReflectionSaved(false), 3000);
       showToast('Personal reflection inscribed in your private codex.', 'success');
     } catch {
-      showToast('Failed to save reflection locally.', 'error');
+      showToast('Your reflection stayed in this browser — private codex storage is full or blocked. Clear space and inscribe it again.', 'error');
     }
   };
 
@@ -127,7 +127,7 @@ export const EpisodeReader: React.FC<EpisodeReaderProps> = ({
       StudioAudio.playSuccessArpeggio();
       showToast('Custom story version saved. You now own this adaptation!', 'success');
     } catch {
-      showToast('Failed to save story locally.', 'error');
+      showToast("Your adaptation wasn't stored on this device — the canon is untouched. Check storage and save again.", 'error');
     }
   };
 

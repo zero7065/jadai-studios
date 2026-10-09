@@ -176,7 +176,7 @@ export const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
               <button
                 onClick={() => {
                   try { StudioAudio.playSuccessArpeggio(); } catch {}
-                  alert('Print Shop Checkout Initialized (Dual Currency Paystack Modal)');
+                  alert('Preview mode — this shows how the Print Shop will behave. Live Paystack checkout activates once the template is deployed. No charge was made.');
                 }}
                 className="px-4 py-2 rounded-lg bg-[#D4A574] text-black font-mono text-xs font-bold hover:bg-[#e8c96a] transition-all cursor-pointer"
               >
@@ -247,7 +247,7 @@ export const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
               <button
                 onClick={() => {
                   try { StudioAudio.playSuccessArpeggio(); } catch {}
-                  alert('Direct Paystack Checkout Initiated with Webhook Verification!');
+                  alert('Preview mode — the cart above is a demo of the live store. Deploy the template to run real Paystack transactions. No charge was made.');
                 }}
                 className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-mono text-xs font-bold transition-all cursor-pointer"
               >

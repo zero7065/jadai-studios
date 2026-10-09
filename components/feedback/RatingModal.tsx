@@ -47,7 +47,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
       showToast('Transmission recorded in studio audit ledger.', 'success', 'Critique Logged');
       onClose();
     } catch (err: any) {
-      showToast(err.message || 'Failed to submit feedback', 'error');
+      showToast(err.message || "Your critique didn't reach the ledger — your answers are still here. Send it once more.", 'error');
     } finally {
       setSubmitting(false);
     }

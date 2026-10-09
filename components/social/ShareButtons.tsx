@@ -35,7 +35,7 @@ export const ShareButtons: React.FC<ShareButtonsProps> = ({
         window.open('https://instagram.com/jadaistudios/', '_blank');
       }, 800);
     } catch {
-      showToast('Unable to copy caption automatically', 'error');
+      showToast("Clipboard blocked the caption — select the text above and copy it by hand.", 'error');
     }
   };
 
@@ -46,7 +46,7 @@ export const ShareButtons: React.FC<ShareButtonsProps> = ({
       showToast('Link copied to clipboard', 'info');
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      showToast('Failed to copy link', 'error');
+      showToast("Clipboard blocked the link — select the address bar and copy it by hand.", 'error');
     }
   };
 

@@ -201,7 +201,9 @@ export default function MarketplacePage() {
         <div className="p-16 text-center rounded-3xl bg-[#0a0908] border border-[rgba(201,168,76,0.15)] max-w-xl mx-auto space-y-3">
           <ShoppingBag className="w-8 h-8 text-[#C9A84C] mx-auto opacity-40" />
           <p className="font-mono text-sm text-[#f5f3f0]">
-            Templates coming soon — follow @hudsonstylez for launch updates.
+            {searchQuery || selectedCategory !== 'All' || selectedStack !== 'All' || selectedStatus !== 'All'
+              ? 'Nothing in the shop matches that yet. Clear the filters to see the full catalog.'
+              : 'The Print Shop is still being typeset. The first templates will surface here the moment they are ready.'}
           </p>
         </div>
       ) : (

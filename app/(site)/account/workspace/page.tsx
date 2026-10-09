@@ -300,7 +300,7 @@ export default function WorkspacePage({ onNavigate }: { onNavigate?: (path: stri
           {filteredDrafts.length === 0 ? (
             <div className="py-12 text-center space-y-2">
               <FolderGit2 className="w-8 h-8 text-[#8a6e2a] mx-auto opacity-50" />
-              <p className="text-xs font-mono text-[#8a6e2a]">No drafts found for {activeFilter}.</p>
+              <p className="text-xs font-mono text-[#8a6e2a]">No drafts under {activeFilter} yet.</p>
               <button
                 onClick={() => onNavigate ? onNavigate('/playground') : (window.location.href = '/playground')}
                 className="text-xs font-mono text-[#C9A84C] hover:underline"

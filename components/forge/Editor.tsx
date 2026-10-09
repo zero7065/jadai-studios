@@ -388,7 +388,7 @@ export function Editor({
       showToast(`Document exported as 4K ${format.toUpperCase()} successfully`, 'success');
     } catch (e: any) {
       console.error('Export failed:', e);
-      showToast('Export failed. Check permissions.', 'error');
+      showToast("The export didn't finish — your browser may have blocked the download. Allow downloads for this site and try again.", 'error');
     } finally {
       setExporting(null);
     }

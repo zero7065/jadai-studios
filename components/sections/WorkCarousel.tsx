@@ -148,7 +148,7 @@ export const WorkCarousel: React.FC = () => {
                     onClick={() => {
                       navigator.clipboard.writeText(liveUrl);
                       StudioAudio.playClick();
-                      alert('Project URL copied to clipboard');
+                      alert('Project link copied — paste it anywhere you need the proof.');
                     }}
                     className="p-2.5 rounded-xl text-[#8a6e2a] hover:text-[#C9A84C] hover:bg-white/5 transition-colors cursor-pointer"
                     title="Share Link"

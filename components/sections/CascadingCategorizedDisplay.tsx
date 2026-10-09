@@ -236,7 +236,7 @@ const HUB_ROW_ITEMS: DisplayItem[] = [
     previewImage: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=400&auto=format&fit=crop&q=80',
     why: 'Coordination overhead kills velocity without shared mental maps.',
     what: 'Encrypted collaborative workrooms with real-time whiteboards and live markdown syncing.',
-    how: 'Coming soon for Voice and Prime tier organizations.',
+    how: 'Reserved for Voice and Prime tiers — upgrade to claim early access.',
   },
 ];
 
