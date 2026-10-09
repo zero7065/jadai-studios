@@ -18,6 +18,7 @@ import {
 } from '@/modules/oracle/lib/writing-modes';
 import { useToast } from '@/components/providers/ToastProvider';
 import { StudioAudio } from '@/lib/watermark';
+import { askPrime, askGrounded } from '@/lib/ai/memory';
 import {
   Type,
   AlignLeft,
@@ -200,21 +201,17 @@ STYLE INVARIANTS:
 8. Return clean prose directly ready to be placed on the canvas. No conversational chatter or quotes around response.`;
 
     try {
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: `Directive: ${directive}\n\nExisting Canvas Excerpt:\n"""\n${snippet || docContent.slice(-1500)}\n"""`,
-          systemPrompt,
-          moduleSlug: 'oracle',
-        }),
+      const result = await askPrime({
+        prompt: `Directive: ${directive}\n\nExisting Canvas Excerpt:\n"""\n${snippet || docContent.slice(-1500)}\n"""`,
+        systemPrompt,
+        moduleSlug: 'oracle',
+        scope: 'writer',
       });
 
-      const data = await res.json();
-      if (data.success && data.data?.text) {
-        return data.data.text.trim();
+      if (result.text) {
+        return result.text.trim();
       }
-      throw new Error(data.error || 'AI generation failed');
+      throw new Error(result.error || 'AI generation failed');
     } catch {
       // Sovereign Highland fallback
       const fallbackPhrases = [
@@ -345,22 +342,18 @@ STYLE INVARIANTS:
     setIsSearching(true);
     StudioAudio.playClick();
     try {
-      const res = await fetch('/api/ai/grounded', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: `Research and synthesize 3 verified factual bullet points or historical citations for writer regarding: "${query}". Format as 3 concise factual notes.`,
-          mode: 'search',
-        }),
+      const result = await askGrounded({
+        prompt: `Research and synthesize 3 verified factual bullet points or historical citations for writer regarding: "${query}". Format as 3 concise factual notes.`,
+        mode: 'search',
+        scope: 'writer',
       });
 
-      const data = await res.json();
-      if (data.success && data.text) {
-        const bulletPoints = data.text
+      if (result.text) {
+        const bulletPoints = result.text
           .split('\n')
           .filter((line: string) => line.trim().length > 10)
           .slice(0, 3);
-        setResearchResults(bulletPoints.length > 0 ? bulletPoints : [data.text]);
+        setResearchResults(bulletPoints.length > 0 ? bulletPoints : [result.text]);
       } else {
         throw new Error('Search failed');
       }

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { getPublicHealth } from './lib/diagnostics/health';
 import { runSelfCheck } from './lib/diagnostics/self-check';
 import { runDiagnosticScan } from './lib/diagnostics/scanner';
-import { generateText } from './lib/ai';
+import { generateText, assembleChatRequest, formatMemoryBlock, extractMemoriesPrompt } from './lib/ai';
 import { getModuleBySlug } from './lib/modules/modules.config';
 import { supabaseAdmin } from './lib/supabase/admin';
 import { invalidateAiCache } from './lib/ai/cache';
@@ -976,20 +976,124 @@ async function startServer() {
   });
 
   // ---------------------------------------------------------------------------
-  // 8. AI CHAT & STATUS
+  // 8. AI CHAT, STATUS & UNIFIED MEMORY
   // ---------------------------------------------------------------------------
+
+  const isValidBuilderId = (v: unknown): v is string =>
+    typeof v === 'string' && /^[a-zA-Z0-9_-]{6,80}$/.test(v);
+
+  const sanitizeScope = (v: unknown): string => {
+    const s = typeof v === 'string' ? v.trim().toLowerCase() : '';
+    return /^[a-z0-9_-]{1,40}$/.test(s) ? s : 'oracle';
+  };
+
+  const inferMemoryType = (key: string): string => {
+    const k = key.toLowerCase();
+    if (k.includes('name') || k.includes('role') || k.includes('location')) return 'profile';
+    if (k.includes('ambition') || k.includes('goal') || k.includes('building')) return 'goal';
+    if (k.includes('prefer') || k.includes('style') || k.includes('voice')) return 'preference';
+    if (k.includes('weak') || k.includes('blind') || k.includes('pattern')) return 'pattern';
+    return 'insight';
+  };
+
+  // Persist an exchange + trigger background memory extraction (never blocks the reply).
+  const persistAiExchange = async (input: {
+    builderId?: unknown;
+    scope?: unknown;
+    moduleSlug?: string;
+    userContent: string;
+    assistantContent: string;
+    recentHistory?: Array<{ role: string; content: string }>;
+  }): Promise<void> => {
+    if (!isValidBuilderId(input.builderId)) return;
+    const builderId = input.builderId;
+    const scope = sanitizeScope(input.scope);
+    const moduleSlug = input.moduleSlug || scope;
+
+    await supabaseAdmin.from('ai_messages').insert([
+      { builder_id: builderId, scope, module_slug: moduleSlug, role: 'user', content: input.userContent.slice(0, 4000) },
+      { builder_id: builderId, scope, module_slug: moduleSlug, role: 'assistant', content: input.assistantContent.slice(0, 4000) },
+    ]);
+
+    // Extraction cadence: every 6th exchange (12 rows). Keeps AI cost predictable.
+    const { count } = await supabaseAdmin
+      .from('ai_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('builder_id', builderId);
+
+    if (!count || count % 12 !== 0) return;
+    const window = (input.recentHistory || []).slice(-8);
+    if (window.length < 4) return;
+
+    const extraction = await generateText(extractMemoriesPrompt(window).prompt, {
+      systemPrompt: extractMemoriesPrompt(window).systemPrompt,
+      moduleSlug: 'memory-engine',
+      bypassCache: true,
+    });
+
+    const jsonMatch = extraction.text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return;
+    let facts: Array<{ key?: string; value?: string; confidence?: number }> = [];
+    try {
+      facts = JSON.parse(jsonMatch[0]);
+    } catch {
+      return;
+    }
+    for (const fact of facts.slice(0, 8)) {
+      if (!fact.key || !fact.value || typeof fact.value !== 'string') continue;
+      if (fact.value.length > 500) continue;
+      await supabaseAdmin.from('ai_memories').upsert(
+        {
+          builder_id: builderId,
+          type: inferMemoryType(String(fact.key)),
+          key: String(fact.key).slice(0, 64),
+          value: fact.value,
+          confidence: Math.min(1, Math.max(0, Number(fact.confidence) || 0.8)),
+          source_module: moduleSlug,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'builder_id,key' }
+      );
+    }
+  };
+
   app.post('/api/ai/chat', rateLimit('ai_chat', { max: 20 }), async (req, res) => {
-    const { prompt, systemPrompt, moduleSlug, bypassCache } = req.body;
-    if (!prompt) {
+    const { prompt, systemPrompt, moduleSlug, bypassCache, persona, history, memory, builderId, scope, temperature } = req.body;
+    if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ success: false, error: 'Missing prompt' });
     }
 
+    const assembled = assembleChatRequest({
+      prompt: prompt.slice(0, 8000),
+      systemPrompt: typeof systemPrompt === 'string' ? systemPrompt.slice(0, 4000) : undefined,
+      persona: typeof persona === 'string' ? persona : undefined,
+      history: Array.isArray(history) ? history : undefined,
+      memory: Array.isArray(memory) || (memory && typeof memory === 'object') ? memory : undefined,
+    });
+
     try {
-      const result = await generateText(prompt, {
-        systemPrompt,
-        moduleSlug: moduleSlug || 'oracle',
+      const result = await generateText(assembled.prompt, {
+        systemPrompt: assembled.systemPrompt,
+        moduleSlug: moduleSlug || scope || 'oracle',
         bypassCache: Boolean(bypassCache),
+        temperature: typeof temperature === 'number' ? Math.min(2, Math.max(0, temperature)) : undefined,
       });
+
+      // Background: transcript sync + periodic memory extraction. Failures are silent.
+      const recentHistory = [
+        ...(Array.isArray(history) ? history : []),
+        { role: 'user', content: prompt },
+        { role: 'assistant', content: result.text },
+      ];
+      void persistAiExchange({
+        builderId,
+        scope,
+        moduleSlug: typeof moduleSlug === 'string' ? moduleSlug : undefined,
+        userContent: prompt,
+        assistantContent: result.text,
+        recentHistory,
+      }).catch(() => {});
+
       res.json({ success: true, data: result });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -1021,18 +1125,110 @@ async function startServer() {
   });
 
   app.post('/api/ai/grounded', rateLimit('ai_grounded', { max: 20 }), async (req, res) => {
-    const { prompt, mode, location, systemPrompt } = req.body;
+    const { prompt, mode, location, systemPrompt, builderId, scope, history, memory } = req.body;
     if (!prompt) {
       return res.status(400).json({ success: false, error: 'Prompt is required for grounded intelligence' });
     }
 
+    // Same continuity protocol as /api/ai/chat — memory travels with grounded calls too.
+    const assembled = assembleChatRequest({
+      prompt: String(prompt).slice(0, 8000),
+      systemPrompt: typeof systemPrompt === 'string' ? systemPrompt.slice(0, 4000) : undefined,
+      history: Array.isArray(history) ? history : undefined,
+      memory: Array.isArray(memory) || (memory && typeof memory === 'object') ? memory : undefined,
+    });
+
     try {
-      const result = await generateGroundedContent(prompt, {
+      const result = await generateGroundedContent(assembled.prompt, {
         mode: mode || 'search',
         location,
-        systemPrompt,
+        systemPrompt: assembled.systemPrompt,
       });
+
+      const recentHistory = [
+        ...(Array.isArray(history) ? history : []),
+        { role: 'user', content: String(prompt) },
+        { role: 'assistant', content: String(result.text || '') },
+      ];
+      void persistAiExchange({
+        builderId,
+        scope,
+        moduleSlug: 'grounded',
+        userContent: String(prompt),
+        assistantContent: String(result.text || ''),
+        recentHistory,
+      }).catch(() => {});
+
       res.json({ success: true, ...result });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET — restore server-synced memory (facts + transcript) for a builder.
+  app.get('/api/ai/memory', rateLimit('ai_memory', { max: 30 }), async (req, res) => {
+    const builderId = req.query.builderId;
+    if (!isValidBuilderId(builderId)) {
+      return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    }
+
+    try {
+      const [factsRes, messagesRes] = await Promise.all([
+        supabaseAdmin
+          .from('ai_memories')
+          .select('type, key, value, confidence, source_module, updated_at')
+          .eq('builder_id', builderId)
+          .order('confidence', { ascending: false })
+          .limit(40),
+        supabaseAdmin
+          .from('ai_messages')
+          .select('scope, role, content, created_at')
+          .eq('builder_id', builderId)
+          .order('created_at', { ascending: false })
+          .limit(40),
+      ]);
+
+      res.json({
+        success: true,
+        facts: (factsRes.data || []).map((f) => ({
+          type: f.type,
+          key: f.key,
+          value: f.value,
+          confidence: f.confidence,
+          source: f.source_module,
+          createdAt: f.updated_at,
+        })),
+        transcript: (messagesRes.data || []).reverse().map((m) => ({
+          role: m.role,
+          content: m.content,
+          scope: m.scope,
+          ts: m.created_at,
+        })),
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // DELETE — full privacy wipe for a builder (client "Clear AI memory" action).
+  app.delete('/api/ai/memory', rateLimit('ai_memory', { max: 10 }), async (req, res) => {
+    const builderId = req.body?.builderId;
+    if (!isValidBuilderId(builderId)) {
+      return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    }
+
+    try {
+      const [memories, messages] = await Promise.all([
+        supabaseAdmin.from('ai_memories').delete().eq('builder_id', builderId),
+        supabaseAdmin.from('ai_messages').delete().eq('builder_id', builderId),
+      ]);
+      res.json({
+        success: true,
+        deleted: {
+          memories: memories.error ? 0 : 'all',
+          messages: messages.error ? 0 : 'all',
+        },
+      });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -1170,6 +1366,32 @@ async function startServer() {
       });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message || 'Message delivery failed' });
+    }
+  });
+
+  // Memory Matrix — inspect what PRIME has learned about builders across surfaces.
+  app.get('/api/admin/ai-memory', async (req, res) => {
+    try {
+      const [memories, messages] = await Promise.all([
+        supabaseAdmin
+          .from('ai_memories')
+          .select('builder_id, type, key, value, confidence, source_module, updated_at')
+          .order('updated_at', { ascending: false })
+          .limit(60),
+        supabaseAdmin
+          .from('ai_messages')
+          .select('builder_id, scope, module_slug, role, content, created_at')
+          .order('created_at', { ascending: false })
+          .limit(60),
+      ]);
+      res.json({
+        success: true,
+        memories: memories.data || [],
+        messages: (messages.data || []).reverse(),
+        memoryError: memories.error?.message || null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 
@@ -1508,6 +1730,150 @@ Draft a continuation of 40-70 words that deepens the architectural or moral stak
     }
 
     res.json({ success: true, message: 'Transmission received by Jadai Studios' });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 9b. PUBLIC INGEST — feedback, JadaiHub listings, Dream Forge intake,
+  //     Oracle profiling answers (feeds unified AI memory)
+  // ---------------------------------------------------------------------------
+
+  app.post('/api/feedback/submit', rateLimit('feedback', { max: 10 }), async (req, res) => {
+    const { rating, message, type, source } = req.body || {};
+    const r = Math.round(Number(rating));
+    if (!Number.isFinite(r) || r < 1 || r > 5) {
+      return res.status(400).json({ success: false, error: 'Rating must be 1-5' });
+    }
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ success: false, error: 'Critique message required' });
+    }
+    const allowedTypes = ['general', 'module', 'template', 'oracle', 'hub'];
+    try {
+      const { error } = await supabaseAdmin.from('feedback').insert({
+        rating: r,
+        message: message.trim().slice(0, 4000),
+        type: allowedTypes.includes(type) ? type : 'general',
+        source: typeof source === 'string' ? source.slice(0, 200) : 'web',
+      });
+      if (error) throw new Error(error.message);
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message || 'Critique not recorded' });
+    }
+    res.json({ success: true, message: 'Critique recorded in studio audit ledger' });
+  });
+
+  app.get('/api/hub/listings', async (req, res) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('hub_listings')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw new Error(error.message);
+      res.json({ success: true, listings: data || [] });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/hub/listings', rateLimit('hub', { max: 10 }), async (req, res) => {
+    const b = req.body || {};
+    const allowedTypes = ['service', 'product', 'collab', 'job'];
+    const title = String(b.title || '').trim().slice(0, 200);
+    const description = String(b.description || '').trim().slice(0, 3000);
+    if (!title || !description) {
+      return res.status(400).json({ success: false, error: 'Title and description required' });
+    }
+    const stack = Array.isArray(b.stack) ? b.stack.filter((s: unknown) => typeof s === 'string').slice(0, 20) : [];
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('hub_listings')
+        .insert({
+          type: allowedTypes.includes(b.type) ? b.type : 'service',
+          title,
+          description,
+          stack,
+          price_type: ['fixed', 'hourly', 'equity', 'free'].includes(b.price_type) ? b.price_type : 'fixed',
+          price: Math.max(0, Math.round(Number(b.price) || 0)),
+          currency: String(b.currency || 'NGN').toUpperCase() === 'USD' ? 'USD' : 'NGN',
+          contact_method: typeof b.contact_method === 'string' ? b.contact_method.slice(0, 300) : null,
+          status: 'pending',
+        })
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      res.json({ success: true, listing: data });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || 'Listing not queued' });
+    }
+  });
+
+  app.post('/api/dream-forge/intake', rateLimit('intake', { max: 10 }), async (req, res) => {
+    const b = req.body || {};
+    const building = String(b.building || '').trim().slice(0, 2000);
+    const email = String(b.email || '').trim().toLowerCase();
+    if (!building) {
+      return res.status(400).json({ success: false, error: 'Tell us what you are building first' });
+    }
+    if (email && !email.includes('@')) {
+      return res.status(400).json({ success: false, error: 'Valid email required when provided' });
+    }
+    try {
+      const { error } = await supabaseAdmin.from('dream_forge_intakes').insert({
+        building,
+        obstacles: String(b.obstacles || '').trim().slice(0, 2000) || null,
+        tried: String(b.tried || '').trim().slice(0, 2000) || null,
+        vision6mo: String(b.vision6Mo || b.vision6mo || '').trim().slice(0, 2000) || null,
+        email: email || null,
+        whatsapp: String(b.whatsapp || '').trim().slice(0, 40) || null,
+      });
+      if (error) throw new Error(error.message);
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message || 'Intake not recorded' });
+    }
+    res.json({ success: true, message: 'Vision recorded — blueprint pipeline engaged' });
+  });
+
+  // Oracle profiling answers land in the unified memory layer so PRIME knows
+  // the builder's answers on every surface, not just this browser session.
+  app.post('/api/oracle/profiling', rateLimit('profiling', { max: 60 }), async (req, res) => {
+    const { builderId, questionIndex, question, answer } = req.body || {};
+    if (!isValidBuilderId(builderId)) {
+      return res.status(400).json({ success: false, error: 'builderId required' });
+    }
+    const a = String(answer || '').trim().slice(0, 1200);
+    if (!a) {
+      return res.status(400).json({ success: false, error: 'Answer required' });
+    }
+    const idx = Math.max(0, Math.min(99, Math.round(Number(questionIndex) || 0)));
+    const q = String(question || '').trim().slice(0, 300);
+    try {
+      await supabaseAdmin.from('ai_memories').upsert(
+        {
+          builder_id: builderId,
+          type: 'profile',
+          key: `profile:q${idx}`,
+          value: q ? `${q} → ${a}` : a,
+          confidence: 0.9,
+          source_module: 'oracle',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'builder_id,key' }
+      );
+      if (idx === 9) {
+        await persistAiExchange({
+          builderId,
+          scope: 'oracle',
+          moduleSlug: 'oracle',
+          userContent: `Profiling complete. Answers: ${a}`,
+          assistantContent: 'Profiling acknowledged. Persona calibrated.',
+          recentHistory: [],
+        });
+      }
+    } catch {
+      // Non-blocking for the flow — answers also persist client-side
+    }
+    res.json({ success: true });
   });
 
   // ---------------------------------------------------------------------------

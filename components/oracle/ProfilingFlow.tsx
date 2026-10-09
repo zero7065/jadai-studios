@@ -3,6 +3,7 @@ import GlassCard from '../ui/GlassCard';
 import Button from '../ui/Button';
 import { Sparkles, ArrowRight, SkipForward } from 'lucide-react';
 import type { PrimePersona } from '../../lib/ai/prompts';
+import { getBuilderId, saveFact } from '../../lib/ai/memory';
 
 export const PROFILING_QUESTIONS = [
   "What did you want to be when you were ten? And why did you stop?",
@@ -42,12 +43,20 @@ export const ProfilingFlow: React.FC<ProfilingFlowProps> = ({
     const updatedAnswers = { ...answers, [currentIdx]: answer.trim() };
     setAnswers(updatedAnswers);
 
-    // Persist answer to backend
+    // Persist answer to backend (unified memory) + local device memory
     try {
+      void saveFact(
+        'profile',
+        `profile:q${currentIdx}`,
+        `${currentQuestion.slice(0, 120)} → ${answer.trim().slice(0, 400)}`,
+        0.9,
+        'oracle'
+      );
       await fetch('/api/oracle/profiling', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          builderId: getBuilderId(),
           questionIndex: currentIdx,
           question: currentQuestion,
           answer: answer.trim(),

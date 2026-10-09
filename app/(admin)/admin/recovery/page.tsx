@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import RecoveryTerminalModal from '@/components/layout/RecoveryTerminalModal';
-import { Terminal, ShieldAlert, KeyRound, RefreshCw, AlertTriangle } from 'lucide-react';
+import { clearAllMemory } from '@/lib/ai/memory';
+import { Terminal, ShieldAlert, KeyRound, RefreshCw, AlertTriangle, Brain } from 'lucide-react';
 
 export default function AdminRecoveryPage() {
   const [terminalOpen, setTerminalOpen] = useState(false);
@@ -55,14 +56,29 @@ export default function AdminRecoveryPage() {
               variant="outline"
               size="sm"
               className="w-full justify-start font-mono text-xs"
-              onClick={() => {
+              onClick={async () => {
+                // Capture builderId + server wipe before nuking localStorage
+                await clearAllMemory();
                 localStorage.clear();
                 sessionStorage.clear();
-                alert('All client caches and local storage successfully wiped.');
+                alert('All client caches, local storage, and PRIME AI memory (device + server) successfully wiped.');
               }}
             >
               <RefreshCw className="w-3.5 h-3.5 mr-2" />
-              Purge LocalStorage & Token Store
+              Purge LocalStorage, Tokens & AI Memory
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start font-mono text-xs"
+              onClick={async () => {
+                await clearAllMemory();
+                alert('PRIME AI memory cleared: facts (IndexedDB), transcripts, and server sync. Builder identity rotated.');
+              }}
+            >
+              <Brain className="w-3.5 h-3.5 mr-2" />
+              Clear PRIME AI Memory Only
             </Button>
 
             <Button

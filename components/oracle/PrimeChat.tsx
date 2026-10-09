@@ -11,6 +11,7 @@ import { useToast } from '../providers/ToastProvider';
 import UpgradeModal from '../auth/UpgradeModal';
 import AuthModal from '../auth/AuthModal';
 import { checkToolAccess, recordModuleExecution } from '../../lib/supabase/gates';
+import { askPrime, fetchServerMemory } from '../../lib/ai/memory';
 
 export interface ChatMessage {
   id: string;
@@ -106,6 +107,27 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
     }
   }, [memories]);
 
+  // Hydrate the memory panel from the unified server-side memory layer
+  useEffect(() => {
+    let cancelled = false;
+    void fetchServerMemory().then(({ facts }) => {
+      if (cancelled || facts.length === 0) return;
+      setMemories((prev) => {
+        const seen = new Set(prev.map((m) => m.key));
+        const merged = [...prev];
+        for (const f of facts) {
+          if (!seen.has(f.key)) {
+            merged.push({ id: `srv-${f.key}`, key: f.key, value: f.value, confidence: f.confidence });
+          }
+        }
+        return merged.slice(-14);
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleSend = async (messageText?: string) => {
     const textToSend = messageText || input;
     if (!textToSend.trim() || loading) return;
@@ -149,26 +171,22 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
     const assistantMsgId = `prime-${Date.now()}`;
     try {
       const historyContext = messages.map((m) => ({ role: m.role, content: m.content }));
-      const memoryMap = memories.reduce((acc, m) => ({ ...acc, [m.key]: m.value }), {});
 
-      const res = await fetch('/api/oracle/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: textToSend.trim(),
-          history: historyContext,
-          userMemory: memoryMap,
-          persona,
-        }),
+      // Unified transport — persona-aware, continuity protocol, persistent transcripts
+      const result = await askPrime({
+        prompt: textToSend.trim(),
+        history: historyContext,
+        memory: memories.map((m) => ({ key: m.key, value: m.value })),
+        persona,
+        scope: 'oracle',
+        moduleSlug: 'oracle',
       });
-
-      const data = await res.json();
-      if (!data.success && data.error) {
-        throw new Error(data.error);
+      if (!result.text || result.error) {
+        throw new Error(result.error || 'No response from PRIME');
       }
 
-      const responseText = data.data?.text || 'PRIME frequency acknowledged.';
-      const providerUsed = data.data?.provider || 'groq';
+      const responseText = result.text;
+      const providerUsed = result.provider || 'groq';
 
       const assistantMsg: ChatMessage = {
         id: assistantMsgId,

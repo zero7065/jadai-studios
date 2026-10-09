@@ -11,6 +11,7 @@ import { PLAYGROUND_TOOLS, PlaygroundTool } from '../../lib/data/playgroundTools
 import { saveLocalDraft } from '../../lib/data/draftWorkspace';
 import { StudioAudio } from '../../lib/watermark';
 import { useToast } from '../providers/ToastProvider';
+import { askPrime } from '../../lib/ai/memory';
 import WarmFallbackModal from '../ai/WarmFallbackModal';
 import RealImageGenerator from '../ai/RealImageGenerator';
 import UpgradeModal from '../auth/UpgradeModal';
@@ -95,22 +96,18 @@ export const ToolRunnerPage: React.FC<ToolRunnerPageProps> = ({ slug, onNavigate
     setRunning(true);
 
     try {
-      // Execute through AI API
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: `Execute the tool: ${tool.name}\nInput: ${inputVal}\nInstruction: Provide direct, professional output following first-principles architecture.`,
-          systemPrompt: `You are the ${tool.name} engine at Jadai Studios. Deliver immediate, high-fidelity sovereign output.`,
-          moduleSlug: tool.slug,
-        }),
+      // Execute through unified AI transport — tool runs inherit builder memory
+      const result = await askPrime({
+        prompt: `Execute the tool: ${tool.name}\nInput: ${inputVal}\nInstruction: Provide direct, professional output following first-principles architecture.`,
+        systemPrompt: `You are the ${tool.name} engine at Jadai Studios. Deliver immediate, high-fidelity sovereign output.`,
+        moduleSlug: tool.slug,
+        scope: tool.slug,
       });
 
-      const data = await res.json();
       let resultText = '';
 
-      if (data.success && data.data?.text) {
-        resultText = data.data.text;
+      if (result.text) {
+        resultText = result.text;
       } else {
         resultText = await tool.mockResultGenerator(inputVal);
       }

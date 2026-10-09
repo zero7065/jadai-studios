@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, Sparkles, Navigation, Compass } from 'lucide-react';
 import { StudioAudio } from '../../lib/watermark';
+import { askPrime, primeWelcome } from '../../lib/ai/memory';
 
 export interface GuideBeeProps {
   onNavigate?: (path: string) => void;
@@ -62,6 +63,11 @@ export const GuideBee: React.FC<GuideBeeProps> = ({ onNavigate }) => {
         if (Array.isArray(parsed) && parsed.length > 0) {
           setMessages(parsed.slice(-5));
         }
+      } else {
+        // Personalized opener — reads builder memory so GUIDE greets by name when known
+        void primeWelcome('GUIDE', 'guide').then((line) => {
+          setMessages((prev) => (prev.length === 0 ? [{ role: 'assistant', content: line }] : prev));
+        });
       }
     } catch {}
 
@@ -154,21 +160,17 @@ export const GuideBee: React.FC<GuideBeeProps> = ({ onNavigate }) => {
     setMood('curious');
 
     try {
-      // Call server proxy or Groq integration
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: `User asking for studio direction: "${query}". You are GUIDE, the navigation guide for Jadai Studios. You give extremely short answers (max 2 sentences). You always end with a direction: the exact page or tool name the user needs. Available destinations: Home, FORGE, PRIME Oracle, MIRAGE, SENTINEL, Book of Lies, Marketplace, Community, Signal, Studio Doctrine, Pricing.`,
-          systemInstruction: `You are GUIDE, the navigation guide for Jadai Studios. Maximum 2 sentences. Always include destination name.`,
-        }),
+      // Unified memory transport — also fixes the old systemInstruction / data.text mismatch
+      // that silently routed every GUIDE reply through the deterministic fallback.
+      const result = await askPrime({
+        prompt: `User asking for studio direction: "${query}"`,
+        systemPrompt:
+          'You are GUIDE, the navigation guide for Jadai Studios. You give extremely short answers (max 2 sentences). You always end with a direction: the exact page or tool name the user needs. Available destinations: Home, FORGE, PRIME Oracle, MIRAGE, SENTINEL, Book of Lies, Marketplace, Community, Signal, Studio Doctrine, Pricing.',
+        moduleSlug: 'guide',
+        scope: 'guide',
       });
 
-      let assistantText = '';
-      if (res.ok) {
-        const data = await res.json();
-        assistantText = data.text || data.response || '';
-      }
+      let assistantText = result.text;
 
       // If response empty or network issue, fallback to smart deterministic routing
       if (!assistantText) {

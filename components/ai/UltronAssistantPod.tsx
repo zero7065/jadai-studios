@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import EdgeGlow from '../ui/EdgeGlow';
 import { StudioAudio } from '../../lib/watermark';
+import { askPrime, askGrounded, getTranscript, appendTranscript, primeWelcome } from '../../lib/ai/memory';
 import {
   Bot,
   Send,
@@ -100,6 +101,29 @@ export const UltronAssistantPod: React.FC<UltronAssistantPodProps> = ({ onNaviga
         { timeout: 5000 }
       );
     }
+  }, []);
+
+  // Restore unified memory transcript + personalized welcome on mount
+  useEffect(() => {
+    void (async () => {
+      const line = await primeWelcome('Ultron', 'ultron');
+      const stored = getTranscript('ultron');
+      setMessages((prev) => {
+        const welcome = prev.find((m) => m.id === 'welcome');
+        const opener =
+          welcome && line ? [{ ...welcome, content: line }] : welcome ? [welcome] : [];
+        if (stored.length > 0) {
+          const restored: ChatMessage[] = stored.slice(-24).map((t, i) => ({
+            id: `mem-${i}-${t.ts}`,
+            role: t.role,
+            content: t.content,
+            timestamp: new Date(t.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          }));
+          return opener.length ? [...opener, ...restored] : restored;
+        }
+        return opener.length ? opener : prev;
+      });
+    })();
   }, []);
 
   // Auto-rotate 8 suggestions every 5.5s
@@ -240,6 +264,9 @@ export const UltronAssistantPod: React.FC<UltronAssistantPodProps> = ({ onNaviga
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
         setMessages((prev) => [...prev, assistantMsg]);
+        // Record local routing decisions in the unified transcript too
+        appendTranscript('ultron', 'user', query);
+        appendTranscript('ultron', 'assistant', matchedIntent.reply);
         setLoading(false);
         StudioAudio.playSuccessArpeggio();
 
@@ -270,53 +297,44 @@ export const UltronAssistantPod: React.FC<UltronAssistantPodProps> = ({ onNaviga
 
     try {
       if (effectiveMode === 'maps' || effectiveMode === 'search') {
-        const res = await fetch('/api/ai/grounded', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: query,
-            mode: effectiveMode,
-            location: userLocation,
-            systemPrompt:
-              effectiveMode === 'maps'
-                ? 'You are Ultron Spatial Navigator for Jadai Studios. Provide accurate geographic data, routes, physical studio coordinates in Nigeria and global nodes, and travel times.'
-                : 'You are Ultron Grounded Truth Agent for Jadai Studios. Discuss current events, cite recent news, and fact-check technical claims with live web accuracy.',
-          }),
+        const result = await askGrounded({
+          prompt: query,
+          mode: effectiveMode,
+          location: userLocation,
+          scope: 'ultron',
+          systemPrompt:
+            effectiveMode === 'maps'
+              ? 'You are Ultron Spatial Navigator for Jadai Studios. Provide accurate geographic data, routes, physical studio coordinates in Nigeria and global nodes, and travel times.'
+              : 'You are Ultron Grounded Truth Agent for Jadai Studios. Discuss current events, cite recent news, and fact-check technical claims with live web accuracy.',
         });
 
-        const data = await res.json();
-        const replyText = data.text || 'Grounded intelligence retrieved successfully.';
-        const sources = data.sources || [];
+        const replyText = result.text || 'Grounded intelligence retrieved successfully.';
+        const sources = result.sources || [];
 
         const assistantMsg: ChatMessage = {
           id: `ai-${Date.now()}`,
           role: 'assistant',
           content: replyText,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          groundingSources: sources,
+          groundingSources: sources as unknown as GroundingSource[],
           groundingMode: effectiveMode,
         };
 
         setMessages((prev) => [...prev, assistantMsg]);
         StudioAudio.playSuccessArpeggio();
       } else {
-        // Standard chat fallback
-        const res = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: query,
-            systemPrompt:
-              'You are Ultron, the Chief Digital Navigator and AI Intelligence of Jadai Studios in Jos, Nigeria. Speak with concise authority, mathematical precision, and sovereign clarity.',
-            moduleSlug: 'oracle',
-          }),
+        // Core PRIME chat — unified memory (builderId + facts + history) travels with the request
+        const result = await askPrime({
+          prompt: query,
+          systemPrompt:
+            'You are Ultron, the Chief Digital Navigator and AI Intelligence of Jadai Studios in Jos, Nigeria. Speak with concise authority, mathematical precision, and sovereign clarity.',
+          moduleSlug: 'oracle',
+          scope: 'ultron',
         });
 
-        const data = await res.json();
+        if (result.error && !result.text) throw new Error(result.error);
         const replyText =
-          data.data?.text ||
-          data.text ||
-          data.response ||
+          result.text ||
           'Understood. You can access Forge for editing, Mirage for visuals, Sentinel for diagnostics, and Book of Lies for our philosophical canon.';
 
         const assistantMsg: ChatMessage = {

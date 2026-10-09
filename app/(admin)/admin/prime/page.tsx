@@ -1,9 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import { useToast } from '@/components/providers/ToastProvider';
 import { StudioAudio, generateTextWatermarkFooter } from '@/lib/watermark';
-import { Sparkles, Send, Copy, CheckCircle, Clock, BookOpen, Share2, Mail, Layers } from 'lucide-react';
+import { askPrime } from '@/lib/ai/memory';
+import { Sparkles, Send, Copy, CheckCircle, Clock, BookOpen, Share2, Mail, Layers, Brain, RefreshCw } from 'lucide-react';
+
+interface MemoryRow {
+  builder_id: string;
+  type: string;
+  key: string;
+  value: string;
+  confidence: number;
+  source_module: string | null;
+  updated_at: string;
+}
+
+interface MessageRow {
+  builder_id: string;
+  scope: string;
+  role: string;
+  content: string;
+  created_at: string;
+}
 
 export default function AdminPrimeStudioPage() {
   const [promptType, setPromptType] = useState<'bol' | 'social' | 'newsletter' | 'lore' | 'blog'>('bol');
@@ -32,19 +51,14 @@ export default function AdminPrimeStudioPage() {
     };
 
     try {
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: `Target subject: ${topic}\nGenerate a complete, non-truncated draft.`,
-          systemPrompt: systemPrompts[promptType],
-          moduleSlug: 'oracle',
-        }),
+      const result = await askPrime({
+        prompt: `Target subject: ${topic}\nGenerate a complete, non-truncated draft.`,
+        systemPrompt: systemPrompts[promptType],
+        moduleSlug: 'oracle',
+        scope: 'admin-prime',
       });
-
-      const data = await res.json();
-      if (data.success && data.data?.text) {
-        let text = data.data.text;
+      if (result.text) {
+        let text = result.text;
         if (watermarked) {
           text += '\n\n' + generateTextWatermarkFooter({ source: 'PRIME ADMIN STUDIO' });
         }
@@ -52,7 +66,7 @@ export default function AdminPrimeStudioPage() {
         StudioAudio.playSuccessArpeggio();
         showToast('Strategic draft synthesized by PRIME.', 'success');
       } else {
-        throw new Error(data.error || 'Generation failed');
+        throw new Error(result.error || 'Generation failed');
       }
     } catch {
       // Deterministic sovereign fallback
@@ -89,6 +103,40 @@ ${watermarked ? generateTextWatermarkFooter({ source: 'PRIME FALLBACK CORE' }) :
   const publishToQueue = () => {
     showToast('Draft scheduled for 9:47 PM transmission pipeline.', 'success', 'Broadcast Queued');
   };
+
+  // Memory Matrix — what PRIME has learned across all surfaces
+  const [memories, setMemories] = useState<MemoryRow[]>([]);
+  const [memoryMessages, setMemoryMessages] = useState<MessageRow[]>([]);
+  const [memoryNote, setMemoryNote] = useState<string | null>(null);
+  const [memoryLoading, setMemoryLoading] = useState(false);
+
+  const loadMemoryMatrix = async () => {
+    setMemoryLoading(true);
+    try {
+      const res = await fetch('/api/admin/ai-memory');
+      const data = await res.json();
+      if (data.success) {
+        setMemories(data.memories || []);
+        setMemoryMessages(data.messages || []);
+        setMemoryNote(
+          data.memoryError
+            ? `Memory tables unreachable — run the latest lib/supabase/schema.sql (${data.memoryError})`
+            : null
+        );
+      } else {
+        setMemoryNote(data.error || 'Memory matrix unavailable');
+      }
+    } catch {
+      setMemoryNote('Memory matrix unreachable');
+    } finally {
+      setMemoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadMemoryMatrix();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -207,6 +255,76 @@ ${watermarked ? generateTextWatermarkFooter({ source: 'PRIME FALLBACK CORE' }) :
           </div>
         </GlassCard>
       </div>
+
+      {/* Memory Matrix — unified builder intelligence across every AI surface */}
+      <GlassCard className="p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-[rgba(201,168,76,0.2)] pb-3">
+          <div className="flex items-center gap-2">
+            <Brain className="w-4 h-4 text-[#C9A84C]" />
+            <span className="text-[10px] font-mono uppercase tracking-widest text-[#8a6e2a]">
+              Memory Matrix — PRIME Builder Intelligence
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-mono text-[#8a6e2a]">
+              {memories.length} facts · {memoryMessages.length} exchanges
+            </span>
+            <Button variant="outline" size="sm" onClick={loadMemoryMatrix} disabled={memoryLoading}>
+              <RefreshCw className={`w-3 h-3 mr-1 ${memoryLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        {memoryNote && (
+          <p className="text-[11px] font-mono text-[#e8c96a] bg-[rgba(201,168,76,0.08)] border border-[rgba(201,168,76,0.25)] rounded-lg px-3 py-2">
+            {memoryNote}
+          </p>
+        )}
+
+        {memories.length === 0 && !memoryNote ? (
+          <p className="text-xs font-mono text-[#8a6e2a] py-6 text-center">
+            No extracted facts yet. Extraction runs every 6th AI exchange across Oracle, Ultron, GUIDE, Writer, and the Playground tools.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[340px] overflow-y-auto pr-1">
+            {memories.map((m, i) => (
+              <div
+                key={`${m.builder_id}-${m.key}-${i}`}
+                className="flex items-start gap-2 p-2.5 rounded-lg bg-[#050404] border border-[rgba(201,168,76,0.15)] text-[11px] font-mono"
+              >
+                <span className="px-1.5 py-0.5 rounded bg-[rgba(201,168,76,0.15)] text-[#C9A84C] uppercase text-[9px] shrink-0">
+                  {m.type}
+                </span>
+                <div className="min-w-0">
+                  <span className="text-[#f5f3f0] font-bold">{m.key}</span>
+                  <span className="text-[#c4c0bb]"> — {m.value}</span>
+                  <div className="text-[9px] text-[#8a6e2a] mt-0.5">
+                    {m.builder_id.slice(0, 14)}… · {Math.round((m.confidence || 0) * 100)}%
+                    {m.source_module ? ` · ${m.source_module}` : ''}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {memoryMessages.length > 0 && (
+          <div className="border-t border-[rgba(201,168,76,0.15)] pt-3 space-y-1.5 max-h-[220px] overflow-y-auto">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-[#8a6e2a]">
+              Recent Transmissions
+            </span>
+            {memoryMessages.slice(-24).map((msg, i) => (
+              <div key={i} className="flex gap-2 text-[10px] font-mono">
+                <span className={msg.role === 'user' ? 'text-[#e8c96a]' : 'text-[#C9A84C]'}>
+                  [{msg.scope}] {msg.role === 'user' ? 'BUILDER' : 'PRIME'}:
+                </span>
+                <span className="text-[#c4c0bb] truncate">{msg.content.slice(0, 160)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </GlassCard>
     </div>
   );
 }

@@ -212,3 +212,81 @@ Generate visual prompt descriptions for art and branding assets adhering to the 
 Visual language: Deep black void (#050404), refined gold filigree (#C9A84C), sacred geometry overlays, cinematic lighting, ultra-sharp fidelity.`,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Unified chat assembly — used by /api/ai/chat and /api/ai/grounded so every
+// surface (Ultron, Oracle, GUIDE, Dream Forge, Writer, tools) shares one
+// memory-aware request shape.
+// ---------------------------------------------------------------------------
+
+export interface ChatHistoryEntry {
+  role: string;
+  content: string;
+}
+
+export interface ChatMemoryFact {
+  key: string;
+  value: string;
+  confidence?: number;
+}
+
+const HISTORY_CHAR_CAP = 900;
+const MAX_HISTORY_LINES = 10;
+const MAX_MEMORY_LINES = 14;
+
+export function formatMemoryBlock(memory?: ChatMemoryFact[] | Record<string, unknown> | null): string {
+  if (!memory) return '';
+  if (Array.isArray(memory)) {
+    const lines = memory
+      .slice(0, MAX_MEMORY_LINES)
+      .map((f) => `- ${f.key}: ${String(f.value).slice(0, 240)}`);
+    return lines.join('\n');
+  }
+  try {
+    const json = JSON.stringify(memory, null, 1);
+    return json.length > 1800 ? json.slice(0, 1800) + '…' : json;
+  } catch {
+    return '';
+  }
+}
+
+export function formatHistoryBlock(history?: ChatHistoryEntry[] | null): string {
+  if (!history || history.length === 0) return '';
+  return history
+    .slice(-MAX_HISTORY_LINES)
+    .map((h) => `${String(h.role || 'user').toUpperCase()}: ${String(h.content || '').slice(0, HISTORY_CHAR_CAP)}`)
+    .join('\n');
+}
+
+export function assembleChatRequest(input: {
+  prompt: string;
+  systemPrompt?: string;
+  persona?: string;
+  history?: ChatHistoryEntry[] | null;
+  memory?: ChatMemoryFact[] | Record<string, unknown> | null;
+}): { systemPrompt: string; prompt: string } {
+  const memoryBlock = formatMemoryBlock(input.memory);
+  const historyBlock = formatHistoryBlock(input.history);
+
+  const personaGuide =
+    input.persona && PRIME_PERSONA_GUIDES[input.persona as PrimePersona]
+      ? PRIME_PERSONA_GUIDES[input.persona as PrimePersona]
+      : '';
+
+  // System: caller's persona (if any) wrapped in the constitution + memory rules.
+  const systemPrompt = `${input.systemPrompt?.trim() || `${JADAI_SYSTEM_PREAMBLE}\nYou are PRIME Oracle. Speak directly, concisely, and with razor-sharp insight. Never sound like a customer support bot.`}
+${personaGuide ? `\n${personaGuide}` : ''}
+
+CONTINUITY PROTOCOL:
+- The BUILDER MEMORY below is persistent across every session and surface. Reference it naturally when relevant — never recite it wholesale.
+- If the builder states a name, ambition, constraint, or decision, treat it as durable fact until they revise it.
+- Keep replies tight: no preamble, no summaries of your own answer, no hedging.
+
+BUILDER MEMORY:
+${memoryBlock || '(none yet — this is a fresh builder)'}`;
+
+  const prompt = `${historyBlock ? `CONVERSATION RECORD:\n${historyBlock}\n\n` : ''}BUILDER: ${input.prompt}
+PRIME:`;
+
+  return { systemPrompt, prompt };
+}

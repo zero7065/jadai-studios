@@ -758,6 +758,79 @@ CREATE INDEX IF NOT EXISTS idx_template_orders_template ON template_orders(templ
 ALTER TABLE template_orders ENABLE ROW LEVEL SECURITY;
 
 -- -----------------------------------------------------------------------------
+-- AI MEMORIES (persistent builder facts extracted by PRIME across all surfaces)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ai_memories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    builder_id TEXT NOT NULL,
+    user_id UUID,
+    type TEXT NOT NULL DEFAULT 'insight' CHECK (type IN ('profile', 'preference', 'insight', 'goal', 'context', 'pattern')),
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    confidence REAL NOT NULL DEFAULT 0.8,
+    source_module TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (builder_id, key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_memories_builder ON ai_memories(builder_id, confidence DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_memories_updated ON ai_memories(updated_at DESC);
+
+ALTER TABLE ai_memories ENABLE ROW LEVEL SECURITY;
+
+-- -----------------------------------------------------------------------------
+-- AI MESSAGES (server-side transcript sync for cross-device continuity)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ai_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    builder_id TEXT NOT NULL,
+    scope TEXT NOT NULL DEFAULT 'oracle',
+    module_slug TEXT,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_messages_builder ON ai_messages(builder_id, scope, created_at DESC);
+
+ALTER TABLE ai_messages ENABLE ROW LEVEL SECURITY;
+
+-- -----------------------------------------------------------------------------
+-- CONTACT SUBMISSIONS (public contact form)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS contact_submissions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    category TEXT DEFAULT 'general',
+    budget TEXT DEFAULT 'unspecified',
+    message TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE contact_submissions ENABLE ROW LEVEL SECURITY;
+
+-- -----------------------------------------------------------------------------
+-- DREAM FORGE INTAKES (vision intake wizard leads)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dream_forge_intakes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    building TEXT NOT NULL,
+    obstacles TEXT,
+    tried TEXT,
+    vision6mo TEXT,
+    email TEXT,
+    whatsapp TEXT,
+    status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'blueprint_sent', 'converted', 'archived')),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_dream_forge_intakes_created ON dream_forge_intakes(created_at DESC);
+
+ALTER TABLE dream_forge_intakes ENABLE ROW LEVEL SECURITY;
+
+-- -----------------------------------------------------------------------------
 -- SEED DATA: ADMIN SETTINGS
 -- -----------------------------------------------------------------------------
 INSERT INTO admin_settings (key, value, category, description, updated_by) VALUES

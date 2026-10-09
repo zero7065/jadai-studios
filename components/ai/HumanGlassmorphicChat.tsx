@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import EdgeGlow from '../ui/EdgeGlow';
 import { StudioAudio } from '../../lib/watermark';
 import { JADAI_ROSTER, JadaiCharacter } from '../../lib/data/jadaiArt';
+import { askPrime, primeWelcome } from '../../lib/ai/memory';
 import WarmFallbackModal from './WarmFallbackModal';
 import {
   Send,
@@ -98,6 +99,18 @@ export const HumanGlassmorphicChat: React.FC<HumanGlassmorphicChatProps> = ({
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Personalize the opener from unified memory when this is a fresh session
+  useEffect(() => {
+    void primeWelcome('PRIME', 'oracle-human').then((line) => {
+      if (!line) return;
+      setMessages((prev) =>
+        prev.length === 1 && prev[0].id === 'msg-start'
+          ? [{ ...prev[0], content: line }]
+          : prev
+      );
+    });
+  }, []);
+
   // Sync to local storage
   useEffect(() => {
     if (typeof window !== 'undefined' && messages.length > 0) {
@@ -156,13 +169,10 @@ export const HumanGlassmorphicChat: React.FC<HumanGlassmorphicChatProps> = ({
     setLoading(true);
 
     try {
-      // Direct call to API
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: query.trim(),
-          systemPrompt: `You are PRIME chatting with a founder or builder in your signature voice:
+      // Unified memory transport — builderId + facts + history attached automatically
+      const result = await askPrime({
+        prompt: query.trim(),
+        systemPrompt: `You are PRIME chatting with a founder or builder in your signature voice:
 - Short, punchy sentences.
 - Specific images.
 - Occasional emoji (2-3 per message max, never spammy).
@@ -173,16 +183,13 @@ Examples of your replies:
 User: "I'm stuck." -> You: "Alright. Stuck on what — the idea, the execution, or the reason you're doing it? 🌀"
 User: "I don't know where to start." -> You: "Start with the smallest thing you'd be embarrassed to show. That's usually where the real one lives. What is it? 👀"
 User: "Can you help me write a book?" -> You: "Yeah. But I need two things first — the theme, and the lie you're trying to kill with it. What is it? 📖"`,
-          moduleSlug: 'oracle',
-        }),
+        moduleSlug: 'oracle',
+        scope: 'oracle-human',
       });
 
-      const data = await res.json();
-      if (!data.success && data.error) {
-        throw new Error(data.error);
-      }
+      if (result.error && !result.text) throw new Error(result.error);
 
-      let reply = data.data?.text || "Got it. Let's build the floor first. ⬡";
+      let reply = result.text || "Got it. Let's build the floor first. ⬡";
 
       // Detect if user asked for art/character/visuals
       const lower = query.toLowerCase();

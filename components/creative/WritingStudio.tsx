@@ -7,6 +7,7 @@ import EdgeGlow from '../ui/EdgeGlow';
 import { useToast } from '../providers/ToastProvider';
 import { useCurrency } from '../providers/CurrencyProvider';
 import { StudioAudio } from '../../lib/watermark';
+import { askPrime } from '../../lib/ai/memory';
 import {
   Feather,
   BookOpen,
@@ -414,17 +415,15 @@ Current Draft Excerpt:
 "${storyContent.slice(0, 1500)}"`;
 
     try {
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: fullInstruction,
-          systemInstruction: 'You are an award-winning literary ghostwriter who specializes in In-Media-Res narrative arcs and Shakespearean wit.',
-        }),
+      // Unified transport — also fixes the old systemInstruction / data.text mismatch
+      const result = await askPrime({
+        prompt: fullInstruction,
+        systemPrompt:
+          'You are an award-winning literary ghostwriter who specializes in In-Media-Res narrative arcs and Shakespearean wit.',
+        moduleSlug: 'writing-studio',
+        scope: 'writing-studio',
       });
-
-      const data = await res.json();
-      const outputText = data.text || data.response || '';
+      const outputText = result.text;
       if (outputText) {
         setAiSuggestion(outputText);
         try {
@@ -432,7 +431,7 @@ Current Draft Excerpt:
         } catch {}
         showToast('Narrative draft synthesized by co-author', 'success', 'Ghostwriter Ready');
       } else {
-        showToast('AI co-author did not return text. Check connection.', 'error');
+        showToast(result.error ? `AI co-author unreachable — ${result.error}` : 'AI co-author did not return text. Check connection.', 'error');
       }
     } catch {
       // Local fallback rewrite

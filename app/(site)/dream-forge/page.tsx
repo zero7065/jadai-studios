@@ -7,6 +7,7 @@ import EdgeGlow from '@/components/ui/EdgeGlow';
 import YinYangLoader from '@/components/ui/YinYangLoader';
 import { useToast } from '@/components/providers/ToastProvider';
 import { StudioAudio } from '@/lib/watermark';
+import { askPrime, saveFact } from '@/lib/ai/memory';
 import {
   Flame,
   Layers,
@@ -114,25 +115,27 @@ Concrete access control rules ensuring zero unauthorized tenant cross-contaminat
 The exact 5-milestone checklist required to bring this from abstract dream to live operational code.`;
 
     try {
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt,
-          systemPrompt:
-            'You are PRIME, the Chief Architect of Jadai Studios in Jos, Nigeria. You produce uncompromising, complete, battle-tested software blueprints. Write concise, precise technical architecture.',
-          moduleSlug: 'dream-forge',
-        }),
+      // Persist the intake as durable builder memory — PRIME remembers what you're building
+      // across every surface, not just this session.
+      await saveFact('goal', 'current_project', `${intake.appName}: ${intake.problemStatement}`.slice(0, 400), 0.9, 'dream-forge');
+      await saveFact('context', 'target_audience', intake.targetAudience.slice(0, 300), 0.8, 'dream-forge');
+      await saveFact('preference', 'monetization', `${intake.monetizationModel} (${intake.primaryCurrency})`, 0.75, 'dream-forge');
+
+      const result = await askPrime({
+        prompt,
+        systemPrompt:
+          'You are PRIME, the Chief Architect of Jadai Studios in Jos, Nigeria. You produce uncompromising, complete, battle-tested software blueprints. Write concise, precise technical architecture.',
+        moduleSlug: 'dream-forge',
+        scope: 'dream-forge',
       });
 
-      const data = await res.json();
-      if (data.success && data.data?.text) {
-        setBlueprintResult(data.data.text);
+      if (result.text) {
+        setBlueprintResult(result.text);
         setShatterActive(true);
         setTimeout(() => setShatterActive(false), 2500);
-        showToast('System architecture synthesized successfully', 'success', 'Forge Active');
+        showToast('System architecture synthesized and archived to builder memory', 'success', 'Forge Active');
       } else {
-        throw new Error(data.error || 'AI generation failed');
+        throw new Error(result.error || 'AI generation failed');
       }
     } catch {
       // Deterministic fallback blueprint
