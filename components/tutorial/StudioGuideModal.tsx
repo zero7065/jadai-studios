@@ -88,16 +88,6 @@ export const StudioGuideModal: React.FC<StudioGuideModalProps> = ({
   onNavigate,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [dontShowAgain, setDontShowAgain] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const seen = localStorage.getItem('jadai_tour_seen');
-      if (seen === 'true') {
-        setDontShowAgain(true);
-      }
-    }
-  }, []);
 
   const step = GUIDE_STEPS[currentStep];
   const StepIcon = step.icon;
@@ -113,7 +103,8 @@ export const StudioGuideModal: React.FC<StudioGuideModalProps> = ({
     if (currentStep < GUIDE_STEPS.length - 1) {
       setCurrentStep((prev) => prev + 1);
     } else {
-      if (dontShowAgain) persistPreference();
+      // Completing the tour counts as seen — never auto-open it again
+      persistPreference();
       StudioAudio.playSuccessArpeggio();
       onClose();
     }
@@ -128,20 +119,9 @@ export const StudioGuideModal: React.FC<StudioGuideModalProps> = ({
 
   const handleSkipTour = () => {
     StudioAudio.playClick();
-    if (dontShowAgain) persistPreference();
+    // Skipping always persists — the tour must not re-open on every visit
+    persistPreference();
     onClose();
-  };
-
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const checked = e.target.checked;
-    setDontShowAgain(checked);
-    if (typeof window !== 'undefined') {
-      if (checked) {
-        localStorage.setItem('jadai_tour_seen', 'true');
-      } else {
-        localStorage.removeItem('jadai_tour_seen');
-      }
-    }
   };
 
   return (
@@ -203,40 +183,28 @@ export const StudioGuideModal: React.FC<StudioGuideModalProps> = ({
           ))}
         </div>
 
-        {/* Preferences checkbox & Actions */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[rgba(201,168,76,0.15)]">
-          <label className="flex items-center gap-2 text-xs font-mono text-[#8a857e] hover:text-[#c4c0bb] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={dontShowAgain}
-              onChange={handleCheckboxChange}
-              className="rounded bg-[#050404] border-[rgba(201,168,76,0.3)] text-[#C9A84C] focus:ring-0 cursor-pointer"
-            />
-            <span>Don&apos;t show again</span>
-          </label>
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[rgba(201,168,76,0.15)]">
+          <button
+            type="button"
+            onClick={handlePrev}
+            disabled={currentStep === 0}
+            className={`px-3 py-1.5 rounded-lg text-xs font-mono flex items-center gap-1 transition-colors ${
+              currentStep === 0
+                ? 'opacity-30 cursor-not-allowed text-[#8a6e2a]'
+                : 'text-[#c4c0bb] hover:text-[#f5f3f0] hover:bg-white/5 cursor-pointer'
+            }`}
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span>Previous</span>
+          </button>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handlePrev}
-              disabled={currentStep === 0}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono flex items-center gap-1 transition-colors ${
-                currentStep === 0
-                  ? 'opacity-30 cursor-not-allowed text-[#8a6e2a]'
-                  : 'text-[#c4c0bb] hover:text-[#f5f3f0] hover:bg-white/5 cursor-pointer'
-              }`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-              <span>Previous</span>
-            </button>
-
-            <EdgeGlow intensity="subtle" color="gold" borderRadius="8px">
-              <Button variant="primary" size="sm" onClick={handleNext}>
-                <span>{step.actionLabel}</span>
-                <ChevronRight className="w-3.5 h-3.5 ml-1" />
-              </Button>
-            </EdgeGlow>
-          </div>
+          <EdgeGlow intensity="subtle" color="gold" borderRadius="8px">
+            <Button variant="primary" size="sm" onClick={handleNext}>
+              <span>{step.actionLabel}</span>
+              <ChevronRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </EdgeGlow>
         </div>
       </div>
     </Modal>

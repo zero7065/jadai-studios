@@ -308,28 +308,37 @@ export default function PremiumProfilePage({ onNavigate }: { onNavigate?: (path:
             }}
             className="text-xs font-mono text-[#8a6e2a] hover:text-[#C9A84C] transition-colors"
           >
-            View All ({drafts.length}) →
+            {drafts.length > 0 ? `View All (${drafts.length}) →` : 'Open Workspace →'}
           </a>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {drafts.slice(0, 3).map((d) => (
-            <div
-              key={d.id}
-              className="p-4 rounded-2xl bg-[#0a0908] border border-[rgba(201,168,76,0.2)] hover:border-[#C9A84C] transition-all space-y-2"
-            >
-              <span className="text-[10px] font-mono uppercase text-[#e8c96a] block">
-                {d.serviceName}
-              </span>
-              <h5 className="font-display font-bold text-sm text-[#f5f3f0] truncate">
-                {d.projectName}
-              </h5>
-              <p className="text-[11px] font-mono text-[#8a6e2a]">
-                {new Date(d.updatedAt).toLocaleDateString()}
-              </p>
-            </div>
-          ))}
-        </div>
+        {drafts.length === 0 ? (
+          <div className="p-5 rounded-2xl bg-[#0a0908] border border-dashed border-[rgba(201,168,76,0.3)] text-center space-y-2">
+            <p className="text-xs font-mono text-[#e8c96a]">No drafts yet — your workspace starts clean.</p>
+            <p className="text-[11px] text-[#8a857e]">
+              Run any engine in the Playground and save a result to see it here.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {drafts.slice(0, 3).map((d) => (
+              <div
+                key={d.id}
+                className="p-4 rounded-2xl bg-[#0a0908] border border-[rgba(201,168,76,0.2)] hover:border-[#C9A84C] transition-all space-y-2"
+              >
+                <span className="text-[10px] font-mono uppercase text-[#e8c96a] block">
+                  {d.serviceName}
+                </span>
+                <h5 className="font-display font-bold text-sm text-[#f5f3f0] truncate">
+                  {d.projectName}
+                </h5>
+                <p className="text-[11px] font-mono text-[#8a6e2a]">
+                  {new Date(d.updatedAt).toLocaleDateString()}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

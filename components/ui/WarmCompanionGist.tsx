@@ -71,8 +71,12 @@ export const WarmCompanionGist: React.FC<WarmCompanionGistProps> = ({ onExplore 
     const dismissedTime = localStorage.getItem('jadai_companion_dismissed');
     const now = Date.now();
 
+    // Deconflict with the first-visit studio tour: only auto-open the gist
+    // once the tour has been seen (otherwise the small corner trigger stays).
+    const tourSeen = localStorage.getItem('jadai_tour_seen') === 'true';
+
     // Show after a gentle 2.5s delay if not dismissed in the last 2 hours
-    if (!dismissedTime || now - parseInt(dismissedTime, 10) > 2 * 60 * 60 * 1000) {
+    if (tourSeen && (!dismissedTime || now - parseInt(dismissedTime, 10) > 2 * 60 * 60 * 1000)) {
       const timer = setTimeout(() => {
         setIsOpen(true);
         // Randomize initial gist

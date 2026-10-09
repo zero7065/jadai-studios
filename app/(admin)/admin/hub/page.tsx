@@ -1,30 +1,94 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { SEED_HUB_LISTINGS, HubListing } from '@/lib/data/hub';
 import { useToast } from '@/components/providers/ToastProvider';
-import { Users, CheckCircle, XCircle, Flag, Eye, MessageSquare, Trash2 } from 'lucide-react';
+import { Users, CheckCircle, XCircle, Flag, Eye, MessageSquare, Trash2, RefreshCw } from 'lucide-react';
+
+// Seed listings use non-UUID ids ('hub-001') and don't exist server-side.
+const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 export default function AdminHubPage() {
   const [listings, setListings] = useState<HubListing[]>(SEED_HUB_LISTINGS);
+  const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
 
-  const handleApprove = (id: string, title: string) => {
+  const loadListings = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/hub/listings');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.listings) && data.listings.length > 0) {
+        // Server rows first, demo seeds after (dedupe by id)
+        const ids = new Set(data.listings.map((l: HubListing) => l.id));
+        setListings([...data.listings, ...SEED_HUB_LISTINGS.filter((s) => !ids.has(s.id))]);
+      }
+    } catch {
+      // Keep current view — seeds always render as fallback
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadListings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleApprove = async (id: string, title: string) => {
+    if (isUuid(id)) {
+      try {
+        const res = await fetch(`/api/admin/hub/listings/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'active' }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+      } catch (err: any) {
+        showToast(err.message || 'Approval failed to persist.', 'error');
+        return;
+      }
+    }
     setListings((prev) =>
       prev.map((l) => (l.id === id ? { ...l, status: 'active' } : l))
     );
     showToast(`Mission "${title}" approved for network broadcast.`, 'success');
   };
 
-  const handleReject = (id: string, title: string) => {
+  const handleReject = async (id: string, title: string) => {
+    if (isUuid(id)) {
+      try {
+        const res = await fetch(`/api/admin/hub/listings/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'rejected' }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+      } catch (err: any) {
+        showToast(err.message || 'Suspension failed to persist.', 'error');
+        return;
+      }
+    }
     setListings((prev) =>
       prev.map((l) => (l.id === id ? { ...l, status: 'rejected' } : l))
     );
     showToast(`Mission "${title}" flagged / rejected.`, 'info');
   };
 
-  const handleDelete = (id: string, title: string) => {
+  const handleDelete = async (id: string, title: string) => {
+    if (isUuid(id)) {
+      try {
+        const res = await fetch(`/api/admin/hub/listings/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+      } catch (err: any) {
+        showToast(err.message || 'Delete failed.', 'error');
+        return;
+      }
+    }
     setListings((prev) => prev.filter((l) => l.id !== id));
     showToast(`Listing "${title}" removed from database.`, 'info');
   };
@@ -40,6 +104,10 @@ export default function AdminHubPage() {
             Review peer missions, co-founding proposals, freelance service bids, and community flags.
           </p>
         </div>
+        <Button variant="outline" size="sm" onClick={loadListings} disabled={loading}>
+          <RefreshCw className={`w-3 h-3 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+          Sync Queue
+        </Button>
       </div>
 
       {/* Listings Table */}

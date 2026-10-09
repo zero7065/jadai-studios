@@ -7,6 +7,7 @@ import YinYangLoader from '../ui/YinYangLoader';
 import LikeButton from '../ui/LikeButton';
 import { getAllProjects } from '../../lib/data/portfolio';
 import { StudioAudio } from '../../lib/watermark';
+import { useToast } from '../providers/ToastProvider';
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,6 +23,7 @@ import {
 
 export const WorkCarousel: React.FC = () => {
   const projects = getAllProjects();
+  const { showToast } = useToast();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [iframeError, setIframeError] = useState(false);
@@ -148,7 +150,7 @@ export const WorkCarousel: React.FC = () => {
                     onClick={() => {
                       navigator.clipboard.writeText(liveUrl);
                       StudioAudio.playClick();
-                      alert('Project link copied — paste it anywhere you need the proof.');
+                      showToast('Project link copied — paste it anywhere you need the proof.', 'success');
                     }}
                     className="p-2.5 rounded-xl text-[#8a6e2a] hover:text-[#C9A84C] hover:bg-white/5 transition-colors cursor-pointer"
                     title="Share Link"

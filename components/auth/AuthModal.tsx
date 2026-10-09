@@ -258,7 +258,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               disabled={loading}
               className="w-full py-3 rounded-full bg-[#C9A84C] hover:bg-[#e8c96a] text-[#050404] font-display font-bold text-xs uppercase tracking-[0.15em] shadow-[0_4px_20px_rgba(201,168,76,0.35)] transition-all cursor-pointer active:scale-95 disabled:opacity-50 mt-2"
             >
-              Sign in
+              {loading ? 'Verifying…' : 'Sign in'}
             </button>
 
             {/* Continue with Google (Outlined) */}
@@ -386,7 +386,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               disabled={loading}
               className="w-full py-3 rounded-full bg-[#C9A84C] hover:bg-[#e8c96a] text-[#050404] font-display font-bold text-xs uppercase tracking-[0.15em] shadow-[0_4px_20px_rgba(201,168,76,0.35)] transition-all cursor-pointer active:scale-95 disabled:opacity-50 mt-2"
             >
-              Create account
+              {loading ? 'Forging account…' : 'Create account'}
             </button>
 
             {/* Continue with Google */}

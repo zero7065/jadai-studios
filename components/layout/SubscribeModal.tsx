@@ -7,6 +7,7 @@ import VerifiedBadge from '../ui/VerifiedBadge';
 import { JADAI_ROSTER, JadaiCharacter } from '../../lib/data/jadaiArt';
 import { StudioAudio } from '../../lib/watermark';
 import { useCurrency } from '../providers/CurrencyProvider';
+import { STARTUP_PAYSTACK_PLANS } from '../../lib/paystack';
 import {
   Check,
   Sparkles,
@@ -37,11 +38,12 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
 }) => {
   const [artStep, setArtStep] = useState(0); // 0 to 8 characters in 30s sequence
   const [animatingSequence, setAnimatingSequence] = useState(true);
-  const [selectedTier, setSelectedTier] = useState<string>('prime');
+  const [selectedTier, setSelectedTier] = useState<string>('playground');
   const [email, setEmail] = useState('');
   const [googleAuthenticated, setGoogleAuthenticated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const { currency, formatDual } = useCurrency();
 
   // 30-second sequence timer
@@ -63,55 +65,57 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
 
   const activeCharacter = JADAI_ROSTER[artStep] || JADAI_ROSTER[0];
 
+  // Canonical price book — derived from STARTUP_PAYSTACK_PLANS so this modal,
+  // /pricing, and /upgrade can never disagree.
   const tiers = [
     {
       id: 'free',
       name: 'Free Covenant',
       price: 'Free Forever',
-      desc: 'Weekly intelligence, Book of Lies drops, and 3 scans/day on diagnostic tools.',
+      desc: 'Weekly intelligence, Book of Lies drops, and 3 tries/day on the core engines.',
       icon: Sparkles,
       amountKobo: 0,
       usd: 0,
       isPaid: false,
     },
     {
-      id: 'foundation',
-      name: 'Foundation',
-      price: `${formatDual(110, 150000).main}`,
-      desc: 'Full 12-tool playground access, technical code review, and member badge.',
+      id: 'playground',
+      name: 'Playground Suite',
+      price: `${formatDual(9, 8000).main} / mo`,
+      desc: 'Unlimited FORGE, ORACLE, MIRAGE & SENTINEL runs with 4K exports.',
       icon: Shield,
-      amountKobo: 15000000,
-      usd: 110,
+      amountKobo: STARTUP_PAYSTACK_PLANS.playground.amountKobo,
+      usd: 9,
       isPaid: true,
     },
     {
-      id: 'voice',
-      name: 'Voice',
-      price: `${formatDual(350, 500000).main}`,
-      desc: 'Brand narrative, interactive system design, and AI strategy execution.',
+      id: 'studio_premium',
+      name: 'Studio Premium',
+      price: `${formatDual(5, 4000).main} / mo`,
+      desc: 'Full 70-episode Book of Lies canon, audio transmissions, and asset gallery.',
       icon: Zap,
-      amountKobo: 50000000,
-      usd: 350,
+      amountKobo: STARTUP_PAYSTACK_PLANS.studio_premium.amountKobo,
+      usd: 5,
       isPaid: true,
     },
     {
-      id: 'architecture',
-      name: 'Architecture',
-      price: `${formatDual(1400, 2000000).main}`,
-      desc: 'Complete full-stack platform deployment and engineering dispatch.',
+      id: 'signal_pro',
+      name: 'Signal Pro',
+      price: `${formatDual(19, 15000).main} / mo`,
+      desc: '100 autonomous signals/day, watchlists, and smart outreach writer.',
       icon: Flame,
-      amountKobo: 200000000,
-      usd: 1400,
+      amountKobo: STARTUP_PAYSTACK_PLANS.signal_pro.amountKobo,
+      usd: 19,
       isPaid: true,
     },
     {
-      id: 'prime',
-      name: 'Prime Member',
-      price: `${formatDual(20, 30000).main} / mo`,
-      desc: 'Continuous adaptive Oracle intelligence, persistent memory, and priority dispatch.',
+      id: 'signal_business',
+      name: 'Signal Business',
+      price: `${formatDual(49, 45000).main} / mo`,
+      desc: '500 signals/day, 5 seats, outbound dispatcher, and founder strategy call.',
       icon: Crown,
-      amountKobo: 3000000,
-      usd: 20,
+      amountKobo: STARTUP_PAYSTACK_PLANS.signal_business.amountKobo,
+      usd: 49,
       isPaid: true,
     },
   ];
@@ -119,40 +123,59 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
   const handleGoogleSignIn = () => {
     StudioAudio.playClick();
     setGoogleAuthenticated(true);
-    setEmail('architect@jadai.studio');
-    localStorage.setItem('jadai-user-email', 'architect@jadai.studio');
+    const anchor = email || 'guest@jadai.dev';
+    setEmail(anchor);
+    localStorage.setItem('jadai-user-email', anchor);
     localStorage.setItem('jadai-email-verified', 'true');
   };
 
   const handleCompleteSubscription = async () => {
     StudioAudio.playClick();
     setLoading(true);
+    setCheckoutError(null);
 
     const activeTierObj = tiers.find((t) => t.id === selectedTier);
 
     if (activeTierObj?.isPaid) {
       try {
-        await fetch('/api/paystack/initialize', {
+        const res = await fetch('/api/paystack/initialize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            email: email || 'architect@jadai.studio',
-            amountKobo: activeTierObj.amountKobo,
-            amountUsd: activeTierObj.usd,
+            email: email || 'guest@jadai.dev',
             currency,
-            planId: selectedTier,
+            plan: selectedTier,
           }),
         });
-      } catch {}
+        const data = await res.json();
+        if (data?.success && data.authorization_url) {
+          if (data.admin_bypass) {
+            // Master admin bypass — unlock without payment
+            localStorage.setItem('jadai-user-tier', selectedTier);
+            localStorage.setItem('jadai-user-subscribed', 'true');
+            localStorage.setItem('jadai-subscription-date', new Date().toISOString());
+            StudioAudio.playSuccessArpeggio();
+            setLoading(false);
+            setSuccess(true);
+            if (onSuccess) onSuccess(selectedTier);
+            return;
+          }
+          // Real checkout — entitlements activate via webhook after payment
+          localStorage.setItem('jadai_pending_plan', selectedTier);
+          window.location.href = data.authorization_url;
+          return;
+        }
+        throw new Error(data?.error || 'Checkout could not start');
+      } catch (err: any) {
+        setLoading(false);
+        setCheckoutError(err?.message || 'Payment gateway unreachable. Try again shortly.');
+        return;
+      }
     }
 
     localStorage.setItem('jadai-user-tier', selectedTier);
     localStorage.setItem('jadai-user-subscribed', 'true');
     localStorage.setItem('jadai-subscription-date', new Date().toISOString());
-
-    // Record for Section 13 rewards calculation
-    const existingPayments = parseInt(localStorage.getItem('jadai-consecutive-payments') || '0', 10);
-    localStorage.setItem('jadai-consecutive-payments', String(existingPayments + 1));
 
     StudioAudio.playSuccessArpeggio();
     setLoading(false);
@@ -347,18 +370,25 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
                       Dismiss
                     </button>
 
-                    <button
-                      onClick={handleCompleteSubscription}
-                      disabled={loading || !googleAuthenticated}
-                      className="px-6 py-2.5 rounded-xl bg-[#C9A84C] text-[#050404] font-mono text-xs font-bold hover:bg-[#e8c96a] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-md cursor-pointer"
-                    >
-                      <span>
-                        {loading
-                          ? 'Authorizing...'
-                          : `Complete with Paystack (${tiers.find((t) => t.id === selectedTier)?.name})`}
-                      </span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {checkoutError && (
+                        <span className="text-[11px] font-mono text-[#C0392B] max-w-[240px] text-right">
+                          {checkoutError}
+                        </span>
+                      )}
+                      <button
+                        onClick={handleCompleteSubscription}
+                        disabled={loading || !googleAuthenticated}
+                        className="px-6 py-2.5 rounded-xl bg-[#C9A84C] text-[#050404] font-mono text-xs font-bold hover:bg-[#e8c96a] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-md cursor-pointer"
+                      >
+                        <span>
+                          {loading
+                            ? 'Authorizing...'
+                            : `Complete with Paystack (${tiers.find((t) => t.id === selectedTier)?.name})`}
+                        </span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </>

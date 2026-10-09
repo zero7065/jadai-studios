@@ -74,7 +74,7 @@ export const STARTUP_PAYSTACK_PLANS: Record<string, PaystackTierPlan> = {
     interval: 'monthly',
     description: 'Complete unredacted Book of Lies canon, audio transmissions, and gallery assets.',
     features: [
-      'Full 40+ Book of Lies chapter manuscripts & audio narrations',
+      'Full 70 Book of Lies chapter manuscripts & audio narrations',
       'High-res graphic asset & typography gallery downloads',
       'Weekly 9:47 PM transmission executive briefing archive',
       'Exclusive community verified member badge',

@@ -44,13 +44,13 @@ export const RatingFeedbackModal: React.FC<RatingFeedbackModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rating || !comment.trim()) return;
 
     StudioAudio.playSuccessArpeggio();
 
-    // Store in localStorage / feedback ledger
+    // Local mirror first so nothing is lost offline
     if (typeof window !== 'undefined') {
       const existing = JSON.parse(localStorage.getItem('jadai-feedback-ratings') || '[]');
       existing.unshift({
@@ -60,6 +60,22 @@ export const RatingFeedbackModal: React.FC<RatingFeedbackModalProps> = ({
         createdAt: new Date().toISOString(),
       });
       localStorage.setItem('jadai-feedback-ratings', JSON.stringify(existing));
+    }
+
+    // Reach the studio ledger so admins actually see homepage ratings
+    try {
+      await fetch('/api/feedback/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rating,
+          message: comment.trim(),
+          type: 'general',
+          source: 'homepage',
+        }),
+      });
+    } catch {
+      // Local mirror already holds it
     }
 
     setSubmitted(true);
@@ -221,7 +237,7 @@ export const RatingFeedbackModal: React.FC<RatingFeedbackModalProps> = ({
 
                 <div className="p-4 rounded-xl bg-[#050404] border border-[rgba(201,168,76,0.2)] text-xs font-mono space-y-2">
                   <p className="text-[#c4c0bb]">
-                    Subscribe to eliminate all rate limits, unlock the full 12 tools, and receive nightly Book of Lies transmissions.
+                    Subscribe to eliminate all rate limits, unlock the full 16 tools, and receive nightly Book of Lies transmissions.
                   </p>
                 </div>
 

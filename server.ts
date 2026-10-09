@@ -917,6 +917,32 @@ async function startServer() {
     }
   });
 
+  // Purchase callback verification — the marketplace reads this after Paystack returns.
+  app.get('/api/templates/ownership', async (req, res) => {
+    const reference = String(req.query.reference || '').trim();
+    if (!reference || reference.length > 100) {
+      return res.status(400).json({ success: false, error: 'reference required' });
+    }
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('template_orders')
+        .select('template_id, status')
+        .eq('paystack_reference', reference)
+        .limit(1);
+      if (error) throw new Error(error.message);
+      const row = data?.[0];
+      res.json({
+        success: true,
+        owned: Boolean(row && row.status === 'paid'),
+        templateId: row?.template_id || null,
+        // Webhook may lag a second behind the browser redirect
+        pending: Boolean(row && row.status !== 'paid'),
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   app.get('/api/templates/download', (req, res) => {
     const templateId = (req.query.id as string) || 'aperture';
     const watermark = generateTextWatermarkFooter({ source: `TEMPLATE_STORE_${templateId.toUpperCase()}` });
@@ -1369,6 +1395,67 @@ async function startServer() {
     }
   });
 
+  // JadaiHub moderation — real persistence for the admin approval loop.
+  app.get('/api/admin/hub/listings', async (req, res) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('hub_listings')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw new Error(error.message);
+      res.json({ success: true, listings: data || [] });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.patch('/api/admin/hub/listings/:id', async (req, res) => {
+    try {
+      const id = String(req.params.id || '');
+      const status = String(req.body?.status || '');
+      if (!['active', 'pending', 'paused', 'rejected'].includes(status)) {
+        return res.status(400).json({ success: false, error: 'Invalid status' });
+      }
+      const { data, error } = await supabaseAdmin
+        .from('hub_listings')
+        .update({ status })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      await supabaseAdmin.from('admin_audit').insert({
+        admin_email: (req as any).adminEmail || 'unknown',
+        action: `hub-${status}`,
+        entity_type: 'hub_listing',
+        entity_id: id,
+        new_value: { status, title: data?.title },
+        ip_address: req.ip,
+      });
+      res.json({ success: true, listing: data });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/admin/hub/listings/:id', async (req, res) => {
+    try {
+      const id = String(req.params.id || '');
+      const { error } = await supabaseAdmin.from('hub_listings').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      await supabaseAdmin.from('admin_audit').insert({
+        admin_email: (req as any).adminEmail || 'unknown',
+        action: 'hub-delete',
+        entity_type: 'hub_listing',
+        entity_id: id,
+        ip_address: req.ip,
+      });
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Memory Matrix — inspect what PRIME has learned about builders across surfaces.
   app.get('/api/admin/ai-memory', async (req, res) => {
     try {
@@ -1490,19 +1577,36 @@ async function startServer() {
     }
   });
 
-  app.get('/api/short/stats/:slug', (req, res) => {
-    const slug = req.params.slug;
+  app.get('/api/short/stats/:slug', async (req, res) => {
+    const slug = String(req.params.slug || '').replace(/[^a-z0-9-]/gi, '').slice(0, 40);
     const mem = shortLinksDb.get(slug);
-    if (!mem) {
+    if (mem) {
+      return res.json({
+        slug: mem.slug,
+        targetUrl: mem.targetUrl,
+        clicks: mem.clicks,
+        cloaked: Boolean(mem.cloaked),
+        createdAt: mem.createdAt || new Date().toISOString(),
+      });
+    }
+    // Survive restarts — durable stats live in short_links
+    try {
+      const { data } = await supabaseAdmin
+        .from('short_links')
+        .select('slug, target_url, clicks, cloaked, created_at')
+        .eq('slug', slug)
+        .maybeSingle();
+      if (!data) return res.status(404).json({ error: 'Short link not found' });
+      return res.json({
+        slug: data.slug,
+        targetUrl: data.target_url,
+        clicks: data.clicks || 0,
+        cloaked: Boolean(data.cloaked),
+        createdAt: data.created_at || new Date().toISOString(),
+      });
+    } catch {
       return res.status(404).json({ error: 'Short link not found' });
     }
-    res.json({
-      slug: mem.slug,
-      targetUrl: mem.targetUrl,
-      clicks: mem.clicks,
-      cloaked: Boolean(mem.cloaked),
-      createdAt: mem.createdAt || new Date().toISOString(),
-    });
   });
 
   app.get('/s/:slug', async (req, res) => {
@@ -1569,10 +1673,15 @@ async function startServer() {
     try {
       const { data } = await supabaseAdmin
         .from('short_links')
-        .select('target_url, cloaked')
+        .select('target_url, cloaked, clicks')
         .eq('slug', slug)
         .maybeSingle();
       if (data?.target_url) {
+        // Durable click counter — survives restarts (fire-and-forget)
+        void supabaseAdmin
+          .from('short_links')
+          .update({ clicks: (data.clicks || 0) + 1 })
+          .eq('slug', slug);
         let protocolOk = false;
         let target = '';
         try {
@@ -1692,19 +1801,26 @@ Draft a continuation of 40-70 words that deepens the architectural or moral stak
   });
 
   app.post('/api/newsletter', rateLimit('newsletter', { max: 5 }), async (req, res) => {
-    const { email } = req.body;
+    const { email, source } = req.body;
     if (!email || !email.includes('@')) {
       return res.status(400).json({ success: false, error: 'Valid email required' });
     }
 
     try {
-      await supabaseAdmin.from('newsletter').upsert({
-        email: email.trim().toLowerCase(),
-        source: 'homepage_foundation',
-        subscribed_at: new Date().toISOString(),
-      }, { onConflict: 'email' });
+      const { error } = await supabaseAdmin.from('newsletter').upsert(
+        {
+          email: email.trim().toLowerCase(),
+          source: typeof source === 'string' && source ? source.slice(0, 60) : 'homepage',
+          subscribed_at: new Date().toISOString(),
+        },
+        { onConflict: 'email' }
+      );
+      if (error) throw new Error(error.message);
     } catch {
-      // Non-blocking
+      return res.status(500).json({
+        success: false,
+        error: 'Subscription did not persist. Please retry or email hello@jadai.dev.',
+      });
     }
 
     res.json({ success: true, message: 'Subscription saved' });
@@ -1717,16 +1833,20 @@ Draft a continuation of 40-70 words that deepens the architectural or moral stak
     }
 
     try {
-      await supabaseAdmin.from('contact_submissions').insert({
-        name,
-        email,
+      const { error } = await supabaseAdmin.from('contact_submissions').insert({
+        name: String(name).slice(0, 200),
+        email: String(email).slice(0, 200),
         category: category || 'general',
         budget: budget || 'unspecified',
-        message,
+        message: String(message).slice(0, 4000),
         created_at: new Date().toISOString(),
       });
-    } catch {
-      // Graceful fallback
+      if (error) throw new Error(error.message);
+    } catch (err: any) {
+      return res.status(500).json({
+        success: false,
+        error: 'Transmission dropped before reaching the studio. Please email hello@jadai.dev directly.',
+      });
     }
 
     res.json({ success: true, message: 'Transmission received by Jadai Studios' });

@@ -6,6 +6,7 @@ import Button from '../ui/Button';
 import EdgeGlow from '../ui/EdgeGlow';
 import CodeBlock from '../ui/CodeBlock';
 import { StudioAudio } from '../../lib/watermark';
+import { useToast } from '../providers/ToastProvider';
 import {
   X,
   Monitor,
@@ -48,6 +49,7 @@ export const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
   onBuy,
   onSelectTemplate,
 }) => {
+  const { showToast } = useToast();
   const [activeTemplate, setActiveTemplate] = useState<TemplateItem | null>(initialTemplate);
   const [viewport, setViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -176,7 +178,7 @@ export const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
               <button
                 onClick={() => {
                   try { StudioAudio.playSuccessArpeggio(); } catch {}
-                  alert('Preview mode — this shows how the Print Shop will behave. Live Paystack checkout activates once the template is deployed. No charge was made.');
+                  showToast('Preview mode — this shows how the Print Shop will behave. Live Paystack checkout activates once the template is deployed. No charge was made.', 'info', 'Preview Mode');
                 }}
                 className="px-4 py-2 rounded-lg bg-[#D4A574] text-black font-mono text-xs font-bold hover:bg-[#e8c96a] transition-all cursor-pointer"
               >
@@ -247,7 +249,7 @@ export const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
               <button
                 onClick={() => {
                   try { StudioAudio.playSuccessArpeggio(); } catch {}
-                  alert('Preview mode — the cart above is a demo of the live store. Deploy the template to run real Paystack transactions. No charge was made.');
+                  showToast('Preview mode — the cart above is a demo of the live store. Deploy the template to run real Paystack transactions. No charge was made.', 'info', 'Preview Mode');
                 }}
                 className="px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-mono text-xs font-bold transition-all cursor-pointer"
               >

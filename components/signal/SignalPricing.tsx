@@ -16,8 +16,8 @@ const TIERS = [
   {
     id: 'pro',
     name: 'Pro',
-    price_ngn: 25000,
-    price_usd: 29,
+    price_ngn: 15000,
+    price_usd: 19,
     signals: '100 signals / day',
     featured: true,
     features: ['100 signals/day', 'All 5 platforms (HN, GH, Reddit, X, Threads)', 'Auto content drafting from commits', 'Funnel analytics & attribution', 'Priority webhook alerts'],
@@ -25,8 +25,8 @@ const TIERS = [
   {
     id: 'business',
     name: 'Business',
-    price_ngn: 75000,
-    price_usd: 89,
+    price_ngn: 45000,
+    price_usd: 49,
     signals: '500 signals / day',
     features: ['500 signals/day', '5 team seats', 'REST API & Webhooks', 'Custom intent model calibration', 'Priority support line'],
   },

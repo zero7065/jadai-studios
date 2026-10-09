@@ -196,7 +196,7 @@ export const UltronAssistantPod: React.FC<UltronAssistantPodProps> = ({ onNaviga
       keywords: ['book of lies', 'lies', 'parable', 'sin', 'canon', 'story', 'chapter', 'episodes'],
       path: '/book-of-lies',
       label: 'Enter The Book of Lies Hall',
-      reply: 'Unlocking The Book of Lies canon—40+ serialized parables exploring pride, moral hazards, and system fragility.',
+      reply: 'Unlocking The Book of Lies canon: 70 serialized parables exploring pride, moral hazards, and system fragility.',
     },
     {
       keywords: ['template', 'marketplace', 'starter', 'aperture', 'vendor', 'shelter', 'bloom', 'glow'],
@@ -352,7 +352,7 @@ export const UltronAssistantPod: React.FC<UltronAssistantPodProps> = ({ onNaviga
         id: `ai-${Date.now()}`,
         role: 'assistant',
         content:
-          'Signal received. Jadai Studios is operating with full redundancy. You can browse the 40+ Book of Lies episodes or launch Sentinel diagnostics.',
+          'Signal received. Jadai Studios is operating with full redundancy. You can browse the 70 Book of Lies episodes or launch Sentinel diagnostics.',
         actionPath: '/playground',
         actionLabel: 'Explore Playground',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),

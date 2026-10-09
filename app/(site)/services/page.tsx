@@ -123,6 +123,8 @@ const AUDIENCE_TABS: {
 ];
 
 import DefensiveFallback from '@/components/ui/DefensiveFallback';
+import FAQSection from '@/components/ui/FAQSection';
+import { SERVICES_FAQ } from '@/lib/data/faqs';
 
 export default function ServicesPage() {
   const [hasError, setHasError] = useState(false);
@@ -173,6 +175,7 @@ export default function ServicesPage() {
   };
 
   return (
+    <>
     <div
       ref={containerRef}
       className="relative min-h-[92vh] w-full flex flex-col justify-between overflow-hidden bg-services-atmos text-[#f5f3f0] px-4 sm:px-8 py-8 select-none"
@@ -394,5 +397,63 @@ export default function ServicesPage() {
         </div>
       </div>
     </div>
+
+    {/* How an engagement works — the strategic process, plain and explicit */}
+    <section className="relative z-20 max-w-5xl mx-auto w-full px-4 sm:px-8 py-14 space-y-6">
+      <div className="border-b border-[rgba(201,168,76,0.2)] pb-4">
+        <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9A84C]">
+          From First Message to Shipped System
+        </span>
+        <h2 className="text-xl sm:text-2xl font-display font-bold text-[#f5f3f0] mt-1">
+          How Engagement Works
+        </h2>
+        <p className="text-xs font-mono text-[#8a857e] mt-2 max-w-2xl leading-relaxed">
+          No discovery-call theater. Four steps, fixed milestones, and you own everything produced.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          {
+            step: '01',
+            title: 'Transmission',
+            body: 'Send the problem — not a brief template. Through /contact or /services you describe what is broken, missing, or imagined. We reply within 24 hours with a scoped, honest read of it.',
+          },
+          {
+            step: '02',
+            title: 'Blueprint',
+            body: 'You receive a fixed-price proposal: deliverables, milestone schedule, timeline, currency, and an explicit out-of-scope list — so nothing balloons later.',
+          },
+          {
+            step: '03',
+            title: 'Architecture',
+            body: 'Work happens in visible milestones. Each one ends with a running artifact you can click, read, or deploy — never a status slide.',
+          },
+          {
+            step: '04',
+            title: 'Handover',
+            body: 'Repos, documentation, schema, and credentials transfer to you. Copyright on creative work signs over at final payment. Support window included.',
+          },
+        ].map((s) => (
+          <div
+            key={s.step}
+            className="rounded-2xl bg-[#050404]/80 border border-[rgba(201,168,76,0.2)] p-5 space-y-2 hover:border-[rgba(201,168,76,0.5)] transition-all duration-300 hover:shadow-[0_0_20px_rgba(201,168,76,0.1)]"
+          >
+            <span className="text-[10px] font-mono tracking-[0.3em] text-[#C9A84C]">
+              STEP {s.step}
+            </span>
+            <h3 className="text-sm font-display font-bold text-[#f5f3f0]">{s.title}</h3>
+            <p className="text-[11px] text-[#8a857e] leading-relaxed">{s.body}</p>
+          </div>
+        ))}
+      </div>
+
+      <FAQSection
+        items={SERVICES_FAQ}
+        title="Working With Us"
+        intro="Timelines, ownership, refunds, and why direct-with-the-architect beats the agency model."
+      />
+    </section>
+    </>
   );
 }

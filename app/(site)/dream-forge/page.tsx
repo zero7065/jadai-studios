@@ -121,6 +121,18 @@ The exact 5-milestone checklist required to bring this from abstract dream to li
       await saveFact('context', 'target_audience', intake.targetAudience.slice(0, 300), 0.8, 'dream-forge');
       await saveFact('preference', 'monetization', `${intake.monetizationModel} (${intake.primaryCurrency})`, 0.75, 'dream-forge');
 
+      // Capture the intake server-side so the studio pipeline also sees the vision
+      void fetch('/api/dream-forge/intake', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          building: `${intake.appName}: ${intake.problemStatement}`,
+          obstacles: intake.complianceNeeds,
+          tried: `Audience: ${intake.targetAudience} · DB: ${intake.databasePreference} · AI: ${intake.aiRequirement}`,
+          vision6Mo: `Monetization: ${intake.monetizationModel} ${intake.primaryCurrency} · Offline-first: ${intake.offlineFirst}`,
+        }),
+      }).catch(() => {});
+
       const result = await askPrime({
         prompt,
         systemPrompt:

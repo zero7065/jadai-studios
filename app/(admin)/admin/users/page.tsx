@@ -141,14 +141,29 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleUpdateTier = (userId: string, tier: MockUser['tier']) => {
+  const handleUpdateTier = async (userId: string, tier: MockUser['tier']) => {
     StudioAudio.playClick();
-    const updated = users.map((u) => (u.id === userId ? { ...u, tier } : u));
-    persistUsers(updated);
-    if (selectedUser?.id === userId) {
-      setSelectedUser({ ...selectedUser, tier });
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+    try {
+      const res = await fetch('/api/admin/users/grant-tier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: target.email, tier }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Tier grant failed');
+      }
+      const updated = users.map((u) => (u.id === userId ? { ...u, tier } : u));
+      persistUsers(updated);
+      if (selectedUser?.id === userId) {
+        setSelectedUser({ ...selectedUser, tier });
+      }
+      showToast(`Designated ${target.email} as ${tier.toUpperCase()} — persisted server-side.`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Tier grant failed. Nothing was changed.', 'error');
     }
-    showToast(`Designated account as ${tier.toUpperCase()}`, 'success');
   };
 
   const handleOpenDirectMessage = (user: MockUser) => {
@@ -158,17 +173,35 @@ export default function AdminUsersPage() {
     setDirectMsgModalOpen(true);
   };
 
-  const handleSendDirectMessage = (e: React.FormEvent) => {
+  const handleSendDirectMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!directMsgText.trim() || !directMsgUser) return;
 
-    StudioAudio.playSuccessArpeggio();
-    setDirectMsgSecondsLeft(300);
-    showToast(
-      `Direct message dispatched to ${directMsgUser.email}. Valid for 5:00 minutes.`,
-      'info',
-      'Ephemeral Transmission'
-    );
+    try {
+      const res = await fetch('/api/admin/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUsername: directMsgUser.email,
+          sender: 'Admin Studio',
+          text: directMsgText.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Delivery failed');
+      }
+      StudioAudio.playSuccessArpeggio();
+      setDirectMsgSecondsLeft(300);
+      showToast(
+        `Direct message dispatched to ${directMsgUser.email}. Queued in their notification inbox.`,
+        'success',
+        'Ephemeral Transmission'
+      );
+      setDirectMsgModalOpen(false);
+    } catch (err: any) {
+      showToast(err.message || 'Message did not reach the user. Try again.', 'error');
+    }
   };
 
   const handleAcceptTicket = (id: string) => {
@@ -219,7 +252,7 @@ export default function AdminUsersPage() {
               </h2>
             </div>
             <p className="text-xs text-slate-300">
-              Your administrator account has automatic unrestricted capability across all 12 tools, templates, and API endpoints.
+              Your administrator account has automatic unrestricted capability across all 16 tools, templates, and API endpoints.
             </p>
           </div>
 

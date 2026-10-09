@@ -25,8 +25,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   const { formatDual, currency } = useCurrency();
   const [loadingPlan, setLoadingPlan] = useState<'playground' | 'signal' | null>(null);
 
-  const playgroundPrice = formatDual(10, 15000);
-  const signalPrice = formatDual(17, 25000);
+  const playgroundPrice = formatDual(9, 8000);
+  const signalPrice = formatDual(19, 15000);
 
   const handleCheckout = async (plan: 'playground' | 'signal') => {
     setLoadingPlan(plan);

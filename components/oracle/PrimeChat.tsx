@@ -82,9 +82,9 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
     if (typeof window !== 'undefined') {
       const today = new Date().toISOString().slice(0, 10);
       const count = localStorage.getItem(`jadai-oracle-usage-${today}`);
-      return count ? parseInt(count, 10) : 4;
+      return count ? parseInt(count, 10) : 0;
     }
-    return 4;
+    return 0;
   });
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -200,13 +200,15 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
       setMessages((prev) => [...prev, assistantMsg]);
       await recordModuleExecution('oracle', access.userEmail, access.userId);
 
-      // Check if memory should be added
-      if (textToSend.length > 30 && Math.random() > 0.4) {
-        const keyName = `insight_${Date.now().toString(36)}`;
-        setMemories((prev) => [
-          ...prev,
-          { id: keyName, key: 'strategic_focus', value: textToSend.slice(0, 80), confidence: 0.85 },
-        ]);
+      // Check if memory should be added — deterministic upsert, not coin-flip
+      if (textToSend.length > 30) {
+        setMemories((prev) => {
+          const filtered = prev.filter((m) => m.key !== 'strategic_focus');
+          return [
+            ...filtered,
+            { id: `insight_${Date.now().toString(36)}`, key: 'strategic_focus', value: textToSend.slice(0, 80), confidence: 0.85 },
+          ].slice(-14);
+        });
       }
     } catch (err: any) {
       // Resilient sovereign intelligence fallback (for offline or disconnected states)
@@ -215,14 +217,19 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
         `[PRIME ORACLE — FIRST PRINCIPLES]\n\nAnalysis of vector: "${textToSend.slice(0, 50)}..."\n\n1. Core Diagnosis: Most builders confuse velocity with momentum. True velocity requires zero rewrites.\n2. Leverage Point: Decouple the write path from the read path. Persist state to local device storage before requesting network sync.\n3. Next Milestone: Commit the schema to version control and lock down the boundary interfaces.`,
       ];
       const fallbackText = smartAnswers[Math.floor(Math.random() * smartAnswers.length)];
+      showToast(
+        'PRIME is unreachable right now — the reply below is a canned offline study, not a live model answer. Retry when the signal returns.',
+        'error',
+        'Offline Mode'
+      );
       setMessages((prev) => [
         ...prev,
         {
           id: assistantMsgId,
           role: 'assistant',
-          content: fallbackText,
+          content: `[OFFLINE STUDY - not a live PRIME answer]\n\n${fallbackText}`,
           isStreaming: false,
-          provider: 'prime-sovereign-matrix',
+          provider: 'offline-fallback',
           timestamp: new Date().toISOString(),
         },
       ]);

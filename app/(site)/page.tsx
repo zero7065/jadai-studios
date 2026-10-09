@@ -158,7 +158,7 @@ export default function HomePage({ onNavigate }: HomePageProps = {}) {
             }}
             className="text-xs font-mono text-[#8a6e2a] hover:text-[#C9A84C] transition-colors flex items-center gap-1"
           >
-            <span>Explore All 7 Sins & Acts</span>
+            <span>Explore All 8 Themes — 7 Sins & Discernment</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </a>
         </div>

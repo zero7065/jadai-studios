@@ -56,10 +56,12 @@ export default function ContactPage() {
       }
       setSubmitted(true);
       showToast('Transmission received. Principal Architect notified.', 'success', 'Signal Logged');
-    } catch {
-      // In-memory fallback
-      setSubmitted(true);
-      showToast('Transmission recorded into studio cache.', 'success');
+    } catch (err: any) {
+      showToast(
+        err?.message || 'Transmission dropped. Email jadaistudiosoffcl@gmail.com directly and we will respond within 24 hours.',
+        'error',
+        'Line Interrupted'
+      );
     } finally {
       setSubmitting(false);
     }

@@ -54,7 +54,7 @@ export default function PlaygroundPage({ onNavigate }: { onNavigate?: (path: str
           The Playground
         </h1>
         <p className="text-sm font-mono text-[#8a6e2a] leading-relaxed">
-          12 purpose-built utility engines engineered for founders, architects, and writers.
+          16 purpose-built utility engines engineered for founders, architects, and writers.
           Zero fluff. Pure mathematical leverage.
         </p>
 
@@ -66,7 +66,7 @@ export default function PlaygroundPage({ onNavigate }: { onNavigate?: (path: str
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search 12 sovereign tools..."
+              placeholder="Search 16 sovereign tools..."
               className="w-full pl-10 pr-4 py-2 rounded-xl bg-[#0a0908] border border-[rgba(201,168,76,0.25)] text-xs font-mono text-[#f5f3f0] placeholder:text-neutral-600 focus:outline-none focus:border-[#C9A84C]"
             />
           </div>
@@ -85,7 +85,7 @@ export default function PlaygroundPage({ onNavigate }: { onNavigate?: (path: str
         </div>
       </div>
 
-      {/* 12 Tools Grid */}
+      {/* 16 Tools Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filtered.map((tool) => (
           <div
@@ -145,6 +145,24 @@ export default function PlaygroundPage({ onNavigate }: { onNavigate?: (path: str
             </EdgeGlow>
           </div>
         ))}
+        {filtered.length === 0 && (
+          <div className="col-span-full rounded-2xl border border-dashed border-[rgba(201,168,76,0.3)] bg-[#0a0908]/60 p-10 text-center space-y-3">
+            <p className="text-sm font-mono text-[#e8c96a]">No engines match that search.</p>
+            <p className="text-xs text-[#8a857e] max-w-md mx-auto leading-relaxed">
+              The chamber holds 16 tools — try a broader term, or reset the filters to see every
+              live and in-build engine.
+            </p>
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setFilterStatus('All');
+              }}
+              className="px-4 py-2 rounded-xl bg-[rgba(201,168,76,0.12)] border border-[rgba(201,168,76,0.4)] text-xs font-mono text-[#e8c96a] hover:bg-[rgba(201,168,76,0.2)] transition-all cursor-pointer"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

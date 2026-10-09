@@ -37,7 +37,7 @@ export interface ToolRunnerPageProps {
 }
 
 export const ToolRunnerPage: React.FC<ToolRunnerPageProps> = ({ slug, onNavigate }) => {
-  const tool = PLAYGROUND_TOOLS.find((t) => t.slug === slug) || PLAYGROUND_TOOLS[0];
+  const tool = PLAYGROUND_TOOLS.find((t) => t.slug === slug);
   const { showToast } = useToast();
 
   const [inputVal, setInputVal] = useState('');
@@ -52,10 +52,45 @@ export const ToolRunnerPage: React.FC<ToolRunnerPageProps> = ({ slug, onNavigate
   const [userUsage, setUserUsage] = useState<{ usageCount: number; tier: string } | null>(null);
 
   useEffect(() => {
+    if (!tool) return;
     checkToolAccess(tool.slug).then((res) => {
       setUserUsage({ usageCount: res.usageCount, tier: res.tier });
     });
-  }, [tool.slug]);
+  }, [tool?.slug]);
+
+  // Unknown engine — honest 404 instead of silently loading a different tool
+  if (!tool) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-24 text-center space-y-5">
+        <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-[#C0392B]">
+          404 // Engine Not Found
+        </span>
+        <h1 className="text-3xl sm:text-4xl font-display font-bold text-[#f5f3f0]">
+          No engine answers to “{slug}”
+        </h1>
+        <p className="text-sm font-mono text-[#8a857e] leading-relaxed max-w-md mx-auto">
+          The link may be stale or mistyped. The chamber currently holds 16 engines — browse
+          them from the playground floor.
+        </p>
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <button
+            onClick={() =>
+              onNavigate ? onNavigate('/playground') : (window.location.href = '/playground')
+            }
+            className="px-5 py-2.5 rounded-xl bg-[#C9A84C] text-[#050404] font-mono text-xs font-bold hover:bg-[#e8c96a] transition-all cursor-pointer"
+          >
+            Back to the Playground
+          </button>
+          <button
+            onClick={() => (onNavigate ? onNavigate('/') : (window.location.href = '/'))}
+            className="px-5 py-2.5 rounded-xl bg-[#0a0908] border border-[rgba(201,168,76,0.3)] text-[#c4c0bb] font-mono text-xs hover:border-[#C9A84C] transition-all cursor-pointer"
+          >
+            Return home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleCopyPrompt = () => {
     StudioAudio.playClick();
@@ -96,22 +131,98 @@ export const ToolRunnerPage: React.FC<ToolRunnerPageProps> = ({ slug, onNavigate
     setRunning(true);
 
     try {
-      // Execute through unified AI transport — tool runs inherit builder memory
+      // ---------------------------------------------------------------------
+      // Deterministic engines — real endpoints, no AI roundtrip needed
+      // ---------------------------------------------------------------------
+      if (tool.slug === 'link-shortener') {
+        if (!/^https?:\/\//i.test(inputVal.trim())) {
+          showToast('Enter a full URL starting with http:// or https://', 'error', 'Link Shortener');
+          return;
+        }
+        const res = await fetch('/api/short/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetUrl: inputVal.trim() }),
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        const output = `SHORT LINK CREATED\n\n${data.shortUrl}\n→ ${data.targetUrl}\nSlug: ${data.slug} · Cloaked: ${data.cloaked ? 'yes' : 'no'}`;
+        setOutputVal(output);
+        saveLocalDraft({
+          serviceSlug: tool.slug,
+          serviceName: tool.name,
+          projectName: `Short link: ${data.slug}`,
+          inputData: inputVal,
+          resultData: output,
+        });
+        StudioAudio.playSuccessArpeggio();
+        showToast('Sovereign short link minted and persisted.', 'success');
+        return;
+      }
+
+      if (tool.slug === 'diagnostic' || tool.slug === 'sentinel') {
+        const url = inputVal.trim();
+        if (!/^https?:\/\//i.test(url)) {
+          showToast('Enter a full URL starting with http:// or https://', 'error', 'Diagnostic');
+          return;
+        }
+        const res = await fetch('/api/sentinel/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+        const scan = await res.json();
+        if (scan.error) throw new Error(scan.error);
+        const lines = [
+          `SENTINEL AUDIT — ${scan.url || url}`,
+          '',
+          `Performance ${scan.scores?.performance ?? '—'} · Accessibility ${scan.scores?.accessibility ?? '—'} · Best Practices ${scan.scores?.bestPractices ?? '—'} · SEO ${scan.scores?.seo ?? '—'}`,
+          `FCP ${scan.metrics?.fcp ?? '—'} · LCP ${scan.metrics?.lcp ?? '—'} · CLS ${scan.metrics?.cls ?? '—'} · TBT ${scan.metrics?.tbt ?? '—'}`,
+          '',
+          ...(scan.issues || []).map((i: any) => `• [${String(i.impact || 'info').toUpperCase()}] ${i.title} — ${i.description}`),
+        ];
+        const output = lines.join('\n');
+        setOutputVal(output);
+        await recordModuleExecution(tool.slug, access.userEmail, access.userId);
+        saveLocalDraft({
+          serviceSlug: tool.slug,
+          serviceName: tool.name,
+          projectName: `Audit: ${new URL(url).hostname}`,
+          inputData: url,
+          resultData: output,
+        });
+        StudioAudio.playSuccessArpeggio();
+        showToast('Diagnostic scan completed. Report saved to Workspace.', 'success');
+        return;
+      }
+
+      // ---------------------------------------------------------------------
+      // AI engines — use the tool's own prompt template so inputs serve as designed
+      // ---------------------------------------------------------------------
+      const placeholder = /\[(INSERT [A-Z ]+|PROMPT)\]/;
+      const prompt = placeholder.test(tool.promptTemplate)
+        ? tool.promptTemplate.replace(placeholder, inputVal.trim())
+        : `${tool.promptTemplate}\n\nInput: ${inputVal.trim()}`;
+
       const result = await askPrime({
-        prompt: `Execute the tool: ${tool.name}\nInput: ${inputVal}\nInstruction: Provide direct, professional output following first-principles architecture.`,
-        systemPrompt: `You are the ${tool.name} engine at Jadai Studios. Deliver immediate, high-fidelity sovereign output.`,
+        prompt,
+        systemPrompt: `You are the ${tool.name} engine at Jadai Studios. ${tool.what} Deliver immediate, high-fidelity sovereign output.`,
         moduleSlug: tool.slug,
         scope: tool.slug,
       });
 
-      let resultText = '';
-
-      if (result.text) {
-        resultText = result.text;
-      } else {
-        resultText = await tool.mockResultGenerator(inputVal);
+      if (!result.text) {
+        // Honest failure — never present a mock as live output, never consume quota
+        const sample = await tool.mockResultGenerator(inputVal);
+        setOutputVal(
+          `OFFLINE SAMPLE — the live ${tool.name} engine is unreachable right now${result.error ? ` (${result.error})` : ''}. Your quota was NOT consumed.\n\n${sample}`
+        );
+        setFallbackModalOpen(true);
+        showToast('Live engine unreachable — showing an offline sample.', 'info', 'Warm Fallback');
+        return;
       }
 
+      const resultText = result.text;
       setOutputVal(resultText);
 
       // Record successful execution
@@ -129,10 +240,12 @@ export const ToolRunnerPage: React.FC<ToolRunnerPageProps> = ({ slug, onNavigate
 
       StudioAudio.playSuccessArpeggio();
       showToast('Execution successful. Draft saved to Workspace.', 'success');
-    } catch (err) {
-      setFallbackModalOpen(true);
+    } catch (err: any) {
       const fallbackResult = await tool.mockResultGenerator(inputVal);
-      setOutputVal(fallbackResult);
+      setOutputVal(
+        `DEGRADED MODE — ${err?.message || 'request failed'}.\nShowing a deterministic sample so you can see the expected shape:\n\n${fallbackResult}`
+      );
+      setFallbackModalOpen(true);
     } finally {
       setRunning(false);
     }

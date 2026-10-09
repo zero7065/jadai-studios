@@ -1,118 +1,44 @@
 import React, { useState } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
+import FAQSection from '@/components/ui/FAQSection';
+import { BILLING_FAQ } from '@/lib/data/faqs';
 import Button from '@/components/ui/Button';
-import StatusBadge from '@/components/ui/StatusBadge';
 import { useToast } from '@/components/providers/ToastProvider';
 import { StudioAudio } from '@/lib/watermark';
+import { STARTUP_PAYSTACK_PLANS, PaystackTierPlan } from '@/lib/paystack';
 import {
-  Shield,
-  Zap,
-  Cpu,
   Crown,
   CheckCircle,
   Sparkles,
   ArrowRight,
-  Lock,
 } from 'lucide-react';
 
-interface TierPlan {
-  id: string;
-  name: string;
-  badge?: string;
-  tagline: string;
-  price_ngn: number;
-  price_usd: number;
-  period: string;
-  features: string[];
-  cta: string;
-  highlight?: boolean;
-}
+// Canonical price book — same source as /pricing so both pages never disagree.
+const TIER_ORDER = ['free', 'playground', 'studio_premium', 'signal_pro', 'signal_business'];
+const TIER_CTA: Record<string, string> = {
+  free: 'Current Plan',
+  playground: 'Ascend to Playground',
+  studio_premium: 'Claim Studio Premium',
+  signal_pro: 'Activate Signal Pro',
+  signal_business: 'Command Signal Business',
+};
+const TIER_TAGLINE: Record<string, string> = {
+  free: 'Base access for exploratory engineers',
+  playground: 'Unlimited AI creation engines',
+  studio_premium: 'The complete unredacted canon',
+  signal_pro: 'Algorithmic distribution OS',
+  signal_business: 'High-volume radar intelligence',
+};
+const TIER_BADGE: Record<string, string | undefined> = {
+  playground: 'Popular',
+  studio_premium: 'Canon',
+  signal_pro: 'Growth',
+  signal_business: 'Partner',
+};
 
-const TIERS: TierPlan[] = [
-  {
-    id: 'free',
-    name: 'Free Floor',
-    tagline: 'Base access for exploratory engineers',
-    price_ngn: 0,
-    price_usd: 0,
-    period: 'forever',
-    features: [
-      'Public URL health & performance scans',
-      'Read Book of Lies Act 1 episodes',
-      'Browse JadaiHub collaborative missions',
-      'Explore Template Market previews',
-      'Single-session PRIME Oracle chat',
-    ],
-    cta: 'Current Plan',
-  },
-  {
-    id: 'foundation',
-    name: 'Foundation',
-    tagline: 'Continuous operational monitoring',
-    price_ngn: 150000,
-    price_usd: 110,
-    period: 'one-time',
-    features: [
-      'Unlimited site diagnostic scans & SSL telemetry',
-      'Full Book of Lies uncut archive (Acts 1-3)',
-      '15% discount on all elite template starters',
-      'Offline-first PWA background sync unlocked',
-      'Downloadable PDF diagnostic audit reports',
-    ],
-    cta: 'Ascend to Foundation',
-  },
-  {
-    id: 'voice',
-    name: 'Voice',
-    badge: 'Popular',
-    tagline: 'Deep intelligence & Socratic memory',
-    price_ngn: 500000,
-    price_usd: 350,
-    period: 'one-time',
-    highlight: true,
-    features: [
-      'PRIME Oracle persistent user memory matrix',
-      'Dynamic persona calibration (Architect, Philosopher, Strategist)',
-      'AI-synthesized automated fix guides for site bugs',
-      'Priority mission broadcasting on JadaiHub',
-      'Direct Dream Forge architecture generation with high token depth',
-    ],
-    cta: 'Claim Voice Tier',
-  },
-  {
-    id: 'architecture',
-    name: 'Architecture',
-    tagline: 'Pro-grade systems engineering toolkit',
-    price_ngn: 2000000,
-    price_usd: 1400,
-    period: 'one-time',
-    features: [
-      'All 20-table Supabase SQL schemas with idempotent migrations',
-      'Access to full production repositories & source code',
-      'Bi-weekly custom schema & RLS security reviews',
-      'Paystack & Stripe dual-currency payment boilerplates',
-      'Direct technical advisory channel in private discord',
-    ],
-    cta: 'Acquire Architecture',
-  },
-  {
-    id: 'prime',
-    name: 'Prime Partner',
-    badge: 'Partner',
-    tagline: 'Direct recurring partnership with Jehu Nanpan',
-    price_ngn: 30000,
-    price_usd: 22,
-    period: 'month',
-    features: [
-      '1-on-1 private architecture sessions with Jehu Nanpan',
-      'Bespoke module synthesis for your specific business',
-      'Private deployment guardianship & zero-latency edge routing',
-      'Full priority queue on all AI and diagnostic engines',
-      'Custom SLA & dedicated emergency recovery response',
-    ],
-    cta: 'Command Prime Partner',
-  },
-];
+type Tier = PaystackTierPlan;
+
+const TIERS: Tier[] = TIER_ORDER.map((id) => STARTUP_PAYSTACK_PLANS[id]).filter(Boolean);
 
 import DefensiveFallback from '@/components/ui/DefensiveFallback';
 
@@ -124,7 +50,7 @@ export default function UpgradePage() {
 
   if (hasError) return <DefensiveFallback />;
 
-  const handleSelectPlan = async (tier: TierPlan) => {
+  const handleSelectPlan = async (tier: Tier) => {
     if (tier.id === 'free') {
       showToast('You are currently on the Free Floor.', 'info');
       return;
@@ -133,13 +59,15 @@ export default function UpgradePage() {
     setLoadingTier(tier.id);
     StudioAudio.playClick();
 
-    const priceFormatted =
-      currency === 'NGN'
-        ? `₦${tier.price_ngn.toLocaleString()} ${tier.period}`
-        : `$${tier.price_usd} ${tier.period}`;
+    const email = prompt('Enter your email to receive your license and receipt:') || '';
+    if (!email || !email.includes('@')) {
+      setLoadingTier(null);
+      showToast('Valid email required for license issuance.', 'error');
+      return;
+    }
 
     showToast(
-      `Initiating ${tier.name} transaction (${priceFormatted}). Connecting Paystack...`,
+      `Initiating ${tier.name} (${currency === 'NGN' ? tier.priceNgnFormatted : tier.priceUsdFormatted}). Connecting Paystack...`,
       'info',
       'Billing Gateway'
     );
@@ -149,25 +77,33 @@ export default function UpgradePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          planId: tier.id,
-          amountKobo: tier.price_ngn * 100,
+          plan: tier.id,
+          email,
           currency,
-          email: 'architect@jadai.dev',
         }),
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.authorization_url) {
         StudioAudio.playSuccessArpeggio();
-        showToast(
-          `${tier.name} unlocked successfully! Entitlements active on current session.`,
-          'success',
-          'Floor Elevated'
-        );
+        if (data.admin_bypass) {
+          showToast('Master Admin bypass recognized: VIP All-Access Unlocked!', 'success');
+          window.location.href = '/account/premium';
+          return;
+        }
+        if (data.simulated) {
+          showToast('Sandbox mode: redirecting to license activation...', 'info');
+        }
+        window.location.href = data.authorization_url;
+      } else {
+        throw new Error(data.error || 'Payment initialization failed');
       }
-    } catch {
-      StudioAudio.playSuccessArpeggio();
-      showToast(`Sandbox Mode: ${tier.name} activated for session.`, 'success');
+    } catch (err: any) {
+      showToast(
+        err.message || 'Payment system unreachable. Please try again in a moment.',
+        'error',
+        'Billing Gateway'
+      );
     } finally {
       setLoadingTier(null);
     }
@@ -187,7 +123,7 @@ export default function UpgradePage() {
           Elevate Your Floor
         </h1>
         <p className="text-sm sm:text-base font-mono text-[#8a6e2a]">
-          Free-until-first-pay. Unlock deeper AI memory, unredacted manuscripts, and sovereign production repositories.
+          Free-until-first-pay. Unlock deeper AI memory, the full canon, and sovereign production tooling — cancel anytime.
         </p>
 
         {/* Currency Toggle */}
@@ -221,21 +157,22 @@ export default function UpgradePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto items-stretch">
         {TIERS.map((tier) => {
           const isFree = tier.id === 'free';
-          const isHighlight = tier.highlight;
+          const isHighlight = tier.id === 'playground';
+          const badge = TIER_BADGE[tier.id];
 
           return (
             <GlassCard
               key={tier.id}
-              className={`p-6 sm:p-8 flex flex-col justify-between space-y-6 relative ${
+              className={`p-6 sm:p-8 flex flex-col justify-between space-y-6 relative transition-all duration-300 hover:-translate-y-1 ${
                 isHighlight
                   ? 'border-[#C9A84C] shadow-[0_0_30px_rgba(201,168,76,0.2)]'
                   : 'border-[rgba(201,168,76,0.2)]'
               }`}
             >
-              {tier.badge && (
+              {badge && (
                 <div className="absolute top-4 right-4">
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#C9A84C] text-[#050404] font-bold uppercase tracking-wider">
-                    {tier.badge}
+                    {badge}
                   </span>
                 </div>
               )}
@@ -246,24 +183,20 @@ export default function UpgradePage() {
                     {tier.name}
                   </h3>
                   <p className="text-xs font-mono text-[#8a6e2a] mt-0.5">
-                    {tier.tagline}
+                    {TIER_TAGLINE[tier.id] || tier.description}
                   </p>
                 </div>
 
                 <div className="pt-2 pb-1 border-b border-[rgba(201,168,76,0.15)]">
-                  {isFree ? (
-                    <div className="text-3xl font-display font-bold text-[#f5f3f0]">
-                      ₦0 <span className="text-xs font-mono text-[#8a6e2a]">/ permanent floor</span>
-                    </div>
-                  ) : (
-                    <div className="text-3xl font-display font-bold text-[#f5f3f0]">
-                      {currency === 'NGN' ? `₦${tier.price_ngn.toLocaleString()}` : `$${tier.price_usd}`}
-                      <span className="text-xs font-mono text-[#8a6e2a] ml-1">
-                        /{tier.period}
-                      </span>
-                    </div>
-                  )}
+                  <div className="text-3xl font-display font-bold text-[#f5f3f0]">
+                    {isFree ? '₦0' : currency === 'NGN' ? `₦${(tier.amountKobo / 100).toLocaleString()}` : `$${(tier.amountUsdCents / 100).toLocaleString()}`}
+                    <span className="text-xs font-mono text-[#8a6e2a] ml-1">
+                      {isFree ? '/ forever' : '/ mo'}
+                    </span>
+                  </div>
                 </div>
+
+                <p className="text-xs text-[#c4c0bb] leading-relaxed">{tier.description}</p>
 
                 <ul className="space-y-2.5 text-xs text-[#c4c0bb] pt-2">
                   {tier.features.map((f, i) => (
@@ -287,7 +220,7 @@ export default function UpgradePage() {
                     'Connecting Paystack...'
                   ) : (
                     <>
-                      <span>{tier.cta}</span>
+                      <span>{TIER_CTA[tier.id] || 'Select Plan'}</span>
                       {!isFree && <ArrowRight className="w-3.5 h-3.5 ml-1.5" />}
                     </>
                   )}
@@ -297,6 +230,26 @@ export default function UpgradePage() {
           );
         })}
       </div>
+
+      <div className="text-center space-y-2 max-w-2xl mx-auto">
+        <p className="text-xs font-mono text-[#8a6e2a]">
+          <Sparkles className="w-3 h-3 inline mr-1 text-[#C9A84C]" />
+          All plans settle in ₦ via Paystack or $ via global cards. Cancel anytime from Account → Premium.
+        </p>
+        <p className="text-[11px] text-[#5a5651]">
+          Subscriptions activate after payment confirmation. Full feature comparison lives on{' '}
+          <a href="/pricing" className="text-[#C9A84C] hover:underline">
+            /pricing
+          </a>
+          .
+        </p>
+      </div>
+
+      <FAQSection
+        items={BILLING_FAQ}
+        title="Billing, Plans & Ownership"
+        className="max-w-3xl mx-auto w-full pt-4"
+      />
     </div>
   );
 }

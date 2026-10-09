@@ -250,7 +250,7 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
                 <td className="py-3 px-4 font-semibold">Monthly Price</td>
                 <td className="py-3 px-4 text-red-400">$185 - $800</td>
                 <td className="py-3 px-4 text-red-400">$49 - $119</td>
-                <td className="py-3 px-4 text-emerald-400 font-bold">$29 / mo (₦25k)</td>
+                <td className="py-3 px-4 text-emerald-400 font-bold">$19 / mo (₦15k)</td>
               </tr>
               <tr>
                 <td className="py-3 px-4 font-semibold">Target Audience</td>

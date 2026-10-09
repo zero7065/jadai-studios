@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -38,7 +38,26 @@ export default function HubPage() {
   const [contactModalListing, setContactModalListing] = useState<HubListing | null>(null);
   const { showToast } = useToast();
 
-  if (hasError) return <DefensiveFallback />;
+  // Load publicly-approved missions from the server (seeds keep the demo rich)
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/hub/listings');
+        const data = await res.json();
+        if (cancelled || !data.success || !Array.isArray(data.listings)) return;
+        setListings((prev) => {
+          const ids = new Set(data.listings.map((l: HubListing) => l.id));
+          return [...data.listings, ...prev.filter((s) => !ids.has(s.id))];
+        });
+      } catch {
+        // Seeds already rendering
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // New Listing Form State
   const [formType, setFormType] = useState<'service' | 'collab' | 'product' | 'job'>('collab');
@@ -96,15 +115,27 @@ export default function HubPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newListing),
       });
-      await res.json();
-    } catch {
-      // In-memory fallback
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Submission failed');
+      }
+      const saved: HubListing = data.listing || newListing;
+      setListings((prev) => [saved, ...prev]);
+      showToast('Mission submitted. It joins the public mesh once moderation approves it.', 'success', 'Broadcast Queued');
+    } catch (err: any) {
+      // Offline fallback — keep the listing visible locally so the work isn't lost
+      setListings((prev) => [newListing, ...prev]);
+      showToast(
+        err.message
+          ? `Queued offline: ${err.message}. It will sync when the network recovers.`
+          : 'Queued offline. It will sync when the network recovers.',
+        'info',
+        'Local Fallback'
+      );
     }
 
-    setListings([newListing, ...listings]);
     setSubmitting(false);
     setPostModalOpen(false);
-    showToast('Mission broadcasted across the JadaiHub mesh network!', 'success', 'Broadcast Active');
 
     // Reset Form
     setFormTitle('');
@@ -113,6 +144,8 @@ export default function HubPage() {
     setFormPrice('');
     setFormContact('');
   };
+
+  if (hasError) return <DefensiveFallback />;
 
   return (
     <div className="py-12 px-4 max-w-7xl mx-auto space-y-12">

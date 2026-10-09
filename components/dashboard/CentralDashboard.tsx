@@ -41,7 +41,7 @@ interface ServiceInstallItem {
 
 const INSTALLABLE_SERVICES: ServiceInstallItem[] = [
   { id: 'write', name: 'Story & Writing', scope: '/write', desc: 'Novel, Memoir, Script & Codex', icon: Edit3 },
-  { id: 'bol', name: 'Book of Lies', scope: '/book-of-lies', desc: '40 Parables & Reflective Mirror', icon: BookOpen },
+  { id: 'bol', name: 'Book of Lies', scope: '/book-of-lies', desc: '70 Parables & Reflective Mirror', icon: BookOpen },
   { id: 'forge', name: 'Dream Forge', scope: '/dream-forge', desc: 'System Architecture & Spec Engine', icon: Sparkles },
   { id: 'radar', name: 'Signal Radar', scope: '/signal', desc: 'Real-Time Web & SEO Diagnostics', icon: Activity },
   { id: 'hub', name: 'Creative Hub', scope: '/hub', desc: 'Curated Templates & Modules', icon: Layers },

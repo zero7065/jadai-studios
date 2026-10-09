@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import GlassCard from '@/components/ui/GlassCard';
+import FAQSection from '@/components/ui/FAQSection';
+import { BILLING_FAQ } from '@/lib/data/faqs';
 import Button from '@/components/ui/Button';
 import EdgeGlow from '@/components/ui/EdgeGlow';
 import { useToast } from '@/components/providers/ToastProvider';
@@ -524,7 +526,7 @@ export default function PricingPage({ onNavigate }: PricingPageProps) {
             <div>
               <h3 className="text-xl font-display font-bold text-[#f5f3f0]">Marketplace Starters</h3>
               <p className="text-xs text-[#8a857e] mt-1">
-                Full-stack production apps (Aperture, Vendor, Shelter, Bloom, Glow).
+                Full-stack production apps (Aperture, Vendor, Shelter, Bloom, Glow, Foundry, Codex).
               </p>
             </div>
 
@@ -538,7 +540,7 @@ export default function PricingPage({ onNavigate }: PricingPageProps) {
                   transition={{ duration: 0.22, ease: 'easeOut' }}
                   className="text-3xl font-mono font-bold text-[#e8c96a]"
                 >
-                  {isUsd ? '$18 – $48' : '₦15,000 – ₦40,000'}
+                  {isUsd ? '$35 – $65' : '₦52,500 – ₦97,500'}
                 </motion.span>
               </AnimatePresence>
               <span className="text-xs font-mono text-[#8a857e]"> / template</span>
@@ -606,20 +608,26 @@ export default function PricingPage({ onNavigate }: PricingPageProps) {
           <div className="space-y-2">
             <h4 className="font-mono font-bold text-sm text-[#e8c96a]">Zero Synthetic Markups</h4>
             <p className="text-[#8a857e]">
-              We run our own inference cache and edge workers. Because our underlying architecture is
-              strictly optimized, we pass direct efficiency savings on to you.
-            </p>
-          </div>
+            We run our own inference cache and edge workers. Because our underlying architecture is
+            strictly optimized, we pass direct efficiency savings on to you.
+          </p>
+        </div>
 
-          <div className="space-y-2">
-            <h4 className="font-mono font-bold text-sm text-[#e8c96a]">Instant Cancel Anytime</h4>
-            <p className="text-[#8a857e]">
-              No dark patterns. Cancel in one click from your account dashboard. You retain all exported
-              manuscripts, codebases, and generated documents forever.
-            </p>
-          </div>
+        <div className="space-y-2">
+          <h4 className="font-mono font-bold text-sm text-[#e8c96a]">Instant Cancel Anytime</h4>
+          <p className="text-[#8a857e]">
+            No dark patterns. Cancel in one click from your account dashboard. You retain all exported
+            manuscripts, codebases, and generated documents forever.
+          </p>
+        </div>
         </div>
       </GlassCard>
+
+      <FAQSection
+        items={BILLING_FAQ}
+        title="Billing, Plans & Ownership"
+        intro="The honest answers about what you pay, what you own, and what happens when things break."
+      />
     </div>
   );
 }

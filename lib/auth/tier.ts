@@ -147,7 +147,7 @@ export function checkAccessToFeature(
       requiredPlan: 'studio_premium',
       priceNgn: '₦4,000 / mo',
       priceUsd: '$5 / mo',
-      reason: 'Unlocks full 40+ Book of Lies canon and raw high-res asset downloads.',
+      reason: 'Unlocks the full 70-episode Book of Lies canon and raw high-res asset downloads.',
     };
   }
 

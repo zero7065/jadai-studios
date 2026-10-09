@@ -45,7 +45,7 @@ export const CATALOG_CATEGORIES: CatalogCategory[] = [
   {
     id: 'playground',
     name: 'PLAYGROUND',
-    subtitle: '4 tools for builders',
+    subtitle: '16 tools for builders',
     borderColor: '#C9A84C', // Gold
     items: [
       {
@@ -91,7 +91,7 @@ export const CATALOG_CATEGORIES: CatalogCategory[] = [
       {
         id: 'book-of-lies',
         title: 'Book of Lies',
-        description: '40 parables and philosophical meditations.',
+        description: '70 parables and philosophical meditations.',
         path: '/book-of-lies',
         icon: BookOpen,
         accentColor: '#c0392b',
@@ -117,7 +117,7 @@ export const CATALOG_CATEGORIES: CatalogCategory[] = [
   {
     id: 'marketplace',
     name: 'MARKETPLACE',
-    subtitle: '5 templates + portfolio',
+    subtitle: '7 templates + portfolio',
     borderColor: '#00e5ff', // Cyan
     items: [
       {
