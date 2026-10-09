@@ -4,122 +4,124 @@
 
 ---
 
-## 1. System Topology Overview
+## 1. System Topology
 
 ```
                       +-----------------------------+
                       |        CLIENT BROWSER       |
-                      |   (Next.js App / PWA sw.js)  |
+                      |  React 19 SPA (Vite bundle) |
+                      |  src/App.tsx route table    |
                       +--------------+--------------+
                                      |
-               +---------------------+---------------------+
-               | (HTTPS / Bearer Auth / Cookies / Tap)     |
-               v                                           v
-    +----------------------+                   +----------------------+
-    |    PUBLIC ROUTES     |                   |    /ADMIN/* ROUTES   |
-    |  - /, /diagnostic    |                   |  - Self-Diagnostics  |
-    |  - /oracle, /hub     |                   |  - Settings Auditor  |
-    |  - /marketplace      |                   |  - Module Management |
-    +----------+-----------+                   +----------+-----------+
-               |                                           |
-               +---------------------+---------------------+
+              Cloudflare Pages (static dist/) — jadai.dev
+              public/_redirects proxies /api/* and /s/*
                                      |
                                      v
-                        +-------------------------+
-                        |      MIDDLEWARE.TS      |
-                        | - Rate Limiter (100/m)  |
-                        | - Admin Cookie Guard    |
-                        | - Security & CSP Headers|
-                        +------------+------------+
-                                     |
-                                     v
-                        +-------------------------+
-                        |      MODULE ENGINE      |
-                        |  /lib/modules/define    |
-                        |  modules.config.ts      |
-                        +------------+------------+
-                                     |
-           +-------------------------+-------------------------+
-           |                                                   |
-           v                                                   v
-+-----------------------+                           +---------------------+
-|      AI LAYER         |                           |  SUPABASE POSTGRES  |
-| 1. Groq (Llama-3.3)   |                           | 20 Tables with RLS  |
-| 2. Gemini (3.8-Flash) |                           | is_admin() Checks   |
-| 3. SHA-256 Cache      |                           | module_usage logs   |
-| 4. Graceful Fallback  |                           | admin_settings      |
-+-----------------------+                           +---------------------+
+                      +-----------------------------+
+                      |   RENDER FREE — api.jadai.dev
+                      |   server.ts (Express, tsx)  |
+                      |  - HMAC admin auth          |
+                      |  - per-IP rate limits       |
+                      |  - cron secret guard        |
+                      |  - SPA fallback + static    |
+                      +------+-------------+--------+
+                             |             |
+              +--------------+--+          v
+              v                 v   +-------------------+
+   +--------------------+  +-----+-----+   | SUPABASE POSTGRES |
+   |     AI LAYER       |  | PAYSTACK  |   | 34 tables, RLS    |
+   | 1. Groq (Llama)    |  | checkout +|   | ai_memories       |
+   | 2. Gemini          |  | webhook   |   | ai_messages       |
+   | 3. SHA-256 cache   |  +-----------+   | template_orders   |
+   | 4. graceful text   |                  | admin_audit ...   |
+   +--------------------+                  +-------------------+
 ```
 
----
-
-## 2. The 4-Step AI Fallback Chain
-
-Every AI request executed via `generateText(prompt, options)` guarantees zero white screens and zero unhandled exceptions:
-
-1. **Groq Primary:** Checks if `GROQ_API_KEY` is present. Invokes `llama-3.3-70b-versatile` with sub-300ms latency.
-2. **Gemini Secondary:** If Groq encounters rate limiting or network timeout, the request seamlessly shifts to `@google/genai` utilizing `gemini-3.8-flash`.
-3. **Cache Layer:** If both external AI APIs are unreachable, the engine computes `SHA-256(prompt + systemPrompt)` and checks the memory and database cache for identical historical answers.
-4. **Graceful Degradation:** If cache misses, the platform returns:
-   *"AI is temporarily unavailable. Please try again in a moment. Your request has been queued and saved."*
-
-Every call asynchronously writes to `module_usage` with latency, tokens used, provider used, and error logs.
+- **Development:** `npm run dev` runs `tsx server.ts`, which mounts Vite as middleware — one origin, HMR on port 3000.
+- **Production:** Cloudflare Pages serves the built SPA; `public/_redirects` forwards `/api/*` and `/s/*` to the Render service. Alternatively set `SERVE_STATIC=1` on Render and skip Pages entirely.
 
 ---
 
-## 3. The "Ask, Don't Assume" Settings Architecture
+## 2. Routing
 
-Components never crash when configuration keys are missing.
-Instead:
-- The system checks `admin_settings` table.
-- If missing, checks `process.env`.
-- If missing, falls back to `country-defaults.ts` (e.g. Nigerian Naira ₦, Paystack gateways, and Jos headquarters contact email).
-- In the Admin Lounge, an explicit prompt is surfaced:
-  `"You haven't set your Groq API key yet. Add it in Admin Settings to enable primary inference."`
-- Public users never see errors or broken fields.
+The SPA uses a hand-ordered route table in `src/App.tsx` (not file-system routing):
+
+- `/admin/*` — 20 admin pages behind the 5-tap HMAC session.
+- Public: `/`, `/playground`, `/playground/:slug` (intercepts `forge|mirage|sentinel|oracle` into their module pages), `/book-of-lies`, `/marketplace`, `/hub`, `/services`, `/pricing`, `/upgrade`, `/account/*`, `/legal/*`, `/offline`, …
+- Server: short links at `/s/:slug`, catch-all `*` serves the SPA shell.
 
 ---
 
-## 4. The Self-Contained Module System
+## 3. The 4-Step AI Fallback Chain
+
+Every model call through `generateText(prompt, options)` (`lib/ai/index.ts`) guarantees a result — never a white screen:
+
+1. **Groq Primary:** `GROQ_API_KEY` present → fast chat model.
+2. **Gemini Secondary:** on Groq rate-limit/timeout → `@google/genai`.
+3. **Cache Layer:** both unreachable → `SHA-256(prompt + systemPrompt)` memory/database cache replay.
+4. **Graceful Degradation:** cache miss → honest offline message. Client surfaces label these (`OFFLINE STUDY`, `OFFLINE SAMPLE`) and do **not** consume quota.
+
+### Unified Client Transport (`lib/ai/memory.ts`)
+
+All AI surfaces call one client — `askPrime({ prompt, persona, history, memory, scope, systemPrompt })` — instead of hand-rolled fetches:
+
+- Builder identity `bld_*`, scoped transcripts (`oracle`, `guide`, `forge`, …) posted to `POST /api/ai/chat`.
+- Facts persisted to IndexedDB (`lib/prime/memory-device.ts`) and mirrored to `POST /api/ai/memory` (`ai_memories`).
+- Server continuity protocol (`assembleChatRequest`) injects prior-exchange memory into the next turn.
+- Exchanges persist to `ai_messages`; every 12th row triggers extraction into `ai_memories`.
+- `primeWelcome` composes personalized openers; `clearAllMemory` wipes device + server memory.
+
+---
+
+## 4. Auth & Security
+
+- **Admin:** 5-tap logo sequence (3s) → passcode → HMAC-signed session cookie over `SESSION_SECRET` (≥32 chars). Password check against `ADMIN_PASSWORD_HASH` (`npm run gen:admin-hash`). All `/api/admin/*` routes pass `requireAdmin`.
+- **Public tiers:** `free | foundation | voice | architecture | prime` gated in `lib/auth/tier.ts`; entitlements activate from Paystack webhooks into `subscriptions`.
+- **Rate limiting:** per-IP buckets on AI, module, auth, and cron routes.
+- **Cron:** `/api/cron/*` requires `CRON_SECRET` (relaxed only outside production).
+- **Recovery:** 20-tap logo → Disaster Recovery Terminal (cache purge, SW unregister, PRIME memory wipe).
+- Every admin mutation writes `admin_audit` rows.
+
+---
+
+## 5. Payments (Canonical Price Book)
+
+Single source of truth: `STARTUP_PAYSTACK_PLANS` in `lib/paystack/index.ts`.
+
+| Plan | USD | NGN |
+|---|---|---|
+| free | $0 | ₦0 |
+| playground | $9/mo | ₦8,000/mo |
+| studio_premium | $5/mo | ₦4,000/mo |
+| signal_pro | $19/mo | ₦15,000/mo |
+| signal_business | $49/mo | ₦45,000/mo |
+
+`/pricing`, `/upgrade`, SubscribeModal, and UpgradeModal all render from this object; checkout posts `{ email, currency, plan }` to `POST /api/paystack/initialize` and redirects to `authorization_url`. Webhook (`/api/paystack/webhook`) verifies signature and activates entitlements. Reference mismatch → 404-style honest failure, never fake success.
+
+---
+
+## 6. The Self-Contained Module System
 
 Every service is isolated in `/modules/[name]/`:
+
 ```
 modules/
 └── [module-name]/
-    ├── index.ts        # JadaiModule definition & metadata
+    ├── index.ts        # defineModule() — metadata, tier, routes
     ├── page.tsx        # React client interface
-    ├── api/            # API endpoints isolated to this module
-    └── README.md       # Operational documentation
+    ├── api/            # Pure TS handlers
+    └── README.md       # Operational notes
 ```
-- Adding a module requires:
-  1. Dropping the folder into `/modules/`
-  2. Adding one line in `lib/modules/modules.config.ts`
-- Zero router rewiring. Catch-all `/app/[...module]/page.tsx` and `/app/api/modules/[...slug]/route.ts` dynamically mount the interface, execute tier checks, rate limit, and log telemetry.
+
+- Adding a module: copy `modules/_template`, register one line in `lib/modules/modules.config.ts`.
+- `POST /api/modules/:slug` dispatches `{ action }` with tier checks, rate limiting, and `module_usage` telemetry (tokens, provider, latency, errors).
+- 14 modules registered: forge, mirage, sentinel, diagnostic, oracle, dream-forge, resume-editor, doc-analyzer, growth-maker, template-market, hub, book-of-lies, career-board, _template.
 
 ---
 
-## 5. Supplement A Design Reference Matrix & Signal Architecture
+## 7. Design & Simplicity Rules
 
-### A. 4 New Design References
-- **Reference 9 — Velopay (Dark Blue-Green with Lime Accent):**
-  - Maps to: Signal Radar dashboard
-  - Centered massive headline ("SIGNAL"), gradient map with pulsating arcs between platforms and product, converter-style panel (signal in / outreach out).
-- **Reference 10 — Flight Tracker HUD (Amber on Navy):**
-  - Maps to: Signal Detail panel & telemetry
-  - Aerospace command center with curved animated glow arcs, status badges, and labeled metadata rails.
-- **Reference 11 — Surface (Fantasy 3D with Bento):**
-  - Maps to: Signal empty state, Dream Forge, and Studio landing
-  - Floating celestial crystal structures, 60px rounded glass bento cards, minimal clean copy.
-- **Reference 12 — GCORE (Central Node with Satellite Web):**
-  - Maps to: Jadai Signal landing hero
-  - 120px circular central node with orbiting satellite platforms (HN, GitHub, Reddit, X, Threads, Web) with animated pulse lines.
-
-### B. Global Simplicity Rules
-- **Nav items:** 4 maximum on any header (+ Home Sigil return button)
-- **Primary CTAs:** 1 per screen; secondary CTAs are ghost buttons
-- **Text density:** Maximum 60 words visible at once on mobile
-- **Whitespace:** Minimum 60% of any viewport
-- **Type scale:** Hero = 8–14vw, H1 = 5vw, Body = 1.05rem max
-- **Section count:** Maximum 5 sections per page
-- **Copy voice:** Plain, human, elegant English without marketing fluff
-- **Colors per section:** Maximum 3 (void background, one accent, one text color)
+- Nav items: max 4 per header (+ Home sigil). Primary CTA: 1 per screen.
+- Max 3 colors per section (void background, one accent, one text).
+- Copy voice: plain, human English — every product answers **why it exists, what it does, how to use it, and why us**.
+- All failure states are honest: real error text + Retry, never silent fake-success.

@@ -1,69 +1,74 @@
 # 05 — DISASTER RECOVERY PLAYBOOK
 
-**Non-Negotiable:** The platform must never lock the founder out, never enter an unrecoverable cache state, and never crash silently.
+**Non-Negotiable:** the platform must never lock the founder out, never enter an unrecoverable cache state, and never crash silently.
 
 ---
 
 ## 1. The Site Is Down
 
-- **Check Vercel Status:** Visit [vercel-status.com](https://vercel-status.com). If Vercel is experiencing an incident, point your DNS A record to your Cloudflare Pages fallback deployment.
-- **Check Supabase Status:** Visit [status.supabase.com](https://status.supabase.com). If the database is restarting, the frontend renders offline notices without throwing React uncaught crashes.
-- **Inspect Edge Logs:** Run `vercel logs jadai.dev` or view the **Deployments → Runtime Logs** panel in Vercel.
+- **Check status pages first:** [Cloudflare status](https://www.cloudflarestatus.com) → [Render status](https://status.render.com) → [Supabase status](https://status.supabase.com).
+- **Static loads, actions fail** → Render API is down or asleep. Hit `https://api.jadai.dev/api/health` directly; Render cold-starts within ~30s on free tier. If it 500s, check Render → Logs.
+- **Nothing loads** → DNS or Pages. Verify the three CNAME records (`@` → pages.dev, `www` → jadai.dev, `api` → onrender.com) in Cloudflare, and the Pages build in the Cloudflare dashboard.
+- **Inspect API logs:** Render → your service → Logs. Client-side failures: browser console + Network tab.
 
 ---
 
 ## 2. AI Stopped Responding
 
-If user chats or diagnostics stop generating AI responses:
-1. Verify `GROQ_API_KEY` in the Admin Lounge or Vercel environment variables.
-2. The system should automatically fail over to `GEMINI_API_KEY`. If Gemini also fails, check the `module_usage` table to see the exact error message.
-3. If both external APIs are exhausted, the platform serves cached answers from the database.
-4. To test AI status directly, invoke:
-   ```bash
-   curl https://jadai.dev/api/ai/status
-   ```
+1. Test the chain directly: `curl https://api.jadai.dev/api/ai/status` — reports which provider keys are present.
+2. Verify `GROQ_API_KEY` / `GEMINI_API_KEY` in Render environment variables (a redeploy is required for env changes to take effect).
+3. Either key alone is enough — the chain fails over automatically. If both fail, the cache layer serves historical answers; cache misses return the honest graceful message (no crash, no quota consumed).
+4. Inspect failures: `SELECT * FROM ai_messages ORDER BY created_at DESC LIMIT 50;` or the PRIME Memory Matrix at `/admin/prime`.
 
 ---
 
 ## 3. Payments Aren't Processing
 
-1. Check the Paystack Webhook Log in your Paystack Dashboard (**Settings → Webhooks**).
-2. Ensure the Webhook URL is set to `https://jadai.dev/api/paystack/webhook`.
-3. Verify that `PAYSTACK_SECRET_KEY` matches the environment (test vs live mode).
-4. Inspect the `subscriptions` table in Supabase to confirm whether customer events are arriving.
+1. Paystack Dashboard → **Settings → Webhooks** — confirm the URL is **`https://api.jadai.dev/api/paystack/webhook`** and the recent events returned 200.
+2. Verify `PAYSTACK_SECRET_KEY` matches the mode (test vs live) and the plan codes in `lib/paystack/index.ts` exist in Paystack.
+3. Check the `subscriptions` and `template_orders` tables for arriving events; check Render logs for `paystack` signature-verification errors.
+4. Return URLs depend on `NEXT_PUBLIC_APP_URL=https://jadai.dev` — a missing/mismatched value breaks the post-checkout redirect.
 
 ---
 
-## 4. You Lost Admin Access (The 20-Tap Recovery Terminal)
+## 4. You Lost Admin Access (The Tap Sequences)
 
-If you are locked out of `/admin`:
-1. Navigate to the homepage `https://jadai.dev`.
-2. Locate the **Jadai Sigil** (the gold rhombus/diamond icon in the top navigation).
-3. **Tap or click the Sigil 20 times within 5 seconds.**
-4. The **Emergency Disaster Recovery Terminal** modal will immediately breach the frontend.
-5. From the Recovery Terminal:
-   - Click **"Purge Client Cache"** to clear corrupted session tokens.
-   - Click **"Emergency Reload"** to force clear service worker registration.
-6. Alternatively, use the **5-tap Quick Login** (5 taps within 2 seconds) to enter your master emergency passcode.
+1. **5-tap quick login:** tap the Jadai Sigil in the top nav **5 times within 3 seconds** → enter the master passcode. Hash a new passcode anytime with `npm run gen:admin-hash` and update `ADMIN_PASSWORD_HASH` in Render.
+2. **20-tap Disaster Recovery Terminal:** tap the Sigil **20 times** → the Recovery Terminal breaches the frontend with:
+   - **Purge client caches** (localStorage, IndexedDB, PRIME device memory)
+   - **Clear PRIME AI memory** (device facts + server sync, rotates builder identity)
+   - **Unregister all service workers** + emergency reload
+3. If the session cookie itself is corrupted, the 5-tap flow issues a fresh HMAC session from `SESSION_SECRET`.
 
 ---
 
 ## 5. A Cache Is Stuck (Service Worker Invalidation)
 
-If users report seeing old code or outdated assets:
-1. Open `/public/sw.js`.
-2. Locate line 7:
-   ```javascript
-   const CACHE_VERSION = 'jadai-v1';
-   ```
-3. Bump the version to `'jadai-v2'` (or higher).
-4. Deploy the update. The `activate` event in the service worker immediately purges all obsolete caches from every client browser across the globe on next visit.
-5. To bypass cache immediately on any page, append `?nocache=1` to the URL.
+Users seeing old code:
+
+1. Open `public/sw.js`, line 7: `const CACHE_VERSION = 'jadai-v2';`
+2. Bump to `'jadai-v3'` (or higher), commit, deploy.
+3. The `activate` handler purges every obsolete cache on each client's next visit.
+4. Immediate bypass on any page: append `?nocache=1` to the URL. Nuclear option: Recovery Terminal → "Unregister all service workers".
 
 ---
 
 ## 6. Database Corrupted or Accidentally Modified
 
-1. Open Supabase Dashboard → **Settings → Database Backups**.
-2. Free tier projects maintain daily backups. Select the point-in-time snapshot and click **Restore**.
-3. If restoring manually, re-run `/lib/supabase/schema.sql` in the SQL Editor. The script is idempotent and safely re-creates missing tables and policies without dropping unrelated data.
+1. Supabase Dashboard → **Settings → Database Backups** → restore the point-in-time snapshot.
+2. Schema drift: re-run all of `lib/supabase/schema.sql` in the SQL Editor. It is idempotent (`CREATE TABLE IF NOT EXISTS`, `DROP POLICY IF EXISTS`, guarded functions) — it creates missing tables/policies without touching existing rows.
+3. Data-integrity forensics: `admin_audit` records who did what in the Admin Lounge; `module_usage` and `ai_messages` retain request history.
+
+---
+
+## 7. Render or Pages Deployment Failed
+
+- **Render build fails:** almost always Node version (`engines: >= 22`) or `npm ci` lockfile mismatch — run `npm ci` locally to verify. Check the build log for the exact `tsc`/vite error; `npm run lint` reproduces type errors locally.
+- **Pages build fails:** same story — the build runs `npm run build` (`vite build`). Keep `dist/` git-ignored (it is).
+- **Bad deploy already live:** Rollbacks — Render → Deploys → previous good deploy → **Rollback**; Cloudflare Pages → Deployments → previous deployment → **Rollback to this deployment**. Database changes are forward-only: keep schema edits additive so rollbacks stay safe.
+
+---
+
+## 8. Contact/Newsletter Intake Down
+
+`POST /api/contact` and `/api/newsletter` write to Supabase and return honest 500s on failure. If the table is missing (schema not re-run), submissions fail loudly in Render logs — re-run the schema; no messages are silently dropped.
