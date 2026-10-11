@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JADAIHUB // MISSION BOARD — live preview</title>
+<style>
+  :root{
+    --void:#050404;--void2:#0a0908;--gold:#C9A84C;--grey:#8a8580;
+    --line:rgba(201,168,76,0.25);--green:#5f9e5a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--void);color:var(--grey);
+    font-family:ui-monospace,'Cascadia Code',Consolas,'Courier New',monospace;
+    font-size:12.5px;line-height:1.5;padding:22px 20px 26px;overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:rgba(201,168,76,.7);text-decoration:none}
+  a:hover{color:var(--gold)}
+  .back{position:fixed;top:12px;left:16px;font-size:11px;letter-spacing:.08em;z-index:40;padding:3px 6px;border:1px solid transparent}
+  .back:hover{border-color:var(--line);background:rgba(201,168,76,.06)}
+  .badge{position:fixed;top:10px;right:14px;text-align:right;z-index:40;pointer-events:none}
+  .badge .b1{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--gold);color:var(--gold);font-size:10px;letter-spacing:.18em;padding:4px 9px;background:rgba(5,4,4,.9)}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:pulse 1.6s infinite}
+  .badge .b2{display:block;font-size:9px;letter-spacing:.1em;color:#5f5b57;margin-top:5px}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  .wrap{max-width:920px;margin:0 auto;padding-top:34px}
+  header.top{border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap}
+  h1{font-size:17px;letter-spacing:.14em;color:#e6e1d7;font-weight:600}
+  .sub{font-size:10.5px;letter-spacing:.14em;color:#6b6660;margin-top:6px}
+  .sub b{color:rgba(201,168,76,.8);font-weight:400}
+  .stats{display:flex;gap:9px;flex-wrap:wrap}
+  .st{border:1px solid var(--line);padding:5px 9px;font-size:9.5px;letter-spacing:.12em;color:#6b6660}
+  .st b{display:block;color:#e6e1d7;font-size:15px;font-weight:400;letter-spacing:.02em;margin-top:2px}
+
+  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;align-items:start}
+  .col{border:1px solid var(--line);background:#080707;min-height:190px;display:flex;flex-direction:column}
+  .ch{
+    padding:8px 10px;border-bottom:1px solid rgba(201,168,76,.15);
+    font-size:9.5px;letter-spacing:.16em;color:#6b6660;
+    display:flex;justify-content:space-between;align-items:center;gap:6px
+  }
+  .ch .cnt{
+    border:1px solid rgba(201,168,76,.5);color:var(--gold);padding:1px 7px;font-size:10px;
+    transition:.25s
+  }
+  .ch .cnt.bump{animation:bump .45s}
+  @keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.45);background:rgba(201,168,76,.28)}100%{transform:scale(1)}}
+  .stack{padding:9px;display:flex;flex-direction:column;gap:9px}
+
+  .card{
+    border:1px solid rgba(255,255,255,.08);background:#0d0c0b;padding:11px;
+    transition:transform .18s, box-shadow .18s, border-color .18s;position:relative;
+    animation:arrive .35s ease-out;
+  }
+  @keyframes arrive{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .card:hover{transform:translateY(-3px);border-color:rgba(201,168,76,.55);box-shadow:0 8px 24px rgba(0,0,0,.55)}
+  .card .id{font-size:9px;letter-spacing:.14em;color:#4f4c49}
+  .card .tt{color:#e6e1d7;font-size:13px;margin-top:5px;line-height:1.45}
+  .card .bud{color:var(--gold);font-size:15px;margin-top:8px;letter-spacing:.02em}
+  .card .bud span{font-size:9.5px;letter-spacing:.14em;color:#6b6660}
+  .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+  .tag{font-size:9px;letter-spacing:.1em;border:1px solid rgba(255,255,255,.1);padding:2px 6px;color:#8a8580}
+  .cmeta{
+    display:flex;justify-content:space-between;gap:8px;margin-top:9px;
+    font-size:9px;letter-spacing:.1em;color:#4f4c49;border-top:1px solid rgba(255,255,255,.05);padding-top:7px
+  }
+  .cmeta b{color:#6b6660;font-weight:400}
+  .vf{margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .vbadge{font-size:9px;letter-spacing:.13em;padding:3px 7px;border:1px solid rgba(255,255,255,.14);color:#6b6660}
+  .vbadge.ok{border-color:var(--gold);color:var(--gold);background:rgba(201,168,76,.1)}
+  .verify{
+    background:transparent;border:1px solid var(--gold);color:var(--gold);font:inherit;
+    font-size:9.5px;letter-spacing:.14em;padding:5px 9px;cursor:pointer;transition:.15s
+  }
+  .verify:hover{background:var(--gold);color:#050404}
+  .verify:disabled{opacity:.5;cursor:default;border-color:rgba(255,255,255,.14);color:#6b6660}
+  .progline{margin-top:9px;height:3px;background:rgba(255,255,255,.07);overflow:hidden;display:none}
+  .progline.on{display:block}
+  .progline i{display:block;height:100%;background:var(--gold);width:0%;transition:width .1s linear}
+  .pmsg{font-size:9px;letter-spacing:.1em;color:#6b6660;margin-top:6px;display:none}
+  .pmsg.on{display:block}
+
+  .empty{font-size:10px;letter-spacing:.1em;color:#413e3c;padding:12px 4px;text-align:center}
+
+  .legend{
+    display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;
+    font-size:9.5px;letter-spacing:.1em;color:#5f5b57;align-items:center
+  }
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .lb{width:9px;height:9px;display:inline-block;border:1px solid rgba(255,255,255,.16)}
+  .lb.ok{border-color:var(--gold);background:rgba(201,168,76,.3)}
+  .legend em{font-style:normal;color:#4f4c49;margin-left:auto}
+
+  .foot-note{margin-top:14px;border:1px dashed var(--line);padding:9px 11px;font-size:10.5px;color:#6b6660;letter-spacing:.05em}
+  .foot-note b{color:rgba(201,168,76,.85);font-weight:400}
+
+  footer{margin-top:16px;border-top:1px solid var(--line);padding-top:13px;font-size:10px;letter-spacing:.08em;color:#5f5b57}
+  @media (max-width:760px){
+    body{padding:56px 14px 24px}
+    .board{grid-template-columns:1fr}
+    h1{font-size:14.5px}
+  }
+</style>
+</head>
+<body>
+<a class="back" href="/">◂ jadai.dev</a>
+<div class="badge">
+  <span class="b1"><i class="dot"></i>LIVE PREVIEW</span>
+  <span class="b2">SELF-HOSTED PREVIEW — INTERACTIVE DEMO</span>
+</div>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>JADAIHUB // MISSION BOARD</h1>
+      <div class="sub">DECENTRALIZED MISSIONS <b>·</b> CODE AUDITS <b>·</b> ESCROW</div>
+    </div>
+    <div class="stats">
+      <div class="st">OPEN<b id="sOpen">3</b></div>
+      <div class="st">IN AUDIT<b id="sAudit">1</b></div>
+      <div class="st">FUNDED<b id="sFund">1</b></div>
+    </div>
+  </header>
+
+  <div class="board" id="board">
+    <section class="col" data-col="open">
+      <div class="ch"><span>OPEN MISSIONS</span><span class="cnt" id="cOpen">0</span></div>
+      <div class="stack" id="colOpen"></div>
+    </section>
+    <section class="col" data-col="audit">
+      <div class="ch"><span>IN AUDIT</span><span class="cnt" id="cAudit">0</span></div>
+      <div class="stack" id="colAudit"></div>
+    </section>
+    <section class="col" data-col="fund">
+      <div class="ch"><span>ESCROW FUNDED</span><span class="cnt" id="cFund">0</span></div>
+      <div class="stack" id="colFund"></div>
+    </section>
+  </div>
+
+  <div class="legend">
+    <span><i class="lb"></i>UNVERIFIED</span>
+    <span><i class="lb ok"></i>REPO VERIFIED</span>
+    <span>BUDGET HELD IN ESCROW UNTIL ACCEPTANCE</span>
+    <em>COUNTERS RECALCULATE ON VERIFY</em>
+  </div>
+
+  <div class="foot-note">
+    <b>DEMO ESCROW STATES</b> — verification and funding shown here are simulated for the preview.
+    No contracts are deployed and no funds move.
+  </div>
+
+  <footer>
+    Preview environment hosted by JADAI Studios. Demo data only — not connected to production.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var COLS = {
+    open: document.getElementById("colOpen"),
+    audit: document.getElementById("colAudit"),
+    fund: document.getElementById("colFund")
+  };
+
+  var MISSIONS = [
+    { id:"MSN-1042", title:"Realtime audit pipeline for Solidity diffs", budget:4200,
+      tags:["Rust","tokio","foundry"], verified:true, col:"fund", posted:"6d ago", bids:"11 bids" },
+    { id:"MSN-1043", title:"PWA offline queue for field data capture", budget:1800,
+      tags:["Next.js","IndexedDB"], verified:false, col:"open", posted:"4h ago", bids:"2 bids" },
+    { id:"MSN-1044", title:"Edge rate-limiter with per-key tokens", budget:2650,
+      tags:["Go","Redis","OPA"], verified:false, col:"open", posted:"11h ago", bids:"5 bids" },
+    { id:"MSN-1045", title:"Fuzz harness for wallet signature decoding", budget:3100,
+      tags:["C++","libFuzzer"], verified:true, col:"audit", posted:"2d ago", bids:"7 bids" },
+    { id:"MSN-1046", title:"Merkle proof verifier for stored reports", budget:1450,
+      tags:["TypeScript","circom"], verified:false, col:"open", posted:"38m ago", bids:"0 bids" }
+  ];
+
+  var COLNAMES = { open:"OPEN MISSIONS", audit:"IN AUDIT", fund:"ESCROW FUNDED" };
+
+  function esc(s){ return String(s).replace(/[<>&]/g, function(c){ return {"<":"&lt;",">":"&gt;","&":"&amp;"}[c]; }); }
+
+  function makeCard(m){
+    var el = document.createElement("article");
+    el.className = "card";
+    var badgeCls = m.verified ? "vbadge ok" : "vbadge";
+    var badgeTxt = m.verified ? "REPO VERIFIED" : "UNVERIFIED";
+
+    el.innerHTML =
+      '<div class="id">' + m.id + ' · ' + esc(COLNAMES[m.col]) + '</div>' +
+      '<div class="tt">' + esc(m.title) + '</div>' +
+      '<div class="bud">$' + m.budget.toLocaleString("en-US") + ' <span>USD</span></div>' +
+      '<div class="tags">' + m.tags.map(function(t){ return '<span class="tag">' + esc(t) + '</span>'; }).join("") + '</div>' +
+      '<div class="cmeta"><span>POSTED <b>' + esc(m.posted) + '</b></span><span>' + esc(m.bids) + '</span></div>' +
+      '<div class="vf"><span class="' + badgeCls + '">' + badgeTxt + '</span>' +
+        (m.col === "open" && !m.verified ? '<button class="verify" type="button">VERIFY REPO</button>' : '') +
+      '</div>' +
+      '<div class="progline"><i></i></div>' +
+      '<div class="pmsg"></div>';
+
+    var btn = el.querySelector(".verify");
+    if(btn){ btn.addEventListener("click", function(){ verify(m, el, btn); }); }
+    return el;
+  }
+
+  function verify(m, el, btn){
+    var pl = el.querySelector(".progline");
+    var fill = el.querySelector(".progline i");
+    var msg = el.querySelector(".pmsg");
+    btn.disabled = true;
+    btn.textContent = "VERIFYING";
+    pl.classList.add("on");
+    msg.classList.add("on");
+
+    var steps = [
+      "resolving repository…",
+      "cloning 41 refs…",
+      "hashing tree · sha256…",
+      "checking CI attestations…",
+      "signature match ok"
+    ];
+    var p = 0, si = 0;
+    msg.textContent = steps[0];
+
+    var iv = setInterval(function(){
+      p += 5 + Math.random()*8;
+      if(p > 100) p = 100;
+      fill.style.width = p + "%";
+      var nextStep = Math.min(steps.length - 1, Math.floor(p/22));
+      if(nextStep !== si){ si = nextStep; msg.textContent = steps[si]; }
+      if(p >= 100){
+        clearInterval(iv);
+        setTimeout(function(){ finalize(m, el, btn, msg, pl); }, 200);
+      }
+    }, 110);
+  }
+
+  function finalize(m, el, btn, msg, pl){
+    m.verified = true;
+    m.col = "audit";
+    var bd = el.querySelector(".vbadge");
+    bd.className = "vbadge ok";
+    bd.textContent = "REPO VERIFIED";
+    msg.textContent = "queued for auditor assignment · demo";
+    btn.remove();
+    pl.classList.remove("on");
+
+    setTimeout(function(){
+      COLS.audit.appendChild(el);
+      el.querySelector(".id").textContent = m.id + " · IN AUDIT";
+      bump();
+      refresh();
+    }, 700);
+  }
+
+  function bump(){
+    ["cOpen","cAudit","cFund"].forEach(function(id){
+      var n = document.getElementById(id);
+      n.classList.remove("bump");
+      void n.offsetWidth;
+      n.classList.add("bump");
+    });
+  }
+
+  function counts(){
+    var c = { open:0, audit:0, fund:0 };
+    MISSIONS.forEach(function(m){ c[m.col]++; });
+    return c;
+  }
+
+  function refresh(){
+    var c = counts();
+    document.getElementById("cOpen").textContent = c.open;
+    document.getElementById("cAudit").textContent = c.audit;
+    document.getElementById("cFund").textContent = c.fund;
+    document.getElementById("sOpen").textContent = c.open;
+    document.getElementById("sAudit").textContent = c.audit;
+    document.getElementById("sFund").textContent = c.fund;
+
+    var checks = [
+      [COLS.open, c.open, "no open missions"],
+      [COLS.audit, c.audit, "no audits running"],
+      [COLS.fund, c.fund, "escrow empty"]
+    ];
+    checks.forEach(function(ch){
+      var stub = ch[0].querySelector(".empty");
+      if(ch[1] === 0 && !stub){
+        var d = document.createElement("div");
+        d.className = "empty";
+        d.textContent = ch[2];
+        ch[0].appendChild(d);
+      } else if(ch[1] > 0 && stub){
+        stub.remove();
+      }
+    });
+  }
+
+  MISSIONS.forEach(function(m){ COLS[m.col].appendChild(makeCard(m)); });
+  refresh();
+})();
+</script>
+</body>
+</html>

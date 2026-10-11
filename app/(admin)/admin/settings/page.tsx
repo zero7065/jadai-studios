@@ -23,7 +23,7 @@ export default function AdminSettingsPage() {
   const [keys, setKeys] = useState<KeyConfig[]>([
     {
       id: 'groq',
-      label: 'Groq API Key (Primary: llama-3.3-70b-versatile)',
+      label: 'Groq API Key (Primary: openai/gpt-oss-120b)',
       envKey: 'GROQ_API_KEY',
       value: 'gsk_prod_jadai_groq_verified_key',
       revealed: false,

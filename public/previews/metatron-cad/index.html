@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>METATRON CAD // SPATIAL COMPILER — live preview</title>
+<style>
+  :root{
+    --void:#050404;--void2:#0a0908;--gold:#C9A84C;--grey:#8a8580;
+    --line:rgba(201,168,76,0.25);--red:#c04a3a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--void);color:var(--grey);
+    font-family:ui-monospace,'Cascadia Code',Consolas,'Courier New',monospace;
+    font-size:12.5px;line-height:1.5;padding:22px 20px 26px;overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:rgba(201,168,76,.7);text-decoration:none}
+  a:hover{color:var(--gold)}
+  .back{position:fixed;top:12px;left:16px;font-size:11px;letter-spacing:.08em;z-index:40;padding:3px 6px;border:1px solid transparent}
+  .back:hover{border-color:var(--line);background:rgba(201,168,76,.06)}
+  .badge{position:fixed;top:10px;right:14px;text-align:right;z-index:40;pointer-events:none}
+  .badge .b1{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--gold);color:var(--gold);font-size:10px;letter-spacing:.18em;padding:4px 9px;background:rgba(5,4,4,.9)}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:pulse 1.6s infinite}
+  .badge .b2{display:block;font-size:9px;letter-spacing:.1em;color:#5f5b57;margin-top:5px}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  .wrap{max-width:880px;margin:0 auto;padding-top:34px}
+  header.top{border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:15px}
+  h1{font-size:17px;letter-spacing:.14em;color:#e6e1d7;font-weight:600}
+  .sub{font-size:10.5px;letter-spacing:.14em;color:#6b6660;margin-top:6px}
+  .sub b{color:rgba(201,168,76,.8);font-weight:400}
+
+  .layout{display:grid;grid-template-columns:1fr 300px;gap:14px}
+  .stage{border:1px solid var(--line);background:#070606;position:relative;overflow:hidden}
+  canvas{display:block;width:100%;height:auto;touch-action:manipulation;cursor:crosshair}
+  .stagetag{position:absolute;top:9px;left:10px;font-size:9.5px;letter-spacing:.16em;color:#5f5b57;pointer-events:none}
+  .stagetag2{position:absolute;bottom:9px;left:10px;font-size:9.5px;letter-spacing:.12em;color:#5f5b57;pointer-events:none}
+  .stagetag3{position:absolute;top:9px;right:10px;font-size:9.5px;letter-spacing:.12em;color:rgba(201,168,76,.75);pointer-events:none}
+
+  .tools{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+  .tool{
+    background:#0c0b0a;border:1px solid rgba(255,255,255,.1);color:#8a8580;
+    font:inherit;font-size:10.5px;letter-spacing:.14em;padding:7px 12px;cursor:pointer;transition:.15s
+  }
+  .tool:hover{border-color:var(--gold);color:var(--gold)}
+  .tool.on{border-color:var(--gold);background:rgba(201,168,76,.14);color:var(--gold)}
+  .keyhint{font-size:9.5px;letter-spacing:.1em;color:#5f5b57;margin-top:9px}
+
+  .panel{border:1px solid var(--line);background:#0a0908;display:flex;flex-direction:column}
+  .ph{padding:8px 11px;border-bottom:1px solid rgba(201,168,76,.15);font-size:10px;letter-spacing:.16em;color:#6b6660;display:flex;justify-content:space-between}
+  .ph b{color:rgba(201,168,76,.85);font-weight:400}
+  .coords{padding:8px 11px;font-size:10.5px;line-height:1.75;max-height:236px;overflow:auto}
+  .coords div{display:flex;justify-content:space-between;gap:8px;white-space:nowrap}
+  .coords .id{color:rgba(201,168,76,.8)}
+  .coords .xy{color:#c9c4bc}
+  .coords div:nth-child(even){color:#6b6660}
+
+  .gwrap{padding:10px 11px;border-top:1px solid rgba(201,168,76,.15)}
+  #gcode{
+    background:#060505;border:1px solid rgba(255,255,255,.07);color:#7fa87c;
+    font-size:10.5px;line-height:1.7;padding:9px 10px;white-space:pre-wrap;word-break:break-all;
+    min-height:96px;margin-bottom:9px;max-height:150px;overflow:auto
+  }
+  #gcode.empty{color:#4a4744}
+  #export{
+    width:100%;background:transparent;border:1px solid var(--gold);color:var(--gold);
+    font:inherit;font-size:10.5px;letter-spacing:.16em;padding:8px;cursor:pointer;transition:.15s
+  }
+  #export:hover{background:var(--gold);color:#050404}
+
+  footer{margin-top:22px;border-top:1px solid var(--line);padding-top:13px;font-size:10px;letter-spacing:.08em;color:#5f5b57}
+  @media (max-width:760px){
+    body{padding:56px 14px 24px}
+    .layout{grid-template-columns:1fr}
+    h1{font-size:14.5px}
+  }
+</style>
+</head>
+<body>
+<a class="back" href="/">◂ jadai.dev</a>
+<div class="badge">
+  <span class="b1"><i class="dot"></i>LIVE PREVIEW</span>
+  <span class="b2">SELF-HOSTED PREVIEW — INTERACTIVE DEMO</span>
+</div>
+
+<div class="wrap">
+  <header class="top">
+    <h1>METATRON CAD // SPATIAL COMPILER</h1>
+    <div class="sub">SACRED GEOMETRY → CNC G-CODE · <b>13 NODE SOLID</b> · TOL 0.02mm</div>
+  </header>
+
+  <div class="layout">
+    <div>
+      <div class="stage">
+        <span class="stagetag">VIEWPORT · ORTHO TOP</span>
+        <span class="stagetag3" id="rotTag">ROT 0.00°</span>
+        <span class="stagetag2">PLATE ALU-6061 · 300×300mm</span>
+        <canvas id="cv" width="640" height="480"></canvas>
+      </div>
+      <div class="tools">
+        <button class="tool" id="tMesh" type="button" data-k="mesh">MESH</button>
+        <button class="tool" id="tNodes" type="button" data-k="nodes">NODES</button>
+        <button class="tool" id="tStress" type="button" data-k="stress">STRESS</button>
+        <button class="tool" id="tSpin" type="button" data-k="spin">SPIN</button>
+      </div>
+      <div class="keyhint">HOVER VIEWPORT OR PRESS · M MESH · N NODES · S STRESS · SPACE ROTATE</div>
+    </div>
+
+    <aside class="panel">
+      <div class="ph"><span>NODE READOUT</span><b id="nCount">13 NODES</b></div>
+      <div class="coords" id="coords"></div>
+      <div class="gwrap">
+        <div class="ph" style="padding:0 0 8px;border:0"><span>G-CODE OUTPUT</span><b id="gState">IDLE</b></div>
+        <pre id="gcode" class="empty">// no toolpath emitted</pre>
+        <button id="export" type="button">EXPORT GCODE</button>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    Preview environment hosted by JADAI Studios. Demo data only — not connected to production.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var cv = document.getElementById("cv");
+  var ctx = cv && cv.getContext ? cv.getContext("2d") : null;
+  if(!ctx){ return; }
+
+  var R = 74;                       // inner hex radius
+  var nodes = [{x:0,y:0}];
+  var a;
+  for(a=0;a<6;a++){ var t = a*Math.PI/3; nodes.push({x:Math.cos(t)*R, y:Math.sin(t)*R}); }
+  for(a=0;a<6;a++){ var u = a*Math.PI/3; nodes.push({x:Math.cos(u)*R*2, y:Math.sin(u)*R*2}); }
+
+  var edges = [];
+  for(var i=0;i<nodes.length;i++){
+    for(var j=i+1;j<nodes.length;j++){
+      var dx = nodes[i].x-nodes[j].x, dy = nodes[i].y-nodes[j].y;
+      edges.push({a:i, b:j, d:Math.sqrt(dx*dx+dy*dy)});
+    }
+  }
+  var maxD = 0;
+  for(var e=0;e<edges.length;e++){ if(edges[e].d > maxD) maxD = edges[e].d; }
+
+  var state = { mesh:false, nodes:false, stress:false, spin:true };
+  var angle = 0;
+
+  function fit(){
+    var w = cv.clientWidth || 640;
+    var scale = w / 640;
+    cv.width = Math.round(640 * scale);
+    cv.height = Math.round(480 * scale);
+    ctx.setTransform(scale,0,0,scale,0,0);
+  }
+
+  function project(n, ang){
+    var ca = Math.cos(ang), sa = Math.sin(ang);
+    var x = n.x*ca - n.y*sa;
+    var y = n.x*sa + n.y*ca;
+    var depth = 1 + (y/620);            // faint pseudo-3D foreshortening
+    return { x: 320 + x*depth, y: 240 + y*0.62*depth, raw:{x:x,y:y} };
+  }
+
+  var coordsEl = document.getElementById("coords");
+  var rotTag = document.getElementById("rotTag");
+
+  function draw(){
+    ctx.clearRect(0,0,640,480);
+
+    ctx.strokeStyle = "rgba(255,255,255,0.045)";
+    ctx.lineWidth = 1;
+    for(var g=0; g<=640; g+=40){ ctx.beginPath(); ctx.moveTo(g,0); ctx.lineTo(g,480); ctx.stroke(); }
+    for(var h=0; h<=480; h+=40){ ctx.beginPath(); ctx.moveTo(0,h); ctx.lineTo(640,h); ctx.stroke(); }
+
+    var P = [];
+    for(var i=0;i<nodes.length;i++){ P.push(project(nodes[i], angle)); }
+
+    if(state.mesh){
+      ctx.fillStyle = "rgba(201,168,76,0.07)";
+      for(var i2=0;i2<P.length;i2++){
+        for(var j=i2+1;j<P.length;j++){
+          for(var k=j+1;k<P.length;k++){
+            var ax = (P[i2].x+P[j].x+P[k].x)/3;
+            var ay = (P[i2].y+P[j].y+P[k].y)/3;
+            if(Math.abs(ax-320) > 175 || Math.abs(ay-240) > 130) continue;
+            if(((i2*31 + j*17 + k*11) % 5) !== 0) continue;
+            ctx.beginPath();
+            ctx.moveTo(P[i2].x,P[i2].y); ctx.lineTo(P[j].x,P[j].y); ctx.lineTo(P[k].x,P[k].y);
+            ctx.closePath(); ctx.fill();
+          }
+        }
+      }
+    }
+
+    for(var e=0;e<edges.length;e++){
+      var ed = edges[e];
+      var hot = state.stress && (ed.d > maxD*0.86);
+      var warm = state.stress && (ed.d > maxD*0.62 && ed.d <= maxD*0.86);
+      ctx.strokeStyle = hot ? "rgba(192,74,58,0.95)" : (warm ? "rgba(201,168,76,0.9)" : "rgba(201,168,76,0.34)");
+      ctx.lineWidth = hot ? 1.7 : 1;
+      ctx.beginPath();
+      ctx.moveTo(P[ed.a].x, P[ed.a].y);
+      ctx.lineTo(P[ed.b].x, P[ed.b].y);
+      ctx.stroke();
+    }
+
+    for(var n=0;n<P.length;n++){
+      var isCtr = n===0;
+      ctx.beginPath();
+      ctx.arc(P[n].x, P[n].y, isCtr ? 20 : 15, 0, Math.PI*2);
+      ctx.strokeStyle = isCtr ? "rgba(201,168,76,0.95)" : "rgba(201,168,76,0.55)";
+      ctx.lineWidth = isCtr ? 1.6 : 1;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(P[n].x, P[n].y, 2.4, 0, Math.PI*2);
+      ctx.fillStyle = "#C9A84C";
+      ctx.fill();
+
+      if(state.nodes){
+        ctx.fillStyle = "rgba(230,225,215,0.85)";
+        ctx.font = "10px ui-monospace, Consolas, monospace";
+        ctx.fillText("N" + (n+1), P[n].x + 8, P[n].y - 8);
+      }
+    }
+
+    var deg = (angle*180/Math.PI) % 360;
+    rotTag.textContent = "ROT " + deg.toFixed(2) + "°";
+    writeCoords(P);
+  }
+
+  var lastCoordWrite = 0;
+  function writeCoords(P){
+    var now = Date.now();
+    if(now - lastCoordWrite < 140) return;
+    lastCoordWrite = now;
+    var html = "";
+    for(var i=0;i<P.length;i++){
+      var rx = P[i].raw.x, ry = P[i].raw.y;
+      html += '<div><span class="id">N' + (i+1) + (i===0?" ·CTR":"") + '</span>' +
+              '<span class="xy">X' + (rx>=0?"+":"") + rx.toFixed(1) +
+              '  Y' + (ry>=0?"+":"") + ry.toFixed(1) + '</span></div>';
+    }
+    coordsEl.innerHTML = html;
+  }
+
+  var running = true;
+  function frame(){
+    if(running && state.spin){ angle += 0.0045; }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  function setToggle(k, force){
+    state[k] = (typeof force === "boolean") ? force : !state[k];
+    document.getElementById("t" + k.charAt(0).toUpperCase() + k.slice(1)).classList.toggle("on", state[k]);
+    if(k === "nodes" && state[k]) lastCoordWrite = 0;
+  }
+
+  ["mesh","nodes","stress","spin"].forEach(function(k){
+    var btn = document.getElementById("t" + k.charAt(0).toUpperCase() + k.slice(1));
+    btn.addEventListener("click", function(){ setToggle(k); });
+  });
+
+  document.addEventListener("keydown", function(e){
+    if(e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+    var k = e.key.toLowerCase();
+    if(k === "m"){ setToggle("mesh"); }
+    else if(k === "n"){ setToggle("nodes"); }
+    else if(k === "s"){ setToggle("stress"); }
+    else if(e.key === " "){ e.preventDefault(); setToggle("spin"); }
+  });
+
+  cv.addEventListener("mouseenter", function(){ setToggle("nodes", true); });
+  cv.addEventListener("click", function(){ setToggle("stress"); });
+
+  document.getElementById("export").addEventListener("click", function(){
+    var gc = document.getElementById("gcode");
+    var st = document.getElementById("gState");
+    st.textContent = "COMPILING";
+    var lines = [];
+    lines.push("; METATRON CAD — 13 node solid, demo toolpath");
+    lines.push("G21 G90 G17");
+    lines.push("G00 X" + nodes[1].x.toFixed(2) + " Y" + nodes[1].y.toFixed(2));
+    lines.push("G01 Z-3.0 F1200");
+    lines.push("G02 X" + nodes[7].x.toFixed(2) + " Y" + nodes[7].y.toFixed(2) +
+               " I" + (nodes[0].x-nodes[1].x).toFixed(2) + " J" + (nodes[0].y-nodes[1].y).toFixed(2) + " F900");
+    lines.push("G01 X" + nodes[4].x.toFixed(2) + " Y" + nodes[4].y.toFixed(2) + " F1400");
+    lines.push("G00 Z12.0");
+    lines.push("M30");
+
+    setTimeout(function(){
+      gc.textContent = lines.join("\n");
+      gc.classList.remove("empty");
+      st.textContent = "READY · " + lines.length + " LINES";
+    }, 500);
+  });
+
+  window.addEventListener("resize", function(){ fit(); draw(); });
+
+  fit();
+  setToggle("nodes", true);
+  draw();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

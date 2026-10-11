@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import StatusBadge from '../ui/StatusBadge';
 import EdgeGlow from '../ui/EdgeGlow';
 import YinYangLoader from '../ui/YinYangLoader';
@@ -31,25 +31,41 @@ export const WorkCarousel: React.FC = () => {
 
   const active = projects[currentIndex];
 
-  const handlePrev = () => {
+  // Self-hosted preview first; live_url only as last resort (historic subdomains are NXDOMAIN).
+  const iframeSrc = active.preview_url || active.live_url || '';
+  const displayUrl = iframeSrc || 'no source configured';
+
+  const resetPreviewState = () => {
     setIframeLoaded(false);
     setIframeError(false);
+  };
+
+  const handlePrev = () => {
+    resetPreviewState();
     setCurrentIndex((prev) => (prev === 0 ? projects.length - 1 : prev - 1));
     StudioAudio.playClick();
   };
 
   const handleNext = () => {
-    setIframeLoaded(false);
-    setIframeError(false);
+    resetPreviewState();
     setCurrentIndex((prev) => (prev === projects.length - 1 ? 0 : prev + 1));
     StudioAudio.playClick();
   };
 
-  const isLive = active.status === 'Live' || active.status === 'In Build';
-  const liveUrl =
-    active.slug === 'exampadi'
-      ? 'https://exampadi.jadai.dev'
-      : active.live_url || `https://${active.slug}.jadai.dev`;
+  const handleDot = (i: number) => {
+    resetPreviewState();
+    setCurrentIndex(i);
+    StudioAudio.playClick();
+  };
+
+  // 4s load watchdog — a dead source must degrade to the dossier panel, never spin forever.
+  useEffect(() => {
+    if (!iframeSrc || iframeLoaded) return;
+    const timer = window.setTimeout(() => {
+      setIframeError(true);
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [iframeSrc, iframeLoaded, currentIndex]);
 
   return (
     <div className="space-y-12 max-w-6xl mx-auto py-8 px-4 select-none">
@@ -92,7 +108,7 @@ export const WorkCarousel: React.FC = () => {
                 {/* Gold URL Bar with gold accent */}
                 <div className="flex-1 max-w-md mx-auto px-4 py-1.5 rounded-full bg-[#050404] border border-[#C9A84C]/50 flex items-center justify-center gap-2 text-xs font-mono text-[#e8c96a] shadow-[inset_0_1px_4px_rgba(0,0,0,0.8)]">
                   <Globe className="w-3.5 h-3.5 text-[#C9A84C]" />
-                  <span className="truncate">{liveUrl}</span>
+                  <span className="truncate">{displayUrl}</span>
                 </div>
 
                 {/* Counter & Status */}
@@ -148,9 +164,12 @@ export const WorkCarousel: React.FC = () => {
 
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(liveUrl);
+                      const shareUrl = iframeSrc
+                        ? `${window.location.origin}${iframeSrc}`
+                        : window.location.origin;
+                      navigator.clipboard.writeText(shareUrl);
                       StudioAudio.playClick();
-                      showToast('Project link copied — paste it anywhere you need the proof.', 'success');
+                      showToast('Preview link copied — paste it anywhere you need the proof.', 'success');
                     }}
                     className="p-2.5 rounded-xl text-[#8a6e2a] hover:text-[#C9A84C] hover:bg-white/5 transition-colors cursor-pointer"
                     title="Share Link"
@@ -163,11 +182,12 @@ export const WorkCarousel: React.FC = () => {
                 <div className="flex-1 relative bg-[#050404] flex flex-col justify-between overflow-hidden">
                   {activeSidebarTab === 'preview' && (
                     <>
-                      {isLive && !iframeError ? (
+                      {iframeSrc && !iframeError ? (
                         <div className="relative w-full h-[480px] bg-[#050404] overflow-hidden">
                           <iframe
-                            src={liveUrl}
-                            title={active.title}
+                            key={active.id}
+                            src={iframeSrc}
+                            title={`${active.title} — self-hosted preview`}
                             className="w-full h-full border-none bg-black"
                             loading="lazy"
                             onLoad={() => setIframeLoaded(true)}
@@ -199,6 +219,20 @@ export const WorkCarousel: React.FC = () => {
                           <p className="text-xs font-serif text-[#c4c0bb] max-w-xl mx-auto leading-relaxed">
                             {active.description}
                           </p>
+                          {iframeError && (
+                            <div className="space-y-3 pt-2 border-t border-[rgba(201,168,76,0.15)] max-w-md">
+                              <p className="text-[11px] font-mono text-[#8a6e2a]">
+                                Preview did not load within 4 seconds. The dossier above is the
+                                full written record.
+                              </p>
+                              <button
+                                onClick={resetPreviewState}
+                                className="px-4 py-1.5 rounded-full border border-[rgba(201,168,76,0.4)] text-[#e8c96a] font-mono text-[10px] uppercase tracking-widest hover:bg-[rgba(201,168,76,0.1)] transition-colors cursor-pointer"
+                              >
+                                Retry Preview
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
@@ -261,17 +295,17 @@ export const WorkCarousel: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Open Live Pill */}
+                    {/* Open Preview Pill */}
                     <div className="flex items-center gap-3">
                       <EdgeGlow intensity="intense" color="dual" borderRadius={9999}>
                         <a
-                          href={liveUrl}
+                          href={iframeSrc || undefined}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-5 py-2 rounded-full bg-[#C9A84C] text-[#050404] font-mono text-xs font-bold tracking-wider hover:bg-[#e8c96a] transition-all flex items-center gap-1.5 shadow-lg uppercase"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
-                          <span>Open Live System</span>
+                          <span>Open Live Preview</span>
                         </a>
                       </EdgeGlow>
                     </div>
@@ -316,10 +350,7 @@ export const WorkCarousel: React.FC = () => {
           {projects.map((_, i) => (
             <button
               key={i}
-              onClick={() => {
-                setCurrentIndex(i);
-                StudioAudio.playClick();
-              }}
+              onClick={() => handleDot(i)}
               className={`h-1.5 rounded-full transition-all cursor-pointer ${
                 currentIndex === i
                   ? 'w-6 bg-[#C9A84C] shadow-[0_0_8px_#C9A84C]'

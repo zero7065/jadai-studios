@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { logger } from '../utils/logger';
+import { isRealGeminiKey } from '../config/envTrust';
 
 export interface GroundingSource {
   title?: string;
@@ -12,11 +13,14 @@ export interface GroundingSource {
 
 export interface GroundedResponse {
   text: string;
-  mode: 'search' | 'maps' | 'standard' | 'fallback';
+  mode: 'search' | 'maps' | 'standard' | 'offline';
   sources: GroundingSource[];
   webSearchQueries?: string[];
   durationMs: number;
   modelUsed: string;
+  /** True when no real grounding provider ran — clients MUST label the output. */
+  offline?: boolean;
+  offlineReason?: string;
 }
 
 export async function generateGroundedContent(
@@ -32,9 +36,9 @@ export async function generateGroundedContent(
   const apiKey = options.apiKey || process.env.GEMINI_API_KEY;
   const mode = options.mode || 'search';
 
-  if (!apiKey || apiKey.startsWith('[SET_IN_') || apiKey.trim() === '') {
-    // Graceful offline/simulation fallback if key is not configured in local environment
-    return getSimulatedGroundedResponse(prompt, mode, startTime);
+  if (!isRealGeminiKey(apiKey)) {
+    // Honest offline: never fabricate citations or fake "live search" results.
+    return getOfflineGroundedResponse(prompt, mode, startTime, 'Gemini API key not configured');
   }
 
   const ai = new GoogleGenAI({
@@ -154,55 +158,29 @@ export async function generateGroundedContent(
       modelUsed: model,
     };
   } catch (err: any) {
-    logger.warn('Grounded Gemini call failed, returning resilient fallback', { error: err.message, mode });
-    return getSimulatedGroundedResponse(prompt, mode, startTime, err.message);
+    logger.warn('Grounded Gemini call failed, returning honest offline response', { error: err.message, mode });
+    return getOfflineGroundedResponse(prompt, mode, startTime, `Grounding provider error: ${err.message}`);
   }
 }
 
-function getSimulatedGroundedResponse(prompt: string, mode: string, startTime: number, errorContext?: string): GroundedResponse {
-  if (mode === 'maps') {
-    return {
-      text: `[SPATIAL INTELLIGENCE // GOOGLE MAPS GROUNDING]\n\nCoordinates and routing for "${prompt}":\n\n• Physical Hub: Jadai Studios Prime Node (Victoria Island, Lagos / Plateau Innovation Hub, Jos)\n• Verified Coordinates: 9.8965° N, 8.8583° E (Jos Central Node) & 6.4281° N, 3.4219° E (Lagos Gateway)\n• Navigation Routing: Direct fiber optic transit corridors active across West Africa, London (LD4), and US-East.\n• Status: Real-time route optimization nominal. Travel time estimated at zero-latency digital packet transmission.`,
-      mode: 'maps',
-      sources: [
-        {
-          title: 'Google Maps Place Link',
-          url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prompt)}`,
-          snippet: 'Direct Google Maps navigational coordinates for query: ' + prompt,
-          sourceType: 'map',
-          placeAddress: 'Global Cloud Node & Innovation Axis',
-        },
-        {
-          title: 'Jadai Studios Central Axis',
-          url: 'https://maps.google.com/?q=Lagos+Nigeria',
-          snippet: 'Registered sovereign node coordinate in West African commercial tech corridor.',
-          sourceType: 'map',
-        }
-      ],
-      durationMs: Date.now() - startTime,
-      modelUsed: 'gemini-3.8-flash (grounded-resilience)',
-    };
-  }
-
+/**
+ * Honest degraded response. No invented sources, no fake "verified against live indexes"
+ * claims — the caller sees offline:true and labels it for the user.
+ */
+function getOfflineGroundedResponse(
+  prompt: string,
+  mode: string,
+  startTime: number,
+  reason: string
+): GroundedResponse {
   return {
-    text: `[REAL-TIME SEARCH VERIFICATION // GOOGLE SEARCH GROUNDING]\n\nReal-time web verification for: "${prompt}"\n\n1. Current Fact Check: Verified against live global indexes. The information reflects prevailing architectural standards and verified public records.\n2. Key Observation: Jadai Studios operates sovereign multi-tenant web engines with zero-chunk code standards and live Paystack transaction settlement.\n3. Public Documentation: Confirmed active deployments across global CDN edge nodes.\n\n${errorContext ? `*(Engine note: Real-time grounding verified with local redundancy)*` : ''}`,
-    mode: 'search',
-    sources: [
-      {
-        title: 'Google Search Live Results',
-        url: `https://www.google.com/search?q=${encodeURIComponent(prompt)}`,
-        snippet: 'Live web index verification and citations matching query.',
-        sourceType: 'web',
-      },
-      {
-        title: 'Jadai Studios Documentation',
-        url: 'https://github.com/jadaistudios',
-        snippet: 'Official architecture repository, developer specs, and core system standards.',
-        sourceType: 'web',
-      },
-    ],
-    webSearchQueries: [prompt, `${prompt} latest news`, `${prompt} real-time data`],
+    text: `GROUNDING OFFLINE — no live web verification ran for this request.\n\nYour query: "${prompt}"\n\nReason: ${reason}\n\nA GEMINI_API_KEY with search grounding is required for verified real-time citations. Until then, treat any answer you already have as unverified. You can still chat with PRIME via /oracle — chat runs on the Groq provider and is unaffected.`,
+    mode: 'offline',
+    sources: [],
+    webSearchQueries: [],
     durationMs: Date.now() - startTime,
-    modelUsed: 'gemini-3.8-flash (grounded-resilience)',
+    modelUsed: 'none (offline)',
+    offline: true,
+    offlineReason: reason,
   };
 }

@@ -14,7 +14,13 @@ export const forgeModule: JadaiModule = defineModule({
     page: '/playground/forge',
     api: {
       analyze: async ({ body }) => {
-        return { success: true, data: { message: 'Document analyzed', result: body } };
+        const text = typeof body?.text === 'string' ? body.text : '';
+        if (!text || text.trim().length < 20) {
+          return { status: 400, success: false, error: 'text (min 20 characters) required' };
+        }
+        const { analyzeDocument } = await import('../doc-analyzer/engine');
+        const analysis = analyzeDocument(text);
+        return { success: true, data: { message: 'Document analyzed', analysis } };
       },
     },
   },

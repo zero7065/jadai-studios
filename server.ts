@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { getPublicHealth } from './lib/diagnostics/health';
 import { runSelfCheck } from './lib/diagnostics/self-check';
 import { runDiagnosticScan } from './lib/diagnostics/scanner';
-import { generateText, assembleChatRequest, formatMemoryBlock, extractMemoriesPrompt } from './lib/ai';
+import { generateText, assembleChatRequest, formatMemoryBlock, extractMemoriesPrompt, GROQ_PRIMARY_MODEL, OPENAI_PRIMARY_MODEL, isOpenAIQuotaExhausted } from './lib/ai';
 import { getModuleBySlug } from './lib/modules/modules.config';
 import { supabaseAdmin } from './lib/supabase/admin';
 import { invalidateAiCache } from './lib/ai/cache';
@@ -20,6 +20,8 @@ import {
   tierForPlan,
 } from './lib/paystack';
 import { generateGroundedContent } from './lib/ai/grounded';
+import { shortLinksDb, createShortLink } from './lib/shortlinks';
+import { isRealGroqKey, isRealGeminiKey, isRealSupabaseUrl, isRealSupabaseKey, isOpenAIKey } from './lib/config/envTrust';
 import { generateTextWatermarkFooter } from './lib/watermark';
 import { isTransmissionCadenceTime } from './lib/content/delivery';
 import { signalRouter } from './lib/signal/api-router';
@@ -1134,15 +1136,21 @@ async function startServer() {
     res.json({
       success: true,
       providers: {
-        groq: {
-          configured: Boolean(groqKey && !groqKey.startsWith('[SET_IN_') && groqKey.trim() !== ''),
-          model: 'llama-3.3-70b-versatile',
+        openai: {
+          configured: isOpenAIKey(process.env.OPENAI_API_KEY),
+          model: OPENAI_PRIMARY_MODEL,
           role: 'Primary',
+          paused: isOpenAIQuotaExhausted() ? 'quota cooldown (auto-resumes)' : undefined,
+        },
+        groq: {
+          configured: isRealGroqKey(groqKey),
+          model: GROQ_PRIMARY_MODEL,
+          role: 'First Fallback',
         },
         gemini: {
-          configured: Boolean(geminiKey && !geminiKey.startsWith('[SET_IN_') && geminiKey.trim() !== ''),
+          configured: isRealGeminiKey(geminiKey),
           model: 'gemini-3.1-flash-lite',
-          role: 'Secondary Redundancy',
+          role: 'Second Fallback',
         },
         cache: { active: true },
         graceful_degradation: { active: true },
@@ -1489,17 +1497,8 @@ async function startServer() {
   app.use('/api/worker', signalRouter);
 
   // ---------------------------------------------------------------------------
-  // 8.6. SENTINEL & SHORT LINKS
+  // 8.6. SENTINEL & SHORT LINKS (store lives in lib/shortlinks.ts)
   // ---------------------------------------------------------------------------
-  const shortLinksDb = new Map<string, {
-    slug: string;
-    targetUrl: string;
-    clicks: number;
-    cloaked?: boolean;
-    pageTitle?: string;
-    description?: string;
-    createdAt?: string;
-  }>();
 
   app.post('/api/sentinel/scan', rateLimit('sentinel', { max: 10 }), async (req, res) => {
     try {
@@ -1514,63 +1513,24 @@ async function startServer() {
 
   app.post('/api/short/create', rateLimit('short_create', { max: 10 }), async (req, res) => {
     try {
-      const targetUrl = req.body.targetUrl || req.body.url;
-      const customSlug = req.body.customSlug || req.body.slug;
-      const cloaked = Boolean(req.body.cloaked);
-      const pageTitle = String(req.body.pageTitle || 'Sovereign Cloaked Link // Jadai Sentinel').slice(0, 200);
-      const description = String(req.body.description || 'Cryptographically cloaked link protected by Jadai Sentinel.').slice(0, 400);
-
-      let parsed: URL;
-      try {
-        parsed = new URL(String(targetUrl));
-      } catch {
-        return res.status(400).json({ error: 'Invalid target URL' });
-      }
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        return res.status(400).json({ error: 'Only http(s) target URLs are allowed' });
-      }
-
-      let slug: string;
-      if (customSlug) {
-        slug = String(customSlug).toLowerCase().trim().replace(/[^a-z0-9-]/g, '').slice(0, 40);
-        if (!slug) return res.status(400).json({ error: 'Invalid custom slug' });
-        if (shortLinksDb.has(slug)) return res.status(409).json({ error: 'Slug already in use' });
-      } else {
-        slug = crypto.randomBytes(6).toString('hex'); // 12 chars, 48 bits of entropy
-      }
-
-      const record = {
-        slug,
-        targetUrl: parsed.toString(),
-        clicks: 0,
-        cloaked,
-        pageTitle,
-        description,
-        createdAt: new Date().toISOString(),
-      };
-
-      shortLinksDb.set(slug, record);
       const host = process.env.NEXT_PUBLIC_APP_URL || `${req.protocol}://${req.get('host')}`;
+      const result = await createShortLink({
+        targetUrl: req.body.targetUrl || req.body.url,
+        customSlug: req.body.customSlug || req.body.slug,
+        cloaked: Boolean(req.body.cloaked),
+        pageTitle: req.body.pageTitle,
+        description: req.body.description,
+      });
+      if (!result.ok) return res.status(result.status).json({ error: result.error });
 
-      try {
-        const { error } = await supabaseAdmin.from('short_links').insert({
-          slug,
-          target_url: record.targetUrl,
-          cloaked,
-        });
-        if (error && error.code === '23505') {
-          shortLinksDb.delete(slug);
-          return res.status(409).json({ error: 'Slug already in use' });
-        }
-      } catch {}
-
+      const rec = result.record;
       res.json({
-        slug,
-        shortUrl: `${host}/s/${slug}`,
-        targetUrl: record.targetUrl,
-        cloaked,
-        pageTitle,
-        clicks: 0,
+        slug: rec.slug,
+        shortUrl: `${host}/s/${rec.slug}`,
+        targetUrl: rec.targetUrl,
+        cloaked: rec.cloaked,
+        pageTitle: rec.pageTitle,
+        clicks: rec.clicks,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -1703,44 +1663,17 @@ async function startServer() {
   // ---------------------------------------------------------------------------
   app.post('/api/mirage/generate', rateLimit('mirage', { max: 15 }), async (req, res) => {
     try {
-      const { prompt, style, aspectRatio } = req.body;
+      const { prompt, style, aspectRatio, count } = req.body;
       const { generateMirageImages } = await import('./modules/mirage/api/generate');
-      const data = await generateMirageImages(prompt, style, aspectRatio);
+      const data = await generateMirageImages(prompt, style, aspectRatio, count);
       res.json(data);
     } catch (err: any) {
       res.status(400).json({ error: err.message || 'Generation failed' });
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // 8B. CREATIVE WORKSPACE BATCH & IN-CONTEXT REGION EDIT
-  // ---------------------------------------------------------------------------
-  app.post('/api/creative/generate', rateLimit('creative', { max: 30 }), async (req, res) => {
-    try {
-      const { prompt, outputType, size } = req.body;
-      const seeds = [
-        Math.floor(Math.random() * 899999) + 100000,
-        Math.floor(Math.random() * 899999) + 100000,
-        Math.floor(Math.random() * 899999) + 100000,
-        Math.floor(Math.random() * 899999) + 100000,
-      ];
-      const width = size?.w || 1024;
-      const height = size?.h || 1024;
-      const encoded = encodeURIComponent(prompt || 'Jadai Studios sovereign visual');
-
-      const variants = seeds.map((seed, idx) => ({
-        id: `gen-${Date.now()}-${idx}`,
-        seed,
-        url: `https://image.pollinations.ai/prompt/${encoded}?width=${width}&height=${height}&seed=${seed}&nologo=true`,
-        width,
-        height,
-      }));
-
-      res.json({ success: true, variants });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
+  // (Removed: /api/creative/generate — no callers, and it returned dead
+  // Pollinations URLs. CreativeWorkspace generates via /api/mirage/generate.)
 
   app.post('/api/writer/cowrite', rateLimit('writer', { max: 30 }), async (req, res) => {
     try {
@@ -1755,16 +1688,22 @@ ${currentText || ''}
 Draft a continuation of 40-70 words that deepens the architectural or moral stakes without fluff. Match the exact cadence. Return ONLY the new suggested paragraph to append.`;
 
       let text = '';
+      let fallback = false;
       try {
         const aiRes = await generateText(prompt, {
           temperature: 0.7,
         });
         text = aiRes.text;
+        fallback = aiRes.provider === 'graceful_fallback';
       } catch {
+        fallback = true;
+      }
+      if (fallback) {
+        // Labelled deterministic standby — never passed off as model output.
         text = `To construct without measuring tensile strength is merely wishing in stone. The cold highland wind exposes what the blueprint hid, and gravity permits no rhetorical appeal.`;
       }
 
-      res.json({ success: true, suggestion: text });
+      res.json({ success: true, suggestion: text, fallback });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }

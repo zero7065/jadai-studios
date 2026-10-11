@@ -1,4 +1,5 @@
 import { defineModule, JadaiModule } from '../../lib/modules/defineModule';
+import { BOOK_EPISODES } from './data';
 import BookOfLiesPage from './page';
 
 export const bookOfLiesModule: JadaiModule = defineModule({
@@ -13,7 +14,7 @@ export const bookOfLiesModule: JadaiModule = defineModule({
   routes: {
     page: '/book-of-lies',
     api: {
-      episodes: async () => ({ success: true, data: [] }),
+      episodes: async () => ({ success: true, data: BOOK_EPISODES }),
     },
   },
   config: {

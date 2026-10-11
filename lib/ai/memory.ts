@@ -64,6 +64,9 @@ export interface AskGroundedOptions {
 export interface AskGroundedResult {
   text: string;
   sources: Array<Record<string, unknown>>;
+  /** True when the grounded chain had no live providers (labelled offline response). */
+  offline?: boolean;
+  offlineReason?: string;
 }
 
 const BUILDER_ID_KEY = 'jadai_builder_id';
@@ -358,9 +361,9 @@ export async function askGrounded(options: AskGroundedOptions): Promise<AskGroun
       appendTranscript(scope, 'assistant', text);
     }
 
-    return { text, sources };
+    return { text, sources, offline: Boolean(data.offline), offlineReason: data.offlineReason };
   } catch {
-    return { text: '', sources: [] };
+    return { text: '', sources: [], offline: true, offlineReason: 'request failed' };
   }
 }
 

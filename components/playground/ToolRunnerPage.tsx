@@ -211,11 +211,12 @@ export const ToolRunnerPage: React.FC<ToolRunnerPageProps> = ({ slug, onNavigate
         scope: tool.slug,
       });
 
-      if (!result.text) {
+      if (!result.text || result.error || result.provider === 'graceful_fallback') {
         // Honest failure — never present a mock as live output, never consume quota
         const sample = await tool.mockResultGenerator(inputVal);
+        const reason = result.error || 'the live chain returned no model output';
         setOutputVal(
-          `OFFLINE SAMPLE — the live ${tool.name} engine is unreachable right now${result.error ? ` (${result.error})` : ''}. Your quota was NOT consumed.\n\n${sample}`
+          `OFFLINE SAMPLE — the live ${tool.name} engine is unreachable right now (${reason}). Your quota was NOT consumed.\n\n${sample}`
         );
         setFallbackModalOpen(true);
         showToast('Live engine unreachable — showing an offline sample.', 'info', 'Warm Fallback');

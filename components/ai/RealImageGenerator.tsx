@@ -9,6 +9,7 @@ import { useToast } from '@/components/providers/ToastProvider';
 import UpgradeModal from '@/components/auth/UpgradeModal';
 import AuthModal from '@/components/auth/AuthModal';
 import { checkToolAccess, recordModuleExecution } from '@/lib/supabase/gates';
+import { requestImages } from '@/lib/ai/imageClient';
 
 export interface RealImageGeneratorProps {
   toolName?: string;
@@ -66,17 +67,26 @@ export const RealImageGenerator: React.FC<RealImageGeneratorProps> = ({
     setIsGenerating(true);
     StudioAudio.playClick();
 
-    const encoded = encodeURIComponent(trimmed + aestheticSuffix);
-    const seeds = [1, 42, 99];
-    const newCards: GeneratedCard[] = seeds.map((seed, idx) => ({
+    // Server-first: OpenAI provider chain (falls back to Pollinations automatically)
+    const { urls, source } = await requestImages(trimmed, {
+      width: 1024,
+      height: 1024,
+      suffix: aestheticSuffix,
+      seeds: [1, 42, 99],
+    });
+
+    const newCards: GeneratedCard[] = urls.map((url, idx) => ({
       id: `img-${Date.now()}-${idx}`,
-      seed,
-      url: `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&seed=${seed}&nologo=true`,
+      seed: [1, 42, 99][idx] ?? idx,
+      url,
       loading: true,
       error: false,
     }));
 
     setActiveCards(newCards);
+    if (source === 'server') {
+      showToast('Rendered through the studio provider chain (OpenAI primary).', 'info');
+    }
     await recordModuleExecution(toolSlug, access.userEmail, access.userId);
   };
 
@@ -95,19 +105,33 @@ export const RealImageGenerator: React.FC<RealImageGeneratorProps> = ({
     setGlobalError('Image generation temporarily unavailable. Try again in 30 seconds.');
   };
 
-  const regenerateSingle = (cardId: string) => {
+  const regenerateSingle = async (cardId: string) => {
     StudioAudio.playClick();
     const newSeed = Math.floor(Math.random() * 900000) + 100;
     const trimmed = prompt.trim() || 'Jadai Studios visual asset';
-    const encoded = encodeURIComponent(trimmed + aestheticSuffix);
-    const newUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&seed=${newSeed}&nologo=true`;
 
     setActiveCards((prev) =>
-      prev.map((c) =>
-        c.id === cardId ? { ...c, seed: newSeed, url: newUrl, loading: true, error: false } : c
-      )
+      prev.map((c) => (c.id === cardId ? { ...c, loading: true, error: false } : c))
     );
     showToast('Regenerating image variation...', 'info');
+
+    try {
+      const { urls } = await requestImages(trimmed, {
+        width: 1024,
+        height: 1024,
+        suffix: aestheticSuffix,
+        seeds: [newSeed],
+      });
+      const url = urls[0];
+      if (!url) throw new Error('No image returned');
+      setActiveCards((prev) =>
+        prev.map((c) => (c.id === cardId ? { ...c, seed: newSeed, url, loading: true, error: false } : c))
+      );
+    } catch {
+      setActiveCards((prev) =>
+        prev.map((c) => (c.id === cardId ? { ...c, loading: false, error: true } : c))
+      );
+    }
   };
 
   const downloadImage = async (card: GeneratedCard) => {

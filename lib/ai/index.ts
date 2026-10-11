@@ -1,3 +1,4 @@
+import { callOpenAI, isOpenAIConfigured, isOpenAIQuotaExhausted } from './openai';
 import { callGroq, isGroqConfigured } from './groq';
 import { callGemini, isGeminiConfigured } from './gemini';
 import { generateCacheKey, getCachedAiResponse, setCachedAiResponse } from './cache';
@@ -11,13 +12,14 @@ export interface GenerateTextOptions {
   bypassCache?: boolean;
   isAdmin?: boolean;
   temperature?: number;
+  openaiKey?: string;
   groqKey?: string;
   geminiKey?: string;
 }
 
 export interface GenerateTextResult {
   text: string;
-  provider: 'groq' | 'gemini' | 'cache' | 'graceful_fallback';
+  provider: 'openai' | 'groq' | 'gemini' | 'cache' | 'graceful_fallback';
   cached: boolean;
   fallbackTriggered: boolean;
   durationMs: number;
@@ -26,11 +28,12 @@ export interface GenerateTextResult {
 }
 
 /**
- * 4-Step Resilient AI Fallback Chain:
- * 1. Groq (llama-3.3-70b-versatile) — if API key configured
- * 2. Gemini (gemini-3.1-flash-lite / gemini-3.8-flash) — resilient multi-model failover
- * 3. Cached response
- * 4. Graceful degradation message
+ * 5-Step Resilient AI Fallback Chain:
+ * 1. OpenAI (gpt-5-mini → gpt-4o-mini) — PRIMARY provider
+ * 2. Groq (openai/gpt-oss-120b → qwen/qwen3.8-27b → …) — first fallback
+ * 3. Gemini (gemini-3.1-flash-lite / gemini-3.8-flash) — second fallback
+ * 4. Cached response / content_bank
+ * 5. Graceful degradation message (labelled, never passed off as model output)
  */
 export async function generateText(
   prompt: string,
@@ -40,13 +43,49 @@ export async function generateText(
   const cacheKey = generateCacheKey(prompt, options.systemPrompt);
 
   let fallbackTriggered = false;
-  let providerUsed: GenerateTextResult['provider'] = 'gemini';
+  let providerUsed: GenerateTextResult['provider'] = 'openai';
   let resultText = '';
   let tokensUsed = 0;
   let finalError: string | undefined;
+  const failureNotes: string[] = [];
 
   // ---------------------------------------------------------------------------
-  // Step 1: Try Groq (if configured)
+  // Step 1: OpenAI — PRIMARY (skips itself while cooling down after quota errors)
+  // ---------------------------------------------------------------------------
+  if (!isOpenAIConfigured(options.openaiKey)) {
+    failureNotes.push('OpenAI: key not configured');
+  } else if (isOpenAIQuotaExhausted()) {
+    failureNotes.push('OpenAI: quota exhausted (cooling down 10 min)');
+    fallbackTriggered = true;
+  } else {
+    try {
+      const res = await callOpenAI(prompt, {
+        systemPrompt: options.systemPrompt,
+        apiKey: options.openaiKey,
+        temperature: options.temperature,
+      });
+      resultText = res.text;
+      tokensUsed = res.tokensUsed;
+      providerUsed = 'openai';
+
+      setCachedAiResponse(cacheKey, resultText, 'openai', options.isAdmin);
+      return {
+        text: resultText,
+        provider: providerUsed,
+        cached: false,
+        fallbackTriggered: false,
+        durationMs: Date.now() - startTime,
+        tokensUsed,
+      };
+    } catch (openaiErr: any) {
+      fallbackTriggered = true;
+      failureNotes.push(`OpenAI: ${openaiErr.message}`);
+      logger.warn('OpenAI inference error, falling back to Groq', { error: openaiErr.message });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Step 2: Groq — first fallback
   // ---------------------------------------------------------------------------
   const groqAvailable = isGroqConfigured(options.groqKey);
   if (groqAvailable) {
@@ -65,44 +104,54 @@ export async function generateText(
         text: resultText,
         provider: providerUsed,
         cached: false,
-        fallbackTriggered: false,
+        fallbackTriggered,
         durationMs: Date.now() - startTime,
         tokensUsed,
       };
     } catch (groqErr: any) {
       fallbackTriggered = true;
+      failureNotes.push(`Groq: ${groqErr.message}`);
       logger.warn('Groq inference error, initiating fallback to Gemini', { error: groqErr.message });
+    }
+  } else {
+    failureNotes.push('Groq: key not configured');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Step 3: Gemini — second fallback (only attempted when configured)
+  // ---------------------------------------------------------------------------
+  if (!isGeminiConfigured(options.geminiKey)) {
+    failureNotes.push('Gemini: key not configured');
+  } else {
+    try {
+      const geminiRes = await callGemini(prompt, {
+        systemPrompt: options.systemPrompt,
+        apiKey: options.geminiKey,
+        temperature: options.temperature,
+      });
+      resultText = geminiRes.text;
+      tokensUsed = geminiRes.tokensUsed;
+      providerUsed = 'gemini';
+
+      setCachedAiResponse(cacheKey, resultText, 'gemini', options.isAdmin);
+      return {
+        text: resultText,
+        provider: providerUsed,
+        cached: false,
+        fallbackTriggered,
+        durationMs: Date.now() - startTime,
+        tokensUsed,
+      };
+    } catch (geminiErr: any) {
+      logger.warn('Gemini inference error', { error: geminiErr.message });
+      failureNotes.push(`Gemini: ${geminiErr.message}`);
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Step 2: Try Gemini (with automatic candidate model failover)
+  // Step 4: Cached response / Supabase content_bank
   // ---------------------------------------------------------------------------
-  try {
-    const geminiRes = await callGemini(prompt, {
-      systemPrompt: options.systemPrompt,
-      apiKey: options.geminiKey,
-      temperature: options.temperature,
-    });
-    resultText = geminiRes.text;
-    tokensUsed = geminiRes.tokensUsed;
-    providerUsed = 'gemini';
-
-    setCachedAiResponse(cacheKey, resultText, 'gemini', options.isAdmin);
-    return {
-      text: resultText,
-      provider: providerUsed,
-      cached: false,
-      fallbackTriggered,
-      durationMs: Date.now() - startTime,
-      tokensUsed,
-    };
-  } catch (geminiErr: any) {
-    logger.warn('Gemini failed, initiating fallback to Cache', { error: geminiErr.message });
-
-    // -------------------------------------------------------------------------
-    // Step 3: Fallback to Cached Response or Supabase content_bank
-    // -------------------------------------------------------------------------
+  {
     const cached = await getCachedAiResponse(cacheKey, options.bypassCache);
     if (cached) {
       resultText = cached.text;
@@ -123,16 +172,16 @@ export async function generateText(
       } catch {
         // Non-blocking
       }
-
-      if (!resultText) {
-        // -----------------------------------------------------------------------
-        // Step 4: Graceful Degradation / Queued Message
-        // -----------------------------------------------------------------------
-        finalError = `Gemini: ${geminiErr?.message || 'Failed'}`;
-        resultText = "PRIME is thinking — you're next in line. Formulate your requirements with precision.";
-        providerUsed = 'graceful_fallback';
-      }
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Step 5: Graceful degradation — labelled offline, never fake model output
+  // ---------------------------------------------------------------------------
+  if (!resultText) {
+    finalError = failureNotes.join(' | ') || 'No AI provider available';
+    resultText = "PRIME is thinking — you're next in line. Formulate your requirements with precision.";
+    providerUsed = 'graceful_fallback';
   }
 
   const durationMs = Date.now() - startTime;
@@ -173,5 +222,6 @@ export async function generateText(
 
 export * from './prompts';
 export * from './cache';
+export * from './openai';
 export * from './groq';
 export * from './gemini';

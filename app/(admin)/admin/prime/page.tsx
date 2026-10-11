@@ -57,7 +57,7 @@ export default function AdminPrimeStudioPage() {
         moduleSlug: 'oracle',
         scope: 'admin-prime',
       });
-      if (result.text) {
+      if (result.text && !result.error && result.provider !== 'graceful_fallback') {
         let text = result.text;
         if (watermarked) {
           text += '\n\n' + generateTextWatermarkFooter({ source: 'PRIME ADMIN STUDIO' });
@@ -68,9 +68,11 @@ export default function AdminPrimeStudioPage() {
       } else {
         throw new Error(result.error || 'Generation failed');
       }
-    } catch {
-      // Deterministic sovereign fallback
-      const fallbackText = `### THE MONOLITH OF JOS // COGNITIVE DRAFT
+    } catch (aiErr: any) {
+      // Deterministic sovereign fallback — clearly labelled, never passed off as AI output
+      const fallbackText = `> DETERMINISTIC TEMPLATE — PRIME was unreachable (${aiErr?.message || 'no provider'}). Standing studio scaffold, not a generated draft.
+
+### THE MONOLITH OF JOS // COGNITIVE DRAFT
 Subject: ${topic}
 Type: ${promptType.toUpperCase()}
 Timestamp: ${new Date().toISOString()}
@@ -88,7 +90,7 @@ ${watermarked ? generateTextWatermarkFooter({ source: 'PRIME FALLBACK CORE' }) :
 
       setDraftResult(fallbackText);
       StudioAudio.playSuccessArpeggio();
-      showToast('Sovereign draft generated from studio cache.', 'success');
+      showToast('PRIME unreachable — showing the deterministic studio template.', 'info', 'Template Mode');
     } finally {
       setGenerating(false);
     }
@@ -101,7 +103,7 @@ ${watermarked ? generateTextWatermarkFooter({ source: 'PRIME FALLBACK CORE' }) :
   };
 
   const publishToQueue = () => {
-    showToast('Draft scheduled for 9:47 PM transmission pipeline.', 'success', 'Broadcast Queued');
+    showToast('Transmission queue is not wired yet — copy the draft and publish manually.', 'info', 'Queue Unavailable');
   };
 
   // Memory Matrix — what PRIME has learned across all surfaces

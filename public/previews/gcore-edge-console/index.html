@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GCORE // EDGE CONSOLE — live preview</title>
+<style>
+  :root{
+    --void:#050404;--void2:#0a0908;--gold:#C9A84C;--grey:#8a8580;
+    --line:rgba(201,168,76,0.25);--red:#c04a3a;--green:#4f8f4a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--void);color:var(--grey);
+    font-family:ui-monospace,'Cascadia Code',Consolas,'Courier New',monospace;
+    font-size:12.5px;line-height:1.5;padding:22px 20px 26px;overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:rgba(201,168,76,.7);text-decoration:none}
+  a:hover{color:var(--gold)}
+  .back{position:fixed;top:12px;left:16px;font-size:11px;letter-spacing:.08em;z-index:40;padding:3px 6px;border:1px solid transparent}
+  .back:hover{border-color:var(--line);background:rgba(201,168,76,.06)}
+  .badge{position:fixed;top:10px;right:14px;text-align:right;z-index:40;pointer-events:none}
+  .badge .b1{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--gold);color:var(--gold);font-size:10px;letter-spacing:.18em;padding:4px 9px;background:rgba(5,4,4,.9)}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:pulse 1.6s infinite}
+  .badge .b2{display:block;font-size:9px;letter-spacing:.1em;color:#5f5b57;margin-top:5px}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  .wrap{max-width:880px;margin:0 auto;padding-top:34px}
+  header.top{border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap}
+  h1{font-size:17px;letter-spacing:.14em;color:#e6e1d7;font-weight:600}
+  .sub{font-size:10.5px;letter-spacing:.14em;color:#6b6660;margin-top:6px}
+  .sub b{color:rgba(201,168,76,.8);font-weight:400}
+  #failBtn{background:transparent;border:1px solid var(--gold);color:var(--gold);font:inherit;font-size:10.5px;letter-spacing:.16em;padding:8px 14px;cursor:pointer;transition:.16s;white-space:nowrap}
+  #failBtn:hover{background:var(--gold);color:#050404}
+  #failBtn.armed{background:var(--gold);color:#050404}
+
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+  .metric{border:1px solid var(--line);background:#0b0a09;padding:10px 11px}
+  .metric .k{font-size:9.5px;letter-spacing:.16em;color:#6b6660}
+  .metric .v{font-size:22px;color:#e6e1d7;letter-spacing:-.01em;margin-top:5px;transition:color .3s}
+  .metric .v.up{color:var(--gold)}
+  .metric .v.dn{color:#6f9a6c}
+  .metric .d{font-size:9.5px;color:#5f5b57;letter-spacing:.1em;margin-top:3px}
+
+  .panel{border:1px solid var(--line);background:#080707;margin-bottom:14px}
+  .ph{display:flex;justify-content:space-between;align-items:center;padding:8px 11px;border-bottom:1px solid rgba(201,168,76,.15);font-size:10px;letter-spacing:.16em;color:#6b6660}
+  .ph b{color:rgba(201,168,76,.85);font-weight:400}
+  .ph .lg{display:flex;gap:12px;align-items:center}
+  .swatch{display:inline-flex;align-items:center;gap:5px;font-size:9px;letter-spacing:.08em}
+  .swatch i{width:8px;height:8px;display:block}
+  .i-g{background:#3f7a3c}.i-y{background:#a6863a}.i-r{background:#a04034}
+
+  .heat{display:grid;grid-template-columns:repeat(16,1fr);gap:4px;padding:11px}
+  .cell{aspect-ratio:1/1;background:#141210;border:1px solid rgba(255,255,255,.04);transition:background .9s linear;position:relative}
+  .cell:hover{outline:1px solid var(--gold);z-index:2}
+
+  .log{height:132px;overflow:hidden;padding:8px 11px;font-size:11.5px;line-height:1.72}
+  .log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:slidein .3s ease-out}
+  @keyframes slidein{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  .t{color:#5f5b57}
+  .p-ok{color:#5f9e5a}.p-warn{color:var(--gold)}.p-err{color:var(--red)}
+  .loc{color:#c9c4bc}
+  .ms{color:rgba(201,168,76,.75)}
+
+  .regions{display:flex;flex-wrap:wrap;gap:6px;padding:0 11px 11px}
+  .rg{border:1px solid rgba(255,255,255,.07);font-size:9.5px;letter-spacing:.1em;padding:3px 7px;color:#6b6660}
+  .rg b{color:#c9c4bc;font-weight:400}
+
+  .routes{padding:4px 11px 10px}
+  .rt{display:grid;grid-template-columns:1.5fr .7fr .7fr .7fr;gap:8px;font-size:11px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);align-items:center}
+  .rt:last-child{border-bottom:0}
+  .rt.h{font-size:9px;letter-spacing:.14em;color:#4f4c49;padding-bottom:4px}
+  .rt .fn{color:#c9c4bc}
+  .rt .rg2{color:#6b6660}
+  .rt .inv{color:var(--gold)}
+  .rt .cs{color:#6b6660}
+  .rt .cs.warn{color:#c04a3a}
+
+  footer{margin-top:22px;border-top:1px solid var(--line);padding-top:13px;font-size:10px;letter-spacing:.08em;color:#5f5b57}
+  @media (max-width:640px){
+    body{padding:56px 14px 24px}
+    .metrics{grid-template-columns:repeat(2,1fr)}
+    .heat{grid-template-columns:repeat(8,1fr)}
+    h1{font-size:14.5px}
+  }
+</style>
+</head>
+<body>
+<a class="back" href="/">◂ jadai.dev</a>
+<div class="badge">
+  <span class="b1"><i class="dot"></i>LIVE PREVIEW</span>
+  <span class="b2">SELF-HOSTED PREVIEW — INTERACTIVE DEMO</span>
+</div>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>GCORE // EDGE CONSOLE</h1>
+      <div class="sub">EDGE TELEMETRY · SERVERLESS ROUTING · <b>POPs 41 / 41 UP</b></div>
+    </div>
+    <button id="failBtn" type="button">FAILOVER SIM</button>
+  </header>
+
+  <div class="metrics">
+    <div class="metric"><div class="k">REQUESTS / S</div><div class="v" id="m1">18,420</div><div class="d" id="d1">▲ 1.4%</div></div>
+    <div class="metric"><div class="k">P95 LATENCY</div><div class="v" id="m2">61ms</div><div class="d" id="d2">▼ 0.9%</div></div>
+    <div class="metric"><div class="k">CACHE HIT</div><div class="v" id="m3">94.7%</div><div class="d" id="d3">▲ 0.2%</div></div>
+    <div class="metric"><div class="k">TLS HANDSHAKES/S</div><div class="v" id="m4">312</div><div class="d" id="d4">▲ 3.1%</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="ph">
+      <span>GLOBAL LATENCY HEATMAP · <b>96 POPS × 6 SAMPLES</b></span>
+      <span class="lg">
+        <span class="swatch"><i class="i-g"></i>&lt;80ms</span>
+        <span class="swatch"><i class="i-y"></i>80–180</span>
+        <span class="swatch"><i class="i-r"></i>&gt;180</span>
+      </span>
+    </div>
+    <div class="heat" id="heat"></div>
+    <div class="regions">
+      <span class="rg">AMS1 <b id="r-ams">43ms</b></span>
+      <span class="rg">FRA1 <b id="r-fra">38ms</b></span>
+      <span class="rg">LHR2 <b id="r-lhr">51ms</b></span>
+      <span class="rg">IAD1 <b id="r-iad">74ms</b></span>
+      <span class="rg">GRU1 <b id="r-gru">118ms</b></span>
+      <span class="rg">JNB1 <b id="r-jnb">146ms</b></span>
+      <span class="rg">SIN3 <b id="r-sin">97ms</b></span>
+      <span class="rg">NRT2 <b id="r-nrt">104ms</b></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><span>SERVERLESS ROUTES · <b>WARM POOL</b></span><span>P99 BUDGET <b>250ms</b></span></div>
+    <div class="routes" id="routes">
+      <div class="rt h"><span>MATCHER</span><span>REGION</span><span>INV/S</span><span>COLD %</span></div>
+      <div class="rt"><span class="fn">/* → render</span><span class="rg2">FRA1</span><span class="inv" data-b="9200">9,204</span><span class="cs" data-b="2">2.1%</span></div>
+      <div class="rt"><span class="fn">/api/* → edge-fn</span><span class="rg2">AMS1</span><span class="inv" data-b="4100">4,118</span><span class="cs" data-b="5">5.4%</span></div>
+      <div class="rt"><span class="fn">/_stream → sse</span><span class="rg2">LHR2</span><span class="inv" data-b="860">872</span><span class="cs" data-b="1">0.9%</span></div>
+      <div class="rt"><span class="fn">/assets/* → cache</span><span class="rg2">IAD1</span><span class="inv" data-b="3300">3,341</span><span class="cs" data-b="0">0.2%</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><span>EDGE LOG · TAIL -F</span><span><b id="logCount">0</b> LINES</span></div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <footer>
+    Preview environment hosted by JADAI Studios. Demo data only — not connected to production.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var COLS = 16, ROWS = 6, TOTAL = COLS*ROWS;
+  var failover = false, tick = 0;
+
+  var heat = document.getElementById("heat");
+  var cells = [];
+  var vals = [];
+
+  for(var i=0;i<TOTAL;i++){
+    var c = document.createElement("div");
+    c.className = "cell";
+    var v = 28 + Math.floor(Math.random()*150);
+    vals.push(v);
+    c.title = "pop-" + (i<10?"0":"") + i + " · " + v + "ms";
+    c.style.background = colorFor(v);
+    heat.appendChild(c);
+    cells.push(c);
+  }
+
+  function colorFor(ms){
+    if(ms < 80) return mix(0.16, 0.34, ms/80);
+    if(ms < 180) return "rgb(" + (150 + Math.floor((ms-80)/100*40)) + "," + (118 + Math.floor((ms-80)/100*20)) + ",48)";
+    return "rgb(168," + (70 - Math.min(30,(ms-180)/8)) + ",52)";
+  }
+  function mix(a,b,t){ return "rgba(79,143,74," + (0.45 + t*0.5) + ")"; }
+
+  function paintAll(force){
+    for(var i=0;i<TOTAL;i++){
+      if(!force && Math.random() > 0.45) continue;
+      var drift = Math.floor((Math.random()-0.5)*70);
+      var v = vals[i] + drift;
+      if(v < 18) v = 18 + Math.floor(Math.random()*20);
+      if(v > 320) v = 240 + Math.floor(Math.random()*70);
+      vals[i] = v;
+      cells[i].style.background = failover ? "rgba(201,168,76," + (0.25 + Math.random()*0.55) + ")" : colorFor(v);
+      cells[i].title = "pop-" + (i<10?"0":"") + i + " · " + (failover ? Math.floor(v*0.42) : v) + "ms";
+    }
+  }
+
+  var m1=document.getElementById("m1"),m2=document.getElementById("m2"),
+      m3=document.getElementById("m3"),m4=document.getElementById("m4"),
+      d1=document.getElementById("d1"),d2=document.getElementById("d2"),
+      d3=document.getElementById("d3"),d4=document.getElementById("d4");
+
+  var m1v = 18420, m2v = 61, m3v = 94.7, m4v = 312;
+
+  function drift(base, pct, lo, hi){
+    var v = base + (Math.random()-0.5)*pct;
+    if(v < lo) v = lo;
+    if(v > hi) v = hi;
+    return v;
+  }
+  function fmt(n){ return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+  function setDelta(node, up){
+    node.textContent = (up ? "▲ " : "▼ ") + (Math.random()*3.4 + 0.1).toFixed(1) + "%";
+    node.style.color = up ? "#6f9a6c" : "#a6863a";
+  }
+
+  function metricsTick(){
+    m1v = drift(m1v, 900, 12000, 26000);
+    m2v = drift(m2v, 9, 34, failover ? 88 : 120);
+    m3v = drift(m3v, 1.1, 88, 99.4);
+    m4v = drift(m4v, 40, 180, 520);
+    m1.textContent = fmt(m1v);
+    m2.textContent = Math.round(m2v) + "ms";
+    m3.textContent = m3v.toFixed(1) + "%";
+    m4.textContent = Math.round(m4v);
+    setDelta(d1, Math.random() > 0.35);
+    setDelta(d2, Math.random() > 0.55);
+    setDelta(d3, Math.random() > 0.4);
+    setDelta(d4, Math.random() > 0.3);
+    m2.classList.toggle("up", failover);
+  }
+
+  var LOCS = ["FRA1","AMS1","LHR2","IAD1","GRU1","JNB1","SIN3","NRT2","CDG1","WAW1","MAD2","YYZ1"];
+  var PATHS = ["tls handshake ok","cache HIT index.html","worker cold start","origin shield MISS",
+               "gzip ok","h2 GOAWAY clean","cert reissue ok","route lookup","waf rule pass","stream resumed"];
+  var LVL = [["p-ok","ok"],["p-ok","ok"],["p-ok","ok"],["p-warn","degraded"],["p-ok","ok"],["p-warn","retry"]];
+  var logEl = document.getElementById("log");
+  var logCount = document.getElementById("logCount");
+  var lines = 0;
+
+  function stamp(){
+    var d = new Date();
+    return ("0"+d.getHours()).slice(-2) + ":" + ("0"+d.getMinutes()).slice(-2) + ":" + ("0"+d.getSeconds()).slice(-2);
+  }
+  function addLine(html){
+    var d = document.createElement("div");
+    d.innerHTML = html;
+    logEl.appendChild(d);
+    lines++;
+    while(logEl.children.length > 8){ logEl.removeChild(logEl.firstChild); }
+    logCount.textContent = lines;
+  }
+  function rand(a){ return a[Math.floor(Math.random()*a.length)]; }
+
+  function logTick(){
+    var lv = rand(LVL);
+    addLine('<span class="t">' + stamp() + '</span> ' +
+            '<span class="loc">' + rand(LOCS) + '</span> ' +
+            '<span class="' + lv[0] + '">' + lv[1] + '</span> ' +
+            rand(PATHS) + ' <span class="ms">' + (8 + Math.floor(Math.random()*90)) + 'ms</span>');
+  }
+
+  var invEls = document.querySelectorAll(".rt .inv");
+  var csEls = document.querySelectorAll(".rt .cs");
+  function routeTick(){
+    for(var i=0;i<invEls.length;i++){
+      var b = parseFloat(invEls[i].getAttribute("data-b")) || 1;
+      invEls[i].textContent = fmt(b + (Math.random()-0.5)*b*0.07);
+      var c = (parseFloat(csEls[i].getAttribute("data-b")) || 0) + Math.random()*1.5;
+      csEls[i].textContent = c.toFixed(1) + "%";
+      csEls[i].classList.toggle("warn", c > 6);
+    }
+  }
+
+  var failBtn = document.getElementById("failBtn");
+  failBtn.addEventListener("click", function(){
+    failover = !failover;
+    failBtn.classList.toggle("armed", failover);
+    failBtn.textContent = failover ? "FAILOVER ACTIVE" : "FAILOVER SIM";
+    if(failover){
+      for(var i=0;i<TOTAL;i++){
+        cells[i].style.background = "rgba(201,168,76," + (0.25 + Math.random()*0.6) + ")";
+      }
+      addLine('<span class="t">' + stamp() + '</span> <span class="p-warn">geo-DNS failover → AMS1 (43ms)</span>');
+      document.getElementById("r-fra").textContent = "—";
+      document.getElementById("r-ams").textContent = "43ms";
+      m2.classList.add("up");
+    } else {
+      paintAll(true);
+      addLine('<span class="t">' + stamp() + '</span> <span class="p-ok">geo-DNS restored → FRA1 (38ms)</span>');
+      document.getElementById("r-fra").textContent = "38ms";
+      m2.classList.remove("up");
+    }
+  });
+
+  setInterval(function(){ paintAll(false); }, 1200);
+  setInterval(metricsTick, 1000);
+  setInterval(logTick, 1600);
+  setInterval(routeTick, 1900);
+
+  paintAll(true);
+  metricsTick();
+  routeTick();
+  for(var b=0;b<5;b++){ logTick(); }
+  logCount.textContent = lines;
+})();
+</script>
+</body>
+</html>

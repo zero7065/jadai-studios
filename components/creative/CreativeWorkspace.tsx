@@ -7,6 +7,7 @@ import Sigil from '../layout/Sigil';
 import { StudioAudio } from '../../lib/watermark';
 import { useToast } from '../providers/ToastProvider';
 import { renderHighResImage, renderAnimatedLoopingClip, ExportConfig } from '../../lib/creative/export';
+import { requestImages } from '../../lib/ai/imageClient';
 import {
   Sparkles,
   Layers,
@@ -210,7 +211,12 @@ export const CreativeWorkspace: React.FC<CreativeWorkspaceProps> = ({
       Math.floor(Math.random() * 899999) + 100000,
     ];
 
-    const encodedPrompt = encodeURIComponent(assembled);
+    // Server-first: OpenAI provider chain (falls back to Pollinations automatically)
+    const { urls } = await requestImages(assembled, {
+      width: sizeConfig.w,
+      height: sizeConfig.h,
+      seeds,
+    });
 
     const newVariants: GeneratedAsset[] = seeds.map((seed, idx) => ({
       id: `asset-${baseTimestamp}-${idx}`,
@@ -218,7 +224,7 @@ export const CreativeWorkspace: React.FC<CreativeWorkspaceProps> = ({
       prompt: subject || customPrompt,
       assembledPrompt: assembled,
       seed,
-      url: `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${sizeConfig.w}&height=${sizeConfig.h}&seed=${seed}&nologo=true`,
+      url: urls[idx] || `https://image.pollinations.ai/prompt/${encodeURIComponent(assembled)}?width=${sizeConfig.w}&height=${sizeConfig.h}&seed=${seed}&nologo=true`,
       width: sizeConfig.w,
       height: sizeConfig.h,
       createdAt: new Date().toISOString(),
@@ -234,11 +240,9 @@ export const CreativeWorkspace: React.FC<CreativeWorkspaceProps> = ({
     setCurrentBatch(newVariants);
     saveToLibrary(newVariants);
 
-    setTimeout(() => {
-      setIsGenerating(false);
-      StudioAudio.playSuccessArpeggio();
-      showToast('Created 4 variants in batch. Pick one to edit, refine, or export in 4K.', 'success');
-    }, 1800);
+    setIsGenerating(false);
+    StudioAudio.playSuccessArpeggio();
+    showToast('Created 4 variants in batch. Pick one to edit, refine, or export in 4K.', 'success');
   };
 
   // Handle Precision Edit (Edit Mode)
@@ -253,14 +257,19 @@ export const CreativeWorkspace: React.FC<CreativeWorkspaceProps> = ({
 
     const newSeed = Math.floor(Math.random() * 899999) + 100000;
     const modifiedPrompt = `${editModalAsset.assembledPrompt}, seamlessly blended edit: ${editInstruction}, action: ${editActionType}, maintaining global scene lighting, perspective and style`;
-    const encoded = encodeURIComponent(modifiedPrompt);
+
+    const { urls } = await requestImages(modifiedPrompt, {
+      width: editModalAsset.width,
+      height: editModalAsset.height,
+      seeds: [newSeed],
+    });
 
     const editedAsset: GeneratedAsset = {
       ...editModalAsset,
       id: `asset-edit-${Date.now()}`,
       assembledPrompt: modifiedPrompt,
       seed: newSeed,
-      url: `https://image.pollinations.ai/prompt/${encoded}?width=${editModalAsset.width}&height=${editModalAsset.height}&seed=${newSeed}&nologo=true`,
+      url: urls[0] || `https://image.pollinations.ai/prompt/${encodeURIComponent(modifiedPrompt)}?width=${editModalAsset.width}&height=${editModalAsset.height}&seed=${newSeed}&nologo=true`,
       createdAt: new Date().toISOString(),
     };
 
@@ -324,7 +333,7 @@ export const CreativeWorkspace: React.FC<CreativeWorkspaceProps> = ({
   };
 
   // Generate Reference Batches for Projects (e.g. Book of Lies)
-  const handleGenerateReferenceBatch = () => {
+  const handleGenerateReferenceBatch = async () => {
     setLoadingReferences(true);
     StudioAudio.playClick();
 
@@ -337,16 +346,25 @@ export const CreativeWorkspace: React.FC<CreativeWorkspaceProps> = ({
       'Monolithic granite library with vault archives, cinematic atmospheric haze',
     ];
 
+    const refSeeds = refThemes.map((_, idx) => 3000 + idx * 77);
+    const refUrls: string[] = [];
+    for (let idx = 0; idx < refThemes.length; idx++) {
+      const { urls } = await requestImages(
+        `${refThemes[idx]}, Book of Lies mood, stoic portraiture, aged archival texture, 35mm film`,
+        { width: 800, height: 1000, seeds: [refSeeds[idx]] }
+      );
+      refUrls.push(urls[0] || '');
+    }
+
     const newRefs: GeneratedAsset[] = refThemes.map((desc, idx) => {
-      const seed = 3000 + idx * 77;
-      const encoded = encodeURIComponent(`${desc}, Book of Lies mood, stoic portraiture, aged archival texture, 35mm film`);
+      const seed = refSeeds[idx];
       return {
         id: `ref-${Date.now()}-${idx}`,
         outputType: 'image',
         prompt: desc,
         assembledPrompt: desc,
         seed,
-        url: `https://image.pollinations.ai/prompt/${encoded}?width=800&height=1000&seed=${seed}&nologo=true`,
+        url: refUrls[idx] || `https://image.pollinations.ai/prompt/${encodeURIComponent(`${desc}, Book of Lies mood, stoic portraiture, aged archival texture, 35mm film`)}?width=800&height=1000&seed=${seed}&nologo=true`,
         width: 800,
         height: 1000,
         createdAt: new Date().toISOString(),

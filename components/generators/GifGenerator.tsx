@@ -1,11 +1,14 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { generateImage } from '@/modules/mirage/lib/providers';
+import { requestImages } from '@/lib/ai/imageClient';
+import { encodeGif, GifFrameInput } from '@/lib/creative/gif-encoder';
 import { Download, RefreshCw, Sparkles, Upload, Play, Pause, Film, Image as ImageIcon } from 'lucide-react';
 import { StudioAudio } from '@/lib/watermark';
+import { useToast } from '@/components/providers/ToastProvider';
 
 export const GifGenerator: React.FC = () => {
+  const { showToast } = useToast();
   const [imageSrc, setImageSrc] = useState<string>('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80');
   const [textCaption, setTextCaption] = useState('JADAI STUDIOS');
   const [subCaption, setSubCaption] = useState('BUILD DIFFERENT');
@@ -138,7 +141,9 @@ export const GifGenerator: React.FC = () => {
     setIsGeneratingBase(true);
     try {
       StudioAudio.playClick();
-      const url = await generateImage(prompt, { width: 600, height: 600 });
+      const { urls } = await requestImages(prompt, { width: 600, height: 600, seeds: [Date.now()] });
+      const url = urls[0];
+      if (!url) throw new Error('No image returned');
       setImageSrc(url);
       try {
         StudioAudio.playSuccessArpeggio();
@@ -158,6 +163,66 @@ export const GifGenerator: React.FC = () => {
         setImageSrc(reader.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // Real animated GIF export — samples one full 120-frame canvas loop and
+  // encodes it with the pure-TS GIF89a encoder (median-cut + LZW).
+  const handleDownloadGif = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || isRendering) return;
+
+    try {
+      StudioAudio.playClick();
+    } catch {}
+    setIsRendering(true);
+    if (!isPlaying) setIsPlaying(true);
+
+    try {
+      const OUT_SIZE = 400;
+      const FRAME_COUNT = 60;
+      const scratch = document.createElement('canvas');
+      scratch.width = OUT_SIZE;
+      scratch.height = OUT_SIZE;
+      const sctx = scratch.getContext('2d');
+      if (!sctx) throw new Error('2d context unavailable');
+
+      const frames: GifFrameInput[] = [];
+      for (let i = 0; i < FRAME_COUNT; i++) {
+        // Sample every 2nd rAF → 60 frames spanning the full 120-frame loop (~2s).
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        sctx.drawImage(canvas, 0, 0, OUT_SIZE, OUT_SIZE);
+        frames.push({ imageData: sctx.getImageData(0, 0, OUT_SIZE, OUT_SIZE), delayMs: 33 });
+      }
+
+      const bytes = encodeGif(OUT_SIZE, OUT_SIZE, frames);
+      const blob = new Blob([bytes], { type: 'image/gif' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `jadai-loop-${Date.now()}.gif`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      StudioAudio.playSuccessArpeggio();
+      showToast(
+        `GIF exported — ${FRAME_COUNT} frames, ${(bytes.length / 1024).toFixed(0)} KB.`,
+        'success'
+      );
+    } catch (err: any) {
+      showToast(
+        `GIF export failed: ${err?.message || 'unknown error'}${
+          String(err?.message || '').includes('tainted') || String(err?.name || '') === 'SecurityError'
+            ? ' (the base image blocks cross-origin pixel reads — upload or generate your own image)'
+            : ''
+        }.`,
+        'error'
+      );
+    } finally {
+      setIsRendering(false);
     }
   };
 
@@ -320,12 +385,23 @@ export const GifGenerator: React.FC = () => {
 
             <button
               type="button"
-              onClick={handleDownloadAnimation}
+              onClick={handleDownloadGif}
               disabled={isRendering}
               className="flex-1 py-2.5 rounded-full bg-[#C9A84C] hover:bg-[#e8c96a] text-[#050404] font-bold text-xs font-mono flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md active:scale-95 disabled:opacity-50"
             >
               {isRendering ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-              <span>{isRendering ? 'Encoding 3s Loop...' : 'Export Animation'}</span>
+              <span>{isRendering ? 'Encoding GIF...' : 'Export GIF (.gif)'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadAnimation}
+              disabled={isRendering}
+              className="px-4 py-2.5 rounded-full border border-[rgba(201,168,76,0.3)] bg-white/5 hover:bg-white/10 text-xs font-mono flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+              title="3-second WebM video loop"
+            >
+              <Film className="w-3.5 h-3.5 text-[#C9A84C]" />
+              <span>WebM</span>
             </button>
           </div>
         </div>

@@ -172,8 +172,8 @@ export const GuideBee: React.FC<GuideBeeProps> = ({ onNavigate }) => {
 
       let assistantText = result.text;
 
-      // If response empty or network issue, fallback to smart deterministic routing
-      if (!assistantText) {
+      // Empty output, provider error, or graceful chain fallback → GUIDE's own deterministic routing
+      if (!assistantText || result.error || result.provider === 'graceful_fallback') {
         const dest = parseDestination(query);
         if (dest) {
           assistantText = `That's ${dest.label}. I'll take you there. →`;

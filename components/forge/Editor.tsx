@@ -27,6 +27,61 @@ import {
 } from 'lucide-react';
 import { StudioAudio } from '@/lib/watermark';
 import { useToast } from '@/components/providers/ToastProvider';
+import { askPrime } from '@/lib/ai/memory';
+
+// ---------------------------------------------------------------------------
+// Deterministic layout lint — real checks that work with zero AI providers.
+// ---------------------------------------------------------------------------
+interface LintHit {
+  id: string;
+  suggestion: string;
+  alignmentIssue?: boolean;
+}
+
+function lintFields(fields: EditableField[]): LintHit[] {
+  const hits: LintHit[] = [];
+  if (fields.length === 0) return hits;
+
+  // Margin consistency: majority x position is the intended margin.
+  const xCounts = new Map<number, number>();
+  fields.forEach((f) => xCounts.set(f.x, (xCounts.get(f.x) || 0) + 1));
+  let margin = fields[0].x;
+  let best = 0;
+  xCounts.forEach((count, x) => {
+    if (count > best) {
+      best = count;
+      margin = x;
+    }
+  });
+  fields.forEach((f) => {
+    if (f.type !== 'text' && f.type !== 'checkbox') return;
+    if (Math.abs(f.x - margin) > 4) {
+      hits.push({
+        id: f.id,
+        suggestion: `Align left margin to ${margin}px for visual harmony.`,
+        alignmentIssue: true,
+      });
+    }
+  });
+
+  fields.forEach((f) => {
+    const value = (f.value || '').trim();
+    if (value.length > 0 && value.length < 3) {
+      hits.push({ id: f.id, suggestion: 'This text field is nearly empty — complete or remove it.' });
+    }
+    if (value.length > 60 && value === value.toUpperCase() && /[A-Z]{4}/.test(value)) {
+      hits.push({ id: f.id, suggestion: 'Convert long ALL-CAPS text to sentence case for readability.' });
+    }
+    if (f === fields[0] && (f.fontSize || 16) < 24) {
+      hits.push({
+        id: f.id,
+        suggestion: 'Elevate the title: raise size above 24px to establish hierarchy.',
+      });
+    }
+  });
+
+  return hits.slice(0, 6);
+}
 
 export interface EditorProps {
   originalUrl: string;
@@ -199,49 +254,93 @@ export function Editor({
     }
   };
 
-  // AI Layout & Copy Audit
-  const handleAiAudit = () => {
+  // AI Layout & Copy Audit — deterministic lint always runs; live AI adds copy
+  // suggestions when the provider chain is up. Honest labelling either way.
+  const handleAiAudit = async () => {
     setAiAuditing(true);
     try {
       StudioAudio.playSuccessArpeggio();
     } catch {}
 
-    setTimeout(() => {
+    try {
       recordSnapshot(fields);
-      // Generate intelligent suggestions & alignment flags
-      setFields((prev) =>
-        prev.map((f, i) => {
-          if (i === 0) {
-            return {
-              ...f,
-              suggestion: 'Elevate title clarity: "Executive Architecture & Systems Blueprint 2026"',
-              alignmentIssue: true,
-            };
+      const lintHits = lintFields(fields);
+
+      let aiHits: LintHit[] = [];
+      let aiProvider: string | undefined;
+      try {
+        const res = await askPrime({
+          prompt:
+            'Audit these document fields. Return ONLY a JSON array (max 4 entries), each: {"id":"<field id>","suggestion":"<one concrete copy or layout improvement, max 18 words>"}.\n' +
+            JSON.stringify(
+              fields.map((f) => ({
+                id: f.id,
+                type: f.type,
+                value: (f.value || '').slice(0, 140),
+                x: f.x,
+                fontSize: f.fontSize,
+              }))
+            ),
+          systemPrompt:
+            'You are a document layout and copy auditor. Respond with raw JSON only — no markdown, no prose.',
+          moduleSlug: 'forge',
+          scope: 'forge',
+        });
+        if (res.text && !res.error && res.provider !== 'graceful_fallback') {
+          const cleaned = res.text
+            .replace(/^```(?:json)?\s*/i, '')
+            .replace(/```\s*$/i, '')
+            .trim();
+          const parsed = JSON.parse(cleaned);
+          if (Array.isArray(parsed)) {
+            aiHits = parsed
+              .filter(
+                (p: any) =>
+                  p &&
+                  typeof p.id === 'string' &&
+                  typeof p.suggestion === 'string' &&
+                  fields.some((f) => f.id === p.id)
+              )
+              .map((p: any) => ({ id: p.id, suggestion: String(p.suggestion).slice(0, 160) }));
+            aiProvider = res.provider;
           }
-          if (i === 1) {
-            return {
-              ...f,
-              suggestion: 'Formalize agreement checkbox: "Confirmed compliance with Row-Level Security"',
-            };
-          }
-          if (i === 2) {
-            return {
-              ...f,
-              alignmentIssue: true,
-              suggestion: 'Align left margin to 40px for visual harmony.',
-            };
-          }
-          return f;
-        })
-      );
-      setAiAuditing(false);
+        }
+      } catch {
+        // Lint-only mode — no AI suggestions available.
+      }
+
+      // Merge: AI copy suggestions win, deterministic lint fills the rest.
+      const merged = fields.map((f) => {
+        const ai = aiHits.find((h) => h.id === f.id);
+        const lint = lintHits.find((h) => h.id === f.id);
+        const hit = ai || lint;
+        return hit
+          ? { ...f, suggestion: hit.suggestion, alignmentIssue: hit.alignmentIssue || lint?.alignmentIssue || false }
+          : { ...f, suggestion: undefined, alignmentIssue: false };
+      });
+      setFields(merged);
       setShowAiHighlights(true);
-      showToast('AI Audit Complete: 3 layout & copy suggestions generated with halos', 'success');
-    }, 1200);
+
+      const total = merged.filter((f) => f.suggestion).length;
+      if (aiHits.length > 0) {
+        showToast(`Audit complete: ${total} suggestion${total === 1 ? '' : 's'} (${aiProvider}).`, 'success', 'AI Audit');
+      } else {
+        showToast(
+          `AI unreachable — audit ran deterministic layout lint only: ${total} finding${total === 1 ? '' : 's'}.`,
+          'info',
+          'Lint Mode'
+        );
+      }
+    } catch (err: any) {
+      showToast(`Audit failed: ${err?.message || 'unknown error'}.`, 'error', 'AI Audit');
+    } finally {
+      setAiAuditing(false);
+    }
   };
 
-  // Apply user AI idea prompt
-  const handleApplyAiPrompt = (e: React.FormEvent) => {
+  // Apply user AI idea prompt — known local commands execute instantly; unknown
+  // phrasing is sent to PRIME for a structured edit spec. Honest toasts either way.
+  const handleApplyAiPrompt = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiPrompt.trim()) return;
 
@@ -250,22 +349,25 @@ export function Editor({
       StudioAudio.playSuccessArpeggio();
     } catch {}
 
-    const promptText = aiPrompt.toLowerCase();
-    showToast(`Applying AI modification: "${aiPrompt.slice(0, 30)}..."`, 'info');
+    const instruction = aiPrompt.trim();
+    const promptText = instruction.toLowerCase();
+    showToast(`Applying instruction: "${instruction.slice(0, 30)}..."`, 'info');
 
-    if (promptText.includes('align') || promptText.includes('margin')) {
-      // Snap items to 40px left align
-      setFields((prev) => prev.map((f) => ({ ...f, x: 40, alignmentIssue: false })));
-      showToast('All fields aligned to standard 40px left margin', 'success');
-    } else if (promptText.includes('title') || promptText.includes('heading')) {
-      setFields((prev) =>
-        prev.map((f, i) =>
-          i === 0 ? { ...f, fontSize: 32, color: '#D4AF37', value: f.value.toUpperCase() } : f
-        )
-      );
-      showToast('Header enhanced with luminous 32px gold styling', 'success');
-    } else {
-      // General refinement
+    const applyLocal = (action: 'align' | 'title' | 'polish'): boolean => {
+      if (action === 'align') {
+        setFields((prev) => prev.map((f) => ({ ...f, x: 40, alignmentIssue: false })));
+        showToast('All fields aligned to 40px left margin', 'success');
+        return true;
+      }
+      if (action === 'title') {
+        setFields((prev) =>
+          prev.map((f, i) =>
+            i === 0 ? { ...f, fontSize: 32, color: '#D4AF37', value: f.value.toUpperCase() } : f
+          )
+        );
+        showToast('Header set to 32px gold uppercase', 'success');
+        return true;
+      }
       setFields((prev) =>
         prev.map((f) => ({
           ...f,
@@ -274,7 +376,50 @@ export function Editor({
           alignmentIssue: false,
         }))
       );
-      showToast('Document styling polished to 4K executive contrast', 'success');
+      showToast('Field styling normalized to high-contrast palette', 'success');
+      return true;
+    };
+
+    // 1. Local editor commands (instant, no AI needed)
+    let localAction: 'align' | 'title' | 'polish' | null = null;
+    if (promptText.includes('align') || promptText.includes('margin')) localAction = 'align';
+    else if (promptText.includes('title') || promptText.includes('heading')) localAction = 'title';
+    else if (promptText.includes('polish') || promptText.includes('contrast') || promptText.includes('style')) localAction = 'polish';
+
+    if (localAction) {
+      applyLocal(localAction);
+      setAiPrompt('');
+      return;
+    }
+
+    // 2. Unknown phrasing → ask PRIME which local edit to run
+    try {
+      const res = await askPrime({
+        prompt: `The document editor supports exactly these local edits: "align" (snap all fields to 40px left margin), "title" (index 0: 32px gold uppercase), "polish" (normalize all text to high-contrast white), "none" (instruction is not executable as a local edit).\n\nUser instruction: "${instruction}"\n\nReturn ONLY JSON: {"action":"align|title|polish|none","note":"<max 12 words explaining the result>"}`,
+        systemPrompt:
+          'You map user formatting instructions to editor commands. Respond with raw JSON only — no markdown, no prose.',
+        moduleSlug: 'forge',
+        scope: 'forge',
+      });
+
+      if (res.text && !res.error && res.provider !== 'graceful_fallback') {
+        const cleaned = res.text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+        const parsed = JSON.parse(cleaned);
+        const action = parsed?.action;
+        if (action === 'align' || action === 'title' || action === 'polish') {
+          applyLocal(action);
+        } else {
+          showToast(
+            `PRIME: ${parsed?.note || 'that instruction does not map to an available edit'} — rephrase with align, title, or polish.`,
+            'info',
+            'PRIME'
+          );
+        }
+      } else {
+        showToast('PRIME unreachable — try a local command: align, title, or polish.', 'info', 'Offline');
+      }
+    } catch {
+      showToast('Instruction could not be parsed and PRIME is unreachable — try: align, title, or polish.', 'info', 'Offline');
     }
     setAiPrompt('');
   };

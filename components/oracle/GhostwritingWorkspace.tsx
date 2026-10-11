@@ -208,18 +208,18 @@ STYLE INVARIANTS:
         scope: 'writer',
       });
 
-      if (result.text) {
+      if (result.text && !result.error && result.provider !== 'graceful_fallback') {
         return result.text.trim();
       }
-      throw new Error(result.error || 'AI generation failed');
-    } catch {
-      // Sovereign Highland fallback
-      const fallbackPhrases = [
-        `\n\nThe silence expanded until the only sound was the copper coil cooling inside the casing. To construct without testing the floor is merely wishing in stone.`,
-        `\n\nHe checked the vernier caliper again. Three tenths of a millimeter out of plumb. A mistake in the blueprint is an inconvenience; a mistake in stone is an avalanche waiting for morning.`,
-        `\n\nWhen the signal tower flickered out at dusk, the local database did not blink. Software that requires perpetual permission to function is not an asset; it is a temporary lease.`,
-      ];
-      return fallbackPhrases[Math.floor(Math.random() * fallbackPhrases.length)];
+      throw new Error(result.error || 'live chain returned no model output');
+    } catch (err: any) {
+      // Honest failure — never inject canned prose into the author's manuscript.
+      showToast(
+        `Co-pilot unreachable (${err?.message || 'no provider'}). Nothing was added to your canvas.`,
+        'error',
+        'Writer Offline'
+      );
+      return null;
     } finally {
       setIsGenerating(false);
     }
@@ -348,21 +348,23 @@ STYLE INVARIANTS:
         scope: 'writer',
       });
 
-      if (result.text) {
+      if (result.text && !result.offline && result.sources.length > 0) {
         const bulletPoints = result.text
           .split('\n')
           .filter((line: string) => line.trim().length > 10)
           .slice(0, 3);
         setResearchResults(bulletPoints.length > 0 ? bulletPoints : [result.text]);
       } else {
-        throw new Error('Search failed');
+        throw new Error(result.offlineReason || 'no live sources');
       }
-    } catch {
-      // Fallback research notes
-      setResearchResults([
-        `Historical note on "${query}": Foundation engineering principles mandate stress-testing substrate under fluctuating load.`,
-        `Citation for "${query}": Sub-second edge systems require decentralized, local-first state cache.`,
-      ]);
+    } catch (err: any) {
+      // Honest failure — never fabricate citations or historical notes.
+      showToast(
+        `Research unavailable (${err?.message || 'offline'}). No citations were generated.`,
+        'error',
+        'Grounding Offline'
+      );
+      setResearchResults([]);
     } finally {
       setIsSearching(false);
     }

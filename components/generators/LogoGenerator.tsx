@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { generateImage } from '@/modules/mirage/lib/providers';
+import { requestImages } from '@/lib/ai/imageClient';
 import { Download, RefreshCw, Sparkles, AlertCircle, FileCode, Layers } from 'lucide-react';
 import { StudioAudio } from '@/lib/watermark';
 
@@ -57,11 +57,13 @@ export const LogoGenerator: React.FC = () => {
         const prompt = `A professional company logo for "${brand}", vibe: ${vibe}, ${style.promptModifier}`;
         const seed = baseSeed + i * 31415 + Math.floor(Math.random() * 500);
 
-        const url = await generateImage(prompt, {
+        const { urls } = await requestImages(prompt, {
           width: 800,
           height: 800,
-          seed,
+          seeds: [seed],
         });
+        const url = urls[0];
+        if (!url) throw new Error('No image returned');
 
         generated.push({
           id: `logo-${i}-${Date.now()}`,
@@ -90,11 +92,13 @@ export const LogoGenerator: React.FC = () => {
 
     try {
       StudioAudio.playClick();
-      const url = await generateImage(prompt, {
+      const { urls } = await requestImages(prompt, {
         width: 800,
         height: 800,
-        seed: Date.now() + Math.floor(Math.random() * 99999),
+        seeds: [Date.now() + Math.floor(Math.random() * 99999)],
       });
+      const url = urls[0];
+      if (!url) throw new Error('No image returned');
 
       setConcepts((prev) => {
         const copy = [...prev];

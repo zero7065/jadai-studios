@@ -1,12 +1,28 @@
 import { getSetting } from '@/lib/settings';
+import { isRealGroqKey, isRealGeminiKey, isOpenAIKey } from '@/lib/config/envTrust';
+import { isOpenAIQuotaExhausted, reportOpenAIQuotaError } from '@/lib/ai/openai';
 
 const PROVIDERS = [
   {
+    name: 'openai',
+    url: 'https://api.openai.com/v1/chat/completions',
+    model: 'gpt-5-mini',
+    keySetting: 'openai_api_key',
+    maxPerDay: 10000,
+    keyCheck: isOpenAIKey,
+    // gpt-5 family: uses max_completion_tokens and default temperature only.
+    tokenField: 'max_completion_tokens' as const,
+    omitTemperature: true,
+  },
+  {
     name: 'groq',
     url: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama-3.3-70b-versatile',
+    // Signal agents parse strict JSON — use the fast non-reasoning candidate.
+    model: 'qwen/qwen3.8-27b',
     keySetting: 'groq_api_key',
     maxPerDay: 14400,
+    keyCheck: isRealGroqKey,
+    tokenField: 'max_tokens' as const,
   },
   {
     name: 'gemini',
@@ -14,6 +30,8 @@ const PROVIDERS = [
     model: 'gemini-2.5-flash',
     keySetting: 'gemini_api_key',
     maxPerDay: 1500,
+    keyCheck: isRealGeminiKey,
+    tokenField: 'max_tokens' as const,
   },
 ];
 
@@ -35,8 +53,14 @@ export async function callSignalLLM(
       continue;
     }
 
+    // OpenAI cools itself down for 10 minutes after quota/credit errors.
+    if (p.name === 'openai' && isOpenAIQuotaExhausted()) {
+      currentIndex = (currentIndex + 1) % PROVIDERS.length;
+      continue;
+    }
+
     const apiKey = await getSetting(p.keySetting);
-    if (!apiKey || apiKey.startsWith('[SET_')) {
+    if (!p.keyCheck(apiKey)) {
       currentIndex = (currentIndex + 1) % PROVIDERS.length;
       continue;
     }
@@ -48,9 +72,11 @@ export async function callSignalLLM(
           { role: 'system', content: system },
           { role: 'user', content: user },
         ],
-        temperature: opts.temperature ?? 0.7,
-        max_tokens: opts.maxTokens ?? 2000,
       };
+      if (!('omitTemperature' in p && p.omitTemperature)) {
+        body.temperature = opts.temperature ?? 0.7;
+      }
+      body[p.tokenField] = opts.maxTokens ?? 2000;
       if (opts.json) body.response_format = { type: 'json_object' };
 
       const res = await fetch(p.url, {
@@ -62,10 +88,21 @@ export async function callSignalLLM(
         body: JSON.stringify(body),
       });
 
-      if (!res.ok) throw new Error(`${p.name} ${res.status}`);
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        if (
+          p.name === 'openai' &&
+          (errText.includes('insufficient_quota') || errText.includes('credit_balance_exhausted'))
+        ) {
+          reportOpenAIQuotaError(`signal: HTTP ${res.status}`);
+        }
+        throw new Error(`${p.name} ${res.status}`);
+      }
       counters[key] = (counters[key] || 0) + 1;
       const data = await res.json();
-      return data.choices[0].message.content;
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) throw new Error(`${p.name} empty content`);
+      return content;
     } catch (e) {
       console.error(`Signal LLM ${p.name} failed:`, e);
       currentIndex = (currentIndex + 1) % PROVIDERS.length;

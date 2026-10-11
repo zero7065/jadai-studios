@@ -405,6 +405,14 @@ function AppContent() {
         case '/account/premium':
           return <PremiumProfilePage onNavigate={navigateTo} />;
 
+      // Module pages (imported above, previously unrouted)
+      case '/resume-editor':
+        return <ResumeEditorPage />;
+      case '/doc-analyzer':
+        return <DocAnalyzerPage />;
+      case '/growth-maker':
+        return <GrowthMakerPage />;
+
       // Career Board
       case '/career-board':
         return <CareerBoardPage />;

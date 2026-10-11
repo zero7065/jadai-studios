@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { generateImage } from '@/modules/mirage/lib/providers';
+import { requestImages } from '@/lib/ai/imageClient';
 import { Download, RefreshCw, Sparkles, Image as ImageIcon, Upload, Check, AlertCircle } from 'lucide-react';
 import { StudioAudio } from '@/lib/watermark';
 
@@ -86,11 +86,13 @@ export const ThumbnailGenerator: React.FC = () => {
     const fullPrompt = `${textPrompt}, ${selectedTemplate.presetStyle}`;
 
     try {
-      const url = await generateImage(fullPrompt, {
+      const { urls } = await requestImages(fullPrompt, {
         width: selectedTemplate.width,
         height: selectedTemplate.height,
-        seed: Date.now(),
+        seeds: [Date.now()],
       });
+      const url = urls[0];
+      if (!url) throw new Error('No image returned');
       setGeneratedImage(url);
       try {
         StudioAudio.playSuccessArpeggio();
@@ -103,24 +105,98 @@ export const ThumbnailGenerator: React.FC = () => {
     }
   };
 
+  // Bakes the headline (scrim + gold accent + auto-shrunk type) onto the
+  // image so the download matches the on-screen preview.
+  const renderComposite = async (): Promise<string> => {
+    const url = generatedImage!;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('image blocked by CORS or failed to load'));
+      img.src = url;
+    });
+
+    const w = img.naturalWidth || selectedTemplate.width;
+    const h = img.naturalHeight || selectedTemplate.height;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('2d context unavailable');
+    ctx.drawImage(img, 0, 0, w, h);
+
+    const title = titleOverlay.trim();
+    if (title) {
+      const pad = Math.round(w * 0.05);
+      const scrimH = Math.round(h * 0.34);
+      const grad = ctx.createLinearGradient(0, h - scrimH, 0, h);
+      grad.addColorStop(0, 'rgba(5,4,4,0)');
+      grad.addColorStop(0.55, 'rgba(5,4,4,0.55)');
+      grad.addColorStop(1, 'rgba(5,4,4,0.92)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, h - scrimH, w, scrimH);
+
+      ctx.fillStyle = '#C9A84C';
+      ctx.fillRect(pad, h - Math.round(scrimH * 0.44), Math.round(w * 0.09), Math.max(2, Math.round(h * 0.005)));
+
+      let size = Math.round(h * 0.11);
+      const maxW = w - pad * 2;
+      ctx.textBaseline = 'alphabetic';
+      ctx.font = `900 ${size}px Cinzel, Georgia, serif`;
+      while (size > 12 && ctx.measureText(title).width > maxW) {
+        size -= 2;
+        ctx.font = `900 ${size}px Cinzel, Georgia, serif`;
+      }
+      ctx.shadowColor = 'rgba(0,0,0,0.9)';
+      ctx.shadowBlur = Math.round(h * 0.02);
+      ctx.shadowOffsetY = Math.round(h * 0.006);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(title.toUpperCase(), pad, h - Math.round(scrimH * 0.22));
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+    }
+
+    return canvas.toDataURL('image/png');
+  };
+
   const handleDownload = async () => {
     if (!generatedImage) return;
     try {
       StudioAudio.playClick();
     } catch {}
 
+    const fileName = `jadai-thumbnail-${selectedTemplate.id}-${Date.now()}.png`;
+
     try {
+      if (titleOverlay.trim()) {
+        // Composite path: headline is baked into the exported PNG.
+        const composited = await renderComposite();
+        const a = document.createElement('a');
+        a.href = composited;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+      }
+
       const res = await fetch(generatedImage);
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = `jadai-thumbnail-${selectedTemplate.id}-${Date.now()}.png`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(blobUrl);
-    } catch {
+    } catch (err: any) {
+      // CORS-tainted canvas or failed fetch — hand the raw image over instead.
+      setError(
+        `Export note: ${err?.message || 'could not bake the title in'} — opening the raw image (save it from the new tab).`
+      );
       window.open(generatedImage, '_blank');
     }
   };

@@ -197,11 +197,16 @@ export const RadarView: React.FC<RadarViewProps> = ({ onNavigate }) => {
 
     try {
       const res = await fetch('/api/signal/worker/scout', { method: 'POST' });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       await loadData();
-      showToast('Radar sweep complete. New developer signals indexed.', 'success', 'Scout Report');
+      if (res.ok && data?.success) {
+        showToast('Radar sweep complete. New developer signals indexed.', 'success', 'Scout Report');
+      } else {
+        const reason = data?.error || `worker responded ${res.status}`;
+        showToast(`Scout run did not complete (${reason}). Existing signals reloaded.`, 'error', 'Scout Report');
+      }
     } catch {
-      showToast('Completed radar scan from edge cache', 'info');
+      showToast('Scout worker unreachable — showing last known signals.', 'info');
       await loadData();
     } finally {
       setScanning(false);

@@ -45,7 +45,15 @@ export default function WorkPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map((p, idx) => (
-            <PortfolioCard key={p.id} project={p} index={idx} />
+            <PortfolioCard
+              key={p.id}
+              project={p}
+              index={idx}
+              onClick={() => {
+                const src = p.preview_url || p.live_url;
+                if (src) window.open(src, '_blank', 'noopener');
+              }}
+            />
           ))}
         </div>
       </div>

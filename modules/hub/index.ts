@@ -1,4 +1,5 @@
 import { defineModule, JadaiModule } from '../../lib/modules/defineModule';
+import { HUB_LISTINGS } from './data';
 import HubModulePage from './page';
 
 export const hubModule: JadaiModule = defineModule({
@@ -13,7 +14,7 @@ export const hubModule: JadaiModule = defineModule({
   routes: {
     page: '/hub',
     api: {
-      listings: async () => ({ success: true, data: [] }),
+      listings: async () => ({ success: true, data: HUB_LISTINGS }),
     },
   },
 });

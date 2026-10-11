@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Carousel from '@/components/ui/Carousel';
-import { generateImage } from './lib/providers';
+import { requestImages } from '@/lib/ai/imageClient';
 import ThumbnailGenerator from '@/components/generators/ThumbnailGenerator';
 import LogoGenerator from '@/components/generators/LogoGenerator';
 import GifGenerator from '@/components/generators/GifGenerator';
@@ -60,21 +60,14 @@ export default function MiragePage({ onNavigate }: { onNavigate?: (path: string)
     const fullPrompt = `${trimmed}, ${styleSuffix}`;
 
     try {
-      // Generate 3 images
-      const baseSeed = Date.now();
-      const generated: string[] = [];
+      // Server-first: OpenAI provider chain (falls back to Pollinations automatically)
+      const { urls } = await requestImages(fullPrompt, {
+        width: selectedRatio.dims.width,
+        height: selectedRatio.dims.height,
+        seeds: [1, 2, 3].map((i) => Date.now() + i * 9973),
+      });
 
-      for (let i = 0; i < 3; i++) {
-        const seed = baseSeed + i * 9973 + Math.floor(Math.random() * 500);
-        const url = await generateImage(fullPrompt, {
-          width: selectedRatio.dims.width,
-          height: selectedRatio.dims.height,
-          seed,
-        });
-        generated.push(url);
-      }
-
-      setImages(generated);
+      setImages(urls);
       try {
         StudioAudio.playSuccessArpeggio();
       } catch {}
@@ -91,11 +84,13 @@ export default function MiragePage({ onNavigate }: { onNavigate?: (path: string)
     const selectedRatio = ASPECT_RATIOS.find((r) => r.id === aspectRatio) || ASPECT_RATIOS[0];
     try {
       StudioAudio.playClick();
-      const url = await generateImage(`${trimmed}, cinematic`, {
+      const { urls } = await requestImages(`${trimmed}, cinematic`, {
         width: selectedRatio.dims.width,
         height: selectedRatio.dims.height,
-        seed: Date.now() + Math.floor(Math.random() * 100000),
+        seeds: [Date.now() + Math.floor(Math.random() * 100000)],
       });
+      const url = urls[0];
+      if (!url) throw new Error('No image returned');
 
       setImages((prev) => {
         const copy = [...prev];

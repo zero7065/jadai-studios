@@ -182,13 +182,13 @@ export const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Column 2: Products (verified .jadai.dev domains) */}
+          {/* Column 2: Products (previews hosted by this app) */}
           <div className="space-y-3">
             <span className="text-xs font-mono uppercase tracking-[0.2em] text-[#e8c96a] font-bold block">
               Products
             </span>
             <ul className="space-y-2 text-xs font-mono text-[#8a857e]">
-              <li><a href="https://exampadi.jadai.dev" target="_blank" rel="noopener noreferrer" className="hover:text-[#f5f3f0] transition-colors">ExamPadi AI</a></li>
+              <li><a href="/previews/exampadi/index.html" target="_blank" rel="noopener noreferrer" className="hover:text-[#f5f3f0] transition-colors">ExamPadi AI</a></li>
               <li><a href="/work" className="hover:text-[#f5f3f0] transition-colors">ATHENA Intelligence</a></li>
               <li><a href="/marketplace" className="hover:text-[#f5f3f0] transition-colors">Forge Prime Templates</a></li>
               <li><a href="/marketplace" className="hover:text-[#f5f3f0] transition-colors">Ghostwriter System</a></li>

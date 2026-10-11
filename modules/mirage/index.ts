@@ -14,7 +14,20 @@ export const mirageModule: JadaiModule = defineModule({
     page: '/playground/mirage',
     api: {
       generate: async ({ body }) => {
-        return { success: true, data: { message: 'Visual generated', result: body } };
+        const prompt = String(body?.prompt || '').trim();
+        if (!prompt) return { status: 400, success: false, error: 'prompt is required' };
+        try {
+          const { generateMirageImages } = await import('./api/generate');
+          const data = await generateMirageImages(
+            prompt,
+            body?.style,
+            body?.aspectRatio,
+            body?.count
+          );
+          return { success: true, data };
+        } catch (err: any) {
+          return { status: 500, success: false, error: err.message || 'Generation failed' };
+        }
       },
     },
   },

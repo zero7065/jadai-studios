@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { logger } from '../utils/logger';
+import { isRealGeminiKey } from '../config/envTrust';
 
 export interface GeminiGenerationOptions {
   systemPrompt?: string;
@@ -9,8 +10,7 @@ export interface GeminiGenerationOptions {
 }
 
 export function isGeminiConfigured(customKey?: string): boolean {
-  const apiKey = customKey || process.env.GEMINI_API_KEY;
-  return Boolean(apiKey && !apiKey.startsWith('[SET_IN_') && apiKey.trim() !== '');
+  return isRealGeminiKey(customKey || process.env.GEMINI_API_KEY);
 }
 
 export async function callGemini(
@@ -20,7 +20,7 @@ export async function callGemini(
   const startTime = Date.now();
   const apiKey = options.apiKey || process.env.GEMINI_API_KEY;
 
-  if (!apiKey || apiKey.startsWith('[SET_IN_') || apiKey.trim() === '') {
+  if (!isRealGeminiKey(apiKey)) {
     throw new Error('Gemini API Key not configured');
   }
 

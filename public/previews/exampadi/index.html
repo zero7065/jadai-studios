@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EXAMPADI // MOCK ENGINE — live preview</title>
+<style>
+  :root{
+    --void:#050404;
+    --void2:#0a0908;
+    --gold:#C9A84C;
+    --grey:#8a8580;
+    --line:rgba(201,168,76,0.25);
+    --red:#c04a3a;
+    --green:#5f9e5a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--void);
+    color:var(--grey);
+    font-family:ui-monospace,'Cascadia Code',Consolas,'Courier New',monospace;
+    font-size:13px;
+    line-height:1.5;
+    padding:22px 20px 26px;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  a{color:rgba(201,168,76,0.7);text-decoration:none}
+  a:hover{color:var(--gold)}
+  .back{
+    position:fixed;top:12px;left:16px;font-size:11px;letter-spacing:.08em;z-index:40;
+    border:1px solid transparent;padding:3px 6px;
+  }
+  .back:hover{border-color:var(--line);background:rgba(201,168,76,0.06)}
+  .badge{
+    position:fixed;top:10px;right:14px;text-align:right;z-index:40;pointer-events:none;
+  }
+  .badge .b1{
+    display:inline-flex;align-items:center;gap:7px;
+    border:1px solid var(--gold);color:var(--gold);
+    font-size:10px;letter-spacing:.18em;padding:4px 9px;background:rgba(5,4,4,.9);
+  }
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:pulse 1.6s infinite}
+  .badge .b2{display:block;font-size:9px;letter-spacing:.1em;color:#5f5b57;margin-top:5px}
+  @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(201,168,76,.5)}50%{opacity:.35;box-shadow:0 0 0 4px rgba(201,168,76,0)}}
+
+  .wrap{max-width:860px;margin:0 auto;padding-top:34px}
+  header.top{border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:16px}
+  h1{font-size:17px;letter-spacing:.14em;color:#e6e1d7;font-weight:600}
+  .stack{font-size:10.5px;letter-spacing:.16em;color:#6b6660;margin-top:7px}
+  .stack b{color:rgba(201,168,76,.75);font-weight:400}
+
+  .meta{display:flex;flex-wrap:wrap;gap:14px;font-size:10.5px;letter-spacing:.1em;margin-bottom:14px}
+  .meta span{border:1px solid var(--line);padding:4px 8px}
+  .meta span b{color:var(--gold);font-weight:400}
+
+  .prog{height:4px;background:#151312;border:1px solid rgba(255,255,255,.05);position:relative;overflow:hidden;margin-bottom:6px}
+  .prog i{display:block;height:100%;background:var(--gold);width:33%;transition:width .5s cubic-bezier(.2,.7,.3,1)}
+  .progrow{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.14em;color:#6b6660;margin-bottom:16px}
+
+  .card{
+    background:linear-gradient(180deg,#0c0b0a,#080707);
+    border:1px solid var(--line);padding:20px 20px 18px;position:relative;
+  }
+  .card.shake{animation:shake .4s}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+  .qtag{font-size:10px;letter-spacing:.18em;color:#6b6660;margin-bottom:12px;display:flex;justify-content:space-between}
+  .qtag b{color:rgba(201,168,76,.8);font-weight:400}
+  .qtext{color:#e6e1d7;font-size:15px;line-height:1.65;margin-bottom:6px}
+  .qhint{font-size:11px;color:#6b6660;min-height:17px;margin-bottom:14px}
+  .qhint.bad{color:var(--red)}
+  .qhint.good{color:var(--green)}
+
+  .opts{display:grid;gap:9px}
+  .opt{
+    text-align:left;background:#0e0d0c;border:1px solid rgba(255,255,255,.07);
+    color:#c9c4bc;font:inherit;font-size:13px;padding:11px 13px;cursor:pointer;
+    display:flex;gap:11px;align-items:flex-start;transition:.16s;
+  }
+  .opt:hover:not(:disabled){border-color:var(--gold);background:rgba(201,168,76,.07);color:#e6e1d7}
+  .opt:disabled{cursor:default;opacity:.55}
+  .opt .k{color:var(--gold);opacity:.7;min-width:14px}
+  .opt.correct{border-color:var(--green);background:rgba(95,158,90,.12);color:#d8e8d6;opacity:1}
+  .opt.wrong{border-color:var(--red);background:rgba(192,74,58,.12);color:#e8c9c4;animation:shake .35s;opacity:1}
+
+  .explain{
+    margin-top:15px;border-left:2px solid var(--gold);padding:8px 12px;
+    background:rgba(201,168,76,.05);font-size:12.5px;color:#c9c4bc;display:none;
+  }
+  .explain.on{display:block;animation:fadein .35s}
+  @keyframes fadein{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+  .foot{margin-top:18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .btn{
+    background:transparent;border:1px solid var(--gold);color:var(--gold);
+    font:inherit;font-size:11px;letter-spacing:.16em;padding:8px 15px;cursor:pointer;transition:.16s;
+  }
+  .btn:hover{background:var(--gold);color:#050404}
+  .btn.ghost{border-color:rgba(255,255,255,.12);color:#8a8580}
+  .btn.ghost:hover{border-color:var(--gold);background:transparent;color:var(--gold)}
+  .note{font-size:10px;letter-spacing:.1em;color:#5f5b57}
+
+  .score{text-align:center;padding:8px 0 4px}
+  .score .num{font-size:52px;color:var(--gold);letter-spacing:.04em;line-height:1}
+  .score .lbl{font-size:10.5px;letter-spacing:.24em;color:#6b6660;margin-top:8px}
+  .score .split{display:flex;gap:22px;justify-content:center;margin-top:18px;font-size:11px;letter-spacing:.1em}
+  .score .split b{display:block;font-size:19px;font-weight:400;margin-bottom:3px}
+  .score .split .ok b{color:var(--green)}
+  .score .split .no b{color:var(--red)}
+  .adapt{
+    margin-top:18px;border:1px dashed var(--line);padding:11px;font-size:11.5px;
+    color:#c9c4bc;text-align:left;background:rgba(201,168,76,.04)
+  }
+  .adapt b{color:var(--gold);font-weight:400}
+
+  footer{margin-top:26px;border-top:1px solid var(--line);padding-top:13px;font-size:10px;letter-spacing:.08em;color:#5f5b57}
+  @media (max-width:520px){
+    body{padding:56px 14px 24px}
+    h1{font-size:14.5px}
+    .score .num{font-size:42px}
+  }
+</style>
+</head>
+<body>
+<a class="back" href="/">◂ jadai.dev</a>
+<div class="badge">
+  <span class="b1"><i class="dot"></i>LIVE PREVIEW</span>
+  <span class="b2">SELF-HOSTED PREVIEW — INTERACTIVE DEMO</span>
+</div>
+
+<div class="wrap">
+  <header class="top">
+    <h1>EXAMPADI // MOCK ENGINE</h1>
+    <div class="stack">Next.js <b>·</b> Gemini <b>·</b> Groq <b>·</b> PWA</div>
+  </header>
+
+  <div class="meta">
+    <span>PAPER <b id="mPaper">WAEC MATHS</b></span>
+    <span>MODE <b>ADAPTIVE</b></span>
+    <span>SESSION <b id="mSess">A7-3391</b></span>
+    <span>LATENCY <b id="mLat">212ms</b></span>
+  </div>
+
+  <div class="prog"><i id="bar"></i></div>
+  <div class="progrow">
+    <span id="stepTxt">QUESTION 1 / 3</span>
+    <span id="scoreTxt">SCORE 0</span>
+  </div>
+
+  <section class="card" id="card">
+    <div class="qtag"><span id="qtopic">ALGEBRA · QUADRATICS</span><b id="qid">Q-001</b></div>
+    <div class="qtext" id="qtext">—</div>
+    <div class="qhint" id="qhint">&nbsp;</div>
+    <div class="opts" id="opts"></div>
+    <div class="explain" id="explain"></div>
+  </section>
+
+  <div class="foot">
+    <button class="btn ghost" id="skip">SKIP →</button>
+    <span class="note" id="status">SELECT ONE ANSWER · HINTS ON</span>
+  </div>
+
+  <footer>
+    Preview environment hosted by JADAI Studios. Demo data only — not connected to production.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var QUESTIONS = [
+    {
+      topic:"ALGEBRA · QUADRATICS",
+      q:"Which pair of values solves x² − 7x + 12 = 0 ?",
+      opts:["x = 2 and x = 6","x = 3 and x = 4","x = −3 and x = −4","x = 1 and x = 12"],
+      answer:1,
+      hint:"Factor the constant: which two numbers multiply to 12 and add to −7?",
+      explain:"Two numbers multiplying to 12 and summing to −7 are −3 and −4, so (x−3)(x−4)=0 gives both roots."
+    },
+    {
+      topic:"PHYSICS · KINEMATICS",
+      q:"A car covers 240 m in 8 s at constant velocity. What is its velocity?",
+      opts:["24 m/s","30 m/s","36 m/s","48 m/s"],
+      answer:1,
+      hint:"Constant velocity means distance ÷ time, nothing more.",
+      explain:"v = d / t = 240 / 8 = 30 m/s — with no acceleration there is only one step."
+    },
+    {
+      topic:"MATHS · SURDS & INDICES",
+      q:"Simplify √144 ÷ √4",
+      opts:["6","12","24","48"],
+      answer:0,
+      hint:"Take each square root first, then divide.",
+      explain:"√144 = 12 and √4 = 2, so 12 ÷ 2 = 6 — dividing surds is division of their whole-number roots here."
+    }
+  ];
+
+  var idx = 0, score = 0, locked = false, finished = false;
+
+  var el = {
+    bar: document.getElementById("bar"),
+    stepTxt: document.getElementById("stepTxt"),
+    scoreTxt: document.getElementById("scoreTxt"),
+    qtopic: document.getElementById("qtopic"),
+    qid: document.getElementById("qid"),
+    qtext: document.getElementById("qtext"),
+    qhint: document.getElementById("qhint"),
+    opts: document.getElementById("opts"),
+    explain: document.getElementById("explain"),
+    card: document.getElementById("card"),
+    status: document.getElementById("status"),
+    skip: document.getElementById("skip"),
+    mLat: document.getElementById("mLat"),
+    mSess: document.getElementById("mSess")
+  };
+
+  function pad(n){ return (n<10?"0":"") + n; }
+
+  function render(){
+    if(idx >= QUESTIONS.length){ finished = true; }
+    if(finished){ renderScore(); return; }
+    var q = QUESTIONS[idx];
+    locked = false;
+    el.qtopic.textContent = q.topic;
+    el.qid.textContent = "Q-00" + (idx+1);
+    el.qtext.textContent = q.q;
+    el.qhint.className = "qhint";
+    el.qhint.innerHTML = "&nbsp;";
+    el.explain.className = "explain";
+    el.explain.textContent = "";
+    el.stepTxt.textContent = "QUESTION " + (idx+1) + " / 3";
+    el.scoreTxt.textContent = "SCORE " + score;
+    el.bar.style.width = (((idx)/3)*100) + "%";
+    el.status.textContent = "SELECT ONE ANSWER · HINTS ON";
+    el.skip.style.display = "";
+
+    el.opts.innerHTML = "";
+    var keys = ["A","B","C","D"];
+    for(var i=0;i<q.opts.length;i++){
+      (function(i){
+        var b = document.createElement("button");
+        b.className = "opt";
+        b.type = "button";
+        b.innerHTML = '<span class="k">' + keys[i] + '</span><span>' + q.opts[i] + '</span>';
+        b.addEventListener("click", function(){ choose(i, b); });
+        el.opts.appendChild(b);
+      })(i);
+    }
+  }
+
+  function choose(i, btn){
+    if(locked || finished) return;
+    var q = QUESTIONS[idx];
+    var all = el.opts.querySelectorAll(".opt");
+
+    if(i === q.answer){
+      locked = true;
+      score++;
+      btn.classList.add("correct");
+      el.qhint.className = "qhint good";
+      el.qhint.textContent = "CORRECT — advancing…";
+      el.explain.textContent = q.explain;
+      el.explain.className = "explain on";
+      el.scoreTxt.textContent = "SCORE " + score;
+      el.status.textContent = "VALIDATED BY GROQ RERANK · 41ms";
+      for(var k=0;k<all.length;k++){ all[k].disabled = true; }
+      setTimeout(function(){ idx++; render(); }, 2100);
+    } else {
+      btn.classList.add("wrong");
+      btn.disabled = true;
+      el.qhint.className = "qhint bad";
+      el.qhint.textContent = "NOT QUITE — " + q.hint;
+      el.status.textContent = "RETRY · ADAPTIVE HINT INJECTED";
+      setTimeout(function(){ btn.classList.remove("wrong"); }, 500);
+    }
+  }
+
+  function renderScore(){
+    finished = true;
+    el.bar.style.width = "100%";
+    el.stepTxt.textContent = "COMPLETE / 3";
+    el.scoreTxt.textContent = "SCORE " + score;
+    el.qtopic.textContent = "SESSION REPORT";
+    el.qid.textContent = "RPT-003";
+    el.opts.innerHTML = "";
+    el.qhint.innerHTML = "&nbsp;";
+    el.explain.className = "explain";
+
+    var pct = Math.round((score/3)*100);
+    var band = pct === 100 ? "MASTERY · move to harder tier" :
+               pct >= 67  ? "SOLID · hold tier, drill weak nodes" :
+                            "FOUNDATION · revisit prerequisites";
+    var node = pct >= 67 ? "quadratics" : "factorising";
+
+    var box = document.createElement("div");
+    box.className = "score";
+    box.innerHTML =
+      '<div class="num">' + score + ' / 3</div>' +
+      '<div class="lbl">FINAL SCORE · ' + pct + '%</div>' +
+      '<div class="split">' +
+        '<div class="ok"><b>' + score + '</b>CORRECT</div>' +
+        '<div class="no"><b>' + (3-score) + '</b> MISSED</div>' +
+        '<div><b style="color:#C9A84C">' + (score===3?"1":"2") + '</b>RETRY TIERS</div>' +
+      '</div>' +
+      '<div class="adapt"><b>ADAPTIVE PROFILE UPDATED</b><br>' +
+      'Band: ' + band + '. Next session will weight <b>' + node + '</b> ' +
+      'and raise difficulty on the nodes you cleared first try.</div>';
+    el.qtext.innerHTML = "";
+    el.qtext.appendChild(box);
+
+    el.status.textContent = "PROFILE SYNCED TO LOCAL VAULT · DEMO ONLY";
+    el.skip.textContent = "↺ RESTART SET";
+    el.skip.className = "btn";
+  }
+
+  el.skip.addEventListener("click", function(){
+    if(finished){
+      idx = 0; score = 0; finished = false;
+      el.qtext.innerHTML = "";
+      el.skip.textContent = "SKIP →";
+      el.skip.className = "btn ghost";
+      render();
+    } else {
+      idx++;
+      if(idx >= 3){ finished = true; }
+      render();
+    }
+  });
+
+  setInterval(function(){
+    var base = 190 + Math.round(Math.sin(Date.now()/2400)*24);
+    el.mLat.textContent = (base + Math.floor(Math.random()*18)) + "ms";
+  }, 1400);
+
+  var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
+  var s = "";
+  for(var i=0;i<5;i++){ s += chars[Math.floor(Math.random()*chars.length)]; }
+  el.mSess.textContent = s + "-" + (1000 + Math.floor(Math.random()*8999));
+
+  render();
+})();
+</script>
+</body>
+</html>

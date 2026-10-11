@@ -1,4 +1,5 @@
 import { defineModule, JadaiModule } from '../../lib/modules/defineModule';
+import { MARKET_TEMPLATES } from './data';
 import TemplateMarketPage from './page';
 
 export const templateMarketModule: JadaiModule = defineModule({
@@ -13,7 +14,7 @@ export const templateMarketModule: JadaiModule = defineModule({
   routes: {
     page: '/marketplace',
     api: {
-      list: async () => ({ success: true, data: [] }),
+      list: async () => ({ success: true, data: MARKET_TEMPLATES }),
     },
   },
 });

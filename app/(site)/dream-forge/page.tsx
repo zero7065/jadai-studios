@@ -141,7 +141,7 @@ The exact 5-milestone checklist required to bring this from abstract dream to li
         scope: 'dream-forge',
       });
 
-      if (result.text) {
+      if (result.text && !result.error && result.provider !== 'graceful_fallback') {
         setBlueprintResult(result.text);
         setShatterActive(true);
         setTimeout(() => setShatterActive(false), 2500);
@@ -149,14 +149,16 @@ The exact 5-milestone checklist required to bring this from abstract dream to li
       } else {
         throw new Error(result.error || 'AI generation failed');
       }
-    } catch {
-      // Deterministic fallback blueprint
-      const fallbackBlueprint = `### 1. Architectural Floor & Topology
+    } catch (aiErr: any) {
+      // Deterministic fallback blueprint — clearly labelled, never passed off as AI output
+      const fallbackBlueprint = `> DETERMINISTIC TEMPLATE — PRIME was unreachable (${aiErr?.message || 'no provider'}). This is the studio's standing blueprint scaffold, not a generated result.
+
+### 1. Architectural Floor & Topology
 • **Core Framework:** Next.js 14 App Router + React 19 + TypeScript
 • **Client-Server Boundary:** Server Actions for authenticated mutations; Edge API routes for streaming AI
 • **Offline Architecture Floor:** Service Worker cache (v1) with IndexedDB store for draft records
 • **Billing Integration:** Paystack dual-currency checkout (${intake.primaryCurrency}) with HMAC-SHA512 webhook verification
-• **AI Fallback Chain:** Groq (Llama-3.3-70B) -> Gemini (3.8-Flash) -> SHA256 In-Memory Cache -> Graceful Fallback
+• **AI Fallback Chain:** OpenAI (gpt-5-mini) -> Groq (gpt-oss-120b) -> Gemini -> In-Memory Cache -> labelled offline fallback
 
 ### 2. Relational PostgreSQL / Database Schema
 \`\`\`sql
@@ -199,7 +201,7 @@ CREATE POLICY "Users can access own ventures" ON public.ventures
 5. Launch closed alpha to 25 verified early architects`;
 
       setBlueprintResult(fallbackBlueprint);
-      showToast('Architectural blueprint generated.', 'success', 'Floor Established');
+      showToast('PRIME unreachable — showing the deterministic blueprint template.', 'info', 'Template Mode');
     } finally {
       setSynthesizing(false);
     }

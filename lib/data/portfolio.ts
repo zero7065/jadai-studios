@@ -9,6 +9,8 @@ export interface PortfolioProject {
   long_description: string;
   stack: string[];
   live_url?: string;
+  /** Self-hosted interactive preview (served by this app under public/previews). */
+  preview_url?: string;
   github_url?: string;
   featured: boolean;
   display_order: number;
@@ -27,6 +29,7 @@ export const SEED_PORTFOLIO: PortfolioProject[] = [
     description: 'Autonomous WAEC/JAMB exam preparation engine using adaptive cognitive profiling and low-bandwidth audio synthesis.',
     long_description: `ExamPadi was engineered to solve educational asymmetry in emerging markets. Built with an offline-first service worker architecture, it downloads entire syllabi and syllabus-aligned mock engines directly into the browser storage. Utilizing localized Gemini models and Groq inference, ExamPadi dissects complex physics, chemistry, and mathematics questions into intuitive Socratic explanations.`,
     stack: ['Next.js 14', 'TypeScript', 'Gemini AI', 'Supabase', 'Tailwind CSS', 'PWA'],
+    preview_url: '/previews/exampadi/index.html',
     live_url: 'https://exampadi.jadai.dev',
     github_url: 'https://github.com/jadaistudios/exampadi',
     featured: true,
@@ -44,6 +47,7 @@ export const SEED_PORTFOLIO: PortfolioProject[] = [
     description: 'Sub-50ms monitoring suite rendering real-time global latency heatmaps, TLS handshakes, and geo-DNS failovers.',
     long_description: `An industrial-grade telemetry panel designed for mission-critical edge deployments. Features real-time WebSockets streaming packet drops, automated DDoS mitigation triggers, and cryptographic routing telemetry with strict zero-pill typographic discipline.`,
     stack: ['React', 'TypeScript', 'WebSockets', 'Tailwind CSS', 'Express', 'Node TLS'],
+    preview_url: '/previews/gcore-edge-console/index.html',
     live_url: 'https://edge.jadai.dev',
     featured: false,
     display_order: 2,
@@ -60,6 +64,7 @@ export const SEED_PORTFOLIO: PortfolioProject[] = [
     description: 'Spatial audio distribution hub designed with void-black aesthetics, live lyric parsing, and lossless streaming.',
     long_description: `Steary redefines African media streaming by stripping away algorithmic advertisement clutter. Designed with pure glassmorphism, dynamic blur attenuation, and sub-second lossless FLAC audio streaming.`,
     stack: ['Next.js', 'WebAudio API', 'Framer Motion', 'Supabase Storage', 'PostgreSQL'],
+    preview_url: '/previews/steary-media/index.html',
     live_url: 'https://steary.jadai.dev',
     github_url: 'https://github.com/jadaistudios/steary',
     featured: false,
@@ -77,6 +82,7 @@ export const SEED_PORTFOLIO: PortfolioProject[] = [
     description: 'Generative design compiler leveraging 13-node Metatron calculations to output stress-tested structural joinery.',
     long_description: `Bridging ancient proportion theory with modern parametric architecture. Metatron CAD parses golden ratios and Platonic solids, outputting directly to G-code for precision 5-axis CNC cutters.`,
     stack: ['WebGL', 'Three.js', 'Rust (WASM)', 'TypeScript'],
+    preview_url: '/previews/metatron-cad/index.html',
     github_url: 'https://github.com/jadaistudios/metatron-cad',
     featured: false,
     display_order: 4,
@@ -93,6 +99,7 @@ export const SEED_PORTFOLIO: PortfolioProject[] = [
     description: 'A keyboard-first browser desktop environment with integrated AI co-thinker and local encrypted file vaults.',
     long_description: `Built for developers who reject neon notification loops. Void OS is a monochrome, typography-led operating layer operating directly in the browser with offline SQLite databases and local PGP encryption.`,
     stack: ['React', 'TypeScript', 'Web Workers', 'OPFS', 'Tailwind CSS'],
+    preview_url: '/previews/void-os/index.html',
     live_url: 'https://void.jadai.dev',
     github_url: 'https://github.com/jadaistudios/void-os',
     featured: false,
@@ -110,6 +117,7 @@ export const SEED_PORTFOLIO: PortfolioProject[] = [
     description: 'Peer-to-peer engineering ecosystem facilitating technical collaborations with automated escrow verification.',
     long_description: `JadaiHub brings together sovereign developers across the African continent and the global diaspora. No recruiters, no fluff: pure repository verification, code reviews, and structured payment milestones.`,
     stack: ['Next.js 14', 'Supabase RLS', 'Paystack', 'TypeScript', 'Tailwind CSS'],
+    preview_url: '/previews/jadai-hub-core/index.html',
     live_url: 'https://jadai.dev/hub',
     featured: false,
     display_order: 6,

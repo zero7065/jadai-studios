@@ -3,7 +3,8 @@ import { generateImage } from '../lib/providers';
 export async function generateMirageImages(
   prompt: string,
   style?: string,
-  aspectRatio: string = '1:1'
+  aspectRatio: string = '1:1',
+  count: number = 3
 ) {
   if (!prompt || prompt.trim().length < 3) {
     throw new Error('Prompt required (minimum 3 characters)');
@@ -28,9 +29,9 @@ export async function generateMirageImages(
   const prompt_used = styleModifier ? `${prompt.trim()}, ${styleModifier}` : prompt.trim();
   const images: string[] = [];
 
-  // Generate 3 images with distinct seeds
+  const total = Math.min(6, Math.max(1, count || 3));
   const baseSeed = Date.now();
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < total; i++) {
     const seed = baseSeed + i * 9973 + Math.floor(Math.random() * 1000);
     const url = await generateImage(prompt_used, {
       ...dimensions,

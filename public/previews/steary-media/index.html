@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STEARY // PLAYER — live preview</title>
+<style>
+  :root{
+    --void:#050404;--void2:#0a0908;--gold:#C9A84C;--grey:#8a8580;
+    --line:rgba(201,168,76,0.25);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--void);color:var(--grey);
+    font-family:ui-monospace,'Cascadia Code',Consolas,'Courier New',monospace;
+    font-size:12.5px;line-height:1.5;padding:22px 20px 26px;overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(600px 340px at 18% 12%, rgba(201,168,76,.16), transparent 65%),
+      radial-gradient(520px 400px at 88% 78%, rgba(120,90,160,.14), transparent 62%),
+      radial-gradient(700px 500px at 55% 110%, rgba(60,110,130,.12), transparent 60%);
+  }
+  a{color:rgba(201,168,76,.7);text-decoration:none}
+  a:hover{color:var(--gold)}
+  .back{position:fixed;top:12px;left:16px;font-size:11px;letter-spacing:.08em;z-index:40;padding:3px 6px;border:1px solid transparent}
+  .back:hover{border-color:var(--line);background:rgba(201,168,76,.06)}
+  .badge{position:fixed;top:10px;right:14px;text-align:right;z-index:40;pointer-events:none}
+  .badge .b1{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--gold);color:var(--gold);font-size:10px;letter-spacing:.18em;padding:4px 9px;background:rgba(5,4,4,.88)}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:pulse 1.6s infinite}
+  .badge .b2{display:block;font-size:9px;letter-spacing:.1em;color:#5f5b57;margin-top:5px}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  .wrap{max-width:880px;margin:0 auto;padding-top:34px;position:relative;z-index:1}
+  header.top{border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:16px}
+  h1{font-size:17px;letter-spacing:.14em;color:#e6e1d7;font-weight:600}
+  .sub{font-size:10.5px;letter-spacing:.14em;color:#6b6660;margin-top:6px}
+  .sub b{color:rgba(201,168,76,.8);font-weight:400}
+
+  .layout{display:grid;grid-template-columns:1.15fr .85fr;gap:14px}
+
+  .glass{
+    background:rgba(20,18,17,.55);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,.09);
+    box-shadow:0 10px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);
+  }
+
+  .player{padding:16px}
+  .art{
+    height:96px;border:1px solid rgba(255,255,255,.07);position:relative;overflow:hidden;
+    background:linear-gradient(135deg,rgba(201,168,76,.16),rgba(90,70,140,.14) 55%,rgba(40,90,110,.16));
+    display:flex;align-items:flex-end;padding:9px 11px;
+  }
+  .art .rings{position:absolute;inset:0;opacity:.5}
+  .art .rings i{position:absolute;border:1px solid rgba(201,168,76,.4);border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%)}
+  .art .cap{position:relative;font-size:9.5px;letter-spacing:.16em;color:rgba(230,225,215,.8)}
+  .art .fmt{
+    position:absolute;top:9px;right:11px;font-size:9px;letter-spacing:.14em;
+    border:1px solid rgba(201,168,76,.55);color:var(--gold);padding:2px 6px;background:rgba(5,4,4,.5)
+  }
+
+  .now{margin-top:13px}
+  .now .tt{color:#e6e1d7;font-size:14.5px;letter-spacing:.02em}
+  .now .ar{font-size:10.5px;letter-spacing:.14em;color:#6b6660;margin-top:4px}
+
+  .wave{display:flex;align-items:flex-end;gap:2px;height:56px;margin-top:14px}
+  .wave i{flex:1;background:linear-gradient(180deg,var(--gold),rgba(201,168,76,.28));height:14%;transition:height .16s linear;min-width:2px}
+  .wave.paused i{background:linear-gradient(180deg,#5c5854,rgba(92,88,84,.3))}
+
+  .bar{height:4px;background:rgba(255,255,255,.08);margin-top:14px;position:relative;cursor:pointer}
+  .bar i{display:block;height:100%;background:var(--gold);width:0%;transition:width .25s linear}
+  .times{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.1em;color:#6b6660;margin-top:6px}
+
+  .ctrls{display:flex;align-items:center;gap:10px;margin-top:13px}
+  .cb{
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#c9c4bc;
+    font:inherit;font-size:11px;letter-spacing:.1em;padding:7px 12px;cursor:pointer;transition:.15s
+  }
+  .cb:hover{border-color:var(--gold);color:var(--gold)}
+  .cb.main{background:var(--gold);border-color:var(--gold);color:#050404;font-weight:700;letter-spacing:.14em;padding:8px 18px}
+  .cb.main:hover{background:#dcbb60;color:#050404}
+  .vol{font-size:10px;letter-spacing:.1em;color:#6b6660;margin-left:auto}
+
+  .queue{padding:14px}
+  .qh{font-size:10px;letter-spacing:.16em;color:#6b6660;display:flex;justify-content:space-between;margin-bottom:11px}
+  .qh b{color:rgba(201,168,76,.8);font-weight:400}
+  .tr{
+    display:flex;gap:10px;align-items:center;padding:9px 9px;cursor:pointer;
+    border:1px solid transparent;transition:.15s;margin-bottom:5px;background:rgba(255,255,255,.02)
+  }
+  .tr:hover{border-color:rgba(201,168,76,.4);background:rgba(201,168,76,.07)}
+  .tr.on{border-color:var(--gold);background:rgba(201,168,76,.11)}
+  .tr .n{font-size:10px;color:#5f5b57;min-width:16px}
+  .tr.on .n{color:var(--gold)}
+  .tr .info{flex:1;min-width:0}
+  .tr .nm{color:#c9c4bc;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tr.on .nm{color:#e6e1d7}
+  .tr .ar{font-size:9.5px;letter-spacing:.1em;color:#5f5b57;margin-top:2px}
+  .tr .dur{font-size:10.5px;color:#6b6660}
+  .tr.on .dur{color:rgba(201,168,76,.85)}
+
+  .drm{
+    margin-top:11px;border:1px dashed var(--line);padding:9px 10px;
+    font-size:10px;letter-spacing:.06em;color:#6b6660;line-height:1.7
+  }
+  .drm b{color:rgba(201,168,76,.85);font-weight:400}
+
+  .caption{margin-top:14px;font-size:10px;letter-spacing:.12em;color:#5f5b57;border-left:2px solid rgba(201,168,76,.4);padding-left:9px}
+
+  footer{margin-top:24px;border-top:1px solid var(--line);padding-top:13px;font-size:10px;letter-spacing:.08em;color:#5f5b57}
+  @media (max-width:700px){
+    body{padding:56px 14px 24px}
+    .layout{grid-template-columns:1fr}
+    h1{font-size:14.5px}
+  }
+</style>
+</head>
+<body>
+<a class="back" href="/">◂ jadai.dev</a>
+<div class="badge">
+  <span class="b1"><i class="dot"></i>LIVE PREVIEW</span>
+  <span class="b2">SELF-HOSTED PREVIEW — INTERACTIVE DEMO</span>
+</div>
+
+<div class="wrap">
+  <header class="top">
+    <h1>STEARY // PLAYER</h1>
+    <div class="sub">STREAMING · AUDIO INTELLIGENCE · <b>LOSSLESS PIPELINE</b></div>
+  </header>
+
+  <div class="layout">
+    <section class="glass player">
+      <div class="art">
+        <div class="rings">
+          <i style="width:60px;height:60px"></i>
+          <i style="width:110px;height:110px"></i>
+          <i style="width:160px;height:160px"></i>
+          <i style="width:220px;height:220px"></i>
+        </div>
+        <span class="fmt">FLAC 24/96</span>
+        <span class="cap" id="artCap">NOW DECODING</span>
+      </div>
+
+      <div class="now">
+        <div class="tt" id="tTitle">—</div>
+        <div class="ar" id="tArtist">—</div>
+      </div>
+
+      <div class="wave" id="wave"></div>
+
+      <div class="bar" id="seek"><i id="seekFill"></i></div>
+      <div class="times"><span id="tCur">0:00</span><span id="tDur">0:00</span></div>
+
+      <div class="ctrls">
+        <button class="cb" id="prev" type="button">|◀</button>
+        <button class="cb main" id="play" type="button">▶ PLAY</button>
+        <button class="cb" id="next" type="button">▶|</button>
+        <span class="vol">GAIN 82%</span>
+      </div>
+
+      <div class="caption">visual demo — audio not loaded in preview</div>
+    </section>
+
+    <aside class="glass queue">
+      <div class="qh"><span>QUEUE · AFRO-ELECTRONIC</span><b id="qCount">5 TRK</b></div>
+      <div id="list"></div>
+      <div class="drm">
+        <b>SOVEREIGN DRM</b> — key exchange bound to device attestation.<br>
+        Offline cache enabled · gapless decode · per-track loudness match.
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    Preview environment hosted by JADAI Studios. Demo data only — not connected to production.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var TRACKS = [
+    {n:"Lagos Neon Interlude", a:"Kwesi Volt",            d:247},
+    {n:"Sahel Drift Protocol",  a:"Amina Null",            d:312},
+    {n:"Kente Signal",          a:"Studio Baobab",         d:198},
+    {n:"Harmattan Bassline",    a:"Troupe Meridian",       d:284},
+    {n:"Zanzibar Tape Delay",   a:"Nia Okon",              d:365}
+  ];
+
+  var BARS = 48, cur = 0, playing = false, pos = 0, raf = null, last = 0;
+  var waveEl = document.getElementById("wave");
+  var bars = [];
+  var phases = [];
+  for(var i=0;i<BARS;i++){
+    var b = document.createElement("i");
+    waveEl.appendChild(b);
+    bars.push(b);
+    phases.push(Math.random()*Math.PI*2);
+  }
+
+  var listEl = document.getElementById("list");
+  function mmss(s){
+    s = Math.max(0, Math.floor(s));
+    var m = Math.floor(s/60);
+    return m + ":" + ("0" + (s%60)).slice(-2);
+  }
+
+  function buildList(){
+    listEl.innerHTML = "";
+    for(var i=0;i<TRACKS.length;i++){
+      (function(i){
+        var t = TRACKS[i];
+        var row = document.createElement("div");
+        row.className = "tr" + (i===cur ? " on" : "");
+        row.setAttribute("role","button");
+        row.tabIndex = 0;
+        row.innerHTML =
+          '<span class="n">' + (i+1) + '</span>' +
+          '<span class="info"><span class="nm">' + t.n + '</span>' +
+          '<span class="ar">' + t.a.toUpperCase() + '</span></span>' +
+          '<span class="dur">' + mmss(t.d) + '</span>';
+        row.addEventListener("click", function(){ select(i, true); });
+        row.addEventListener("keydown", function(e){
+          if(e.key === "Enter" || e.key === " "){ e.preventDefault(); select(i, true); }
+        });
+        listEl.appendChild(row);
+      })(i);
+    }
+  }
+
+  function select(i, autoplay){
+    cur = i;
+    pos = 0;
+    var t = TRACKS[i];
+    document.getElementById("tTitle").textContent = t.n;
+    document.getElementById("tArtist").textContent = t.a.toUpperCase() + " · " + (2024 + (i%3)) + " · LOSSLESS MASTER";
+    document.getElementById("tDur").textContent = mmss(t.d);
+    document.getElementById("tCur").textContent = "0:00";
+    document.getElementById("seekFill").style.width = "0%";
+    var rows = listEl.querySelectorAll(".tr");
+    for(var k=0;k<rows.length;k++){ rows[k].classList.toggle("on", k===i); }
+    if(autoplay && !playing) toggle();
+    else if(!autoplay && playing) { /* keep playing */ }
+    renderWave(0);
+  }
+
+  var playBtn = document.getElementById("play");
+  function toggle(){
+    playing = !playing;
+    playBtn.textContent = playing ? "|| PAUSE" : "▶ PLAY";
+    waveEl.classList.toggle("paused", !playing);
+    document.getElementById("artCap").textContent = playing ? "NOW DECODING" : "PIPELINE IDLE";
+    if(playing){ last = performance.now(); loop(last); }
+    else if(raf){ cancelAnimationFrame(raf); raf = null; }
+  }
+  playBtn.addEventListener("click", toggle);
+
+  document.getElementById("next").addEventListener("click", function(){ select((cur+1)%TRACKS.length, false); });
+  document.getElementById("prev").addEventListener("click", function(){ select((cur-1+TRACKS.length)%TRACKS.length, false); });
+
+  document.getElementById("seek").addEventListener("click", function(e){
+    var r = this.getBoundingClientRect();
+    var p = (e.clientX - r.left) / r.width;
+    pos = Math.max(0, Math.min(1, p)) * TRACKS[cur].d;
+    document.getElementById("seekFill").style.width = (p*100) + "%";
+    document.getElementById("tCur").textContent = mmss(pos);
+  });
+
+  function renderWave(t){
+    for(var i=0;i<BARS;i++){
+      var env = 0.35 + 0.65*Math.abs(Math.sin(phases[i] + t*2.1));
+      var h;
+      if(playing){
+        h = 10 + env * (30 + 60*Math.abs(Math.sin(t*3.4 + i*0.42)));
+      } else {
+        h = 8 + env * 14;
+      }
+      bars[i].style.height = Math.min(100, h) + "%";
+    }
+  }
+
+  function loop(now){
+    var dt = (now - last)/1000;
+    last = now;
+    pos += dt;
+    var t = TRACKS[cur];
+    if(pos >= t.d){ select((cur+1)%TRACKS.length, false); pos = 0; }
+    document.getElementById("seekFill").style.width = (pos/t.d*100) + "%";
+    document.getElementById("tCur").textContent = mmss(pos);
+    renderWave(now/1000);
+    raf = requestAnimationFrame(loop);
+  }
+
+  buildList();
+  select(0, false);
+  renderWave(0);
+})();
+</script>
+</body>
+</html>
