@@ -99,7 +99,7 @@ export const ThumbnailGenerator: React.FC = () => {
       } catch {}
     } catch (err: any) {
       console.error('Thumbnail generation failed:', err);
-      setError("PRIME's image engine is busy. Try again in 30 seconds.");
+      setError('All image providers failed (OpenAI credits exhausted or server unreachable) — nothing was generated.');
     } finally {
       setIsGenerating(false);
     }

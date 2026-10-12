@@ -1,48 +1,44 @@
+'use client';
+
 import React, { useState } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import { useToast } from '@/components/providers/ToastProvider';
 import { StudioAudio } from '@/lib/watermark';
-import { Bell, Send, CheckCircle, Smartphone, Clock, Users } from 'lucide-react';
+import { Send, Smartphone } from 'lucide-react';
 
 interface SentNotification {
   id: string;
   title: string;
   body: string;
-  targetTier: string;
+  actionUrl: string;
   sentAt: string;
   deliveredCount: number;
+  note: string;
 }
 
-const SEED_NOTIFICATIONS: SentNotification[] = [
-  {
-    id: 'notif-01',
-    title: 'Book of Lies // Nightly Transmission 9:47 PM',
-    body: 'Episode #001 "The Foundation Invariant" has unlocked on your local feed.',
-    targetTier: 'All Architects',
-    sentAt: '2026-09-28 21:47',
-    deliveredCount: 1420,
-  },
-  {
-    id: 'notif-02',
-    title: 'Aperture Starter Kit Released',
-    body: 'Photography portfolio with live EXIF inspection now in the Template Market.',
-    targetTier: 'Foundation & Above',
-    sentAt: '2026-09-27 14:00',
-    deliveredCount: 480,
-  },
-];
+const HISTORY_KEY = 'jadai_admin_broadcast_history';
+
+function loadHistory(): SentNotification[] {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(HISTORY_KEY) : null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed as SentNotification[];
+    }
+  } catch {}
+  return [];
+}
 
 export default function AdminNotificationsPage() {
-  const [notifications, setNotifications] = useState<SentNotification[]>(SEED_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<SentNotification[]>(loadHistory);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [targetTier, setTargetTier] = useState('All Architects');
   const [actionUrl, setActionUrl] = useState('https://jadai.dev/book-of-lies');
   const [sending, setSending] = useState(false);
   const { showToast } = useToast();
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !body) {
       showToast('Title and notification body are required', 'error');
@@ -52,23 +48,66 @@ export default function AdminNotificationsPage() {
     setSending(true);
     StudioAudio.playClick();
 
-    setTimeout(() => {
+    try {
+      if (typeof Notification === 'undefined') {
+        throw new Error('this browser does not support the Notification API');
+      }
+
+      let permission = Notification.permission;
+      if (permission === 'default') {
+        permission = await Notification.requestPermission();
+      }
+      if (permission !== 'granted') {
+        showToast('Notification permission not granted — nothing was dispatched.', 'error', 'Dispatch Blocked');
+        return;
+      }
+
+      // Prefer the service worker (tray notifications + click-through to Target URL).
+      let delivered = false;
+      try {
+        const reg = await navigator.serviceWorker?.ready;
+        if (reg && 'showNotification' in reg) {
+          await reg.showNotification(title, {
+            body,
+            tag: `jadai-broadcast-${Date.now()}`,
+            data: { url: actionUrl },
+          });
+          delivered = true;
+        }
+      } catch {
+        // fall through to plain Notification
+      }
+      if (!delivered) {
+        new Notification(title, { body });
+        delivered = true;
+      }
+
       const newNotif: SentNotification = {
         id: `notif-${Date.now()}`,
         title,
         body,
-        targetTier,
+        actionUrl,
         sentAt: new Date().toLocaleString(),
-        deliveredCount: targetTier === 'All Architects' ? 1420 : 380,
+        deliveredCount: delivered ? 1 : 0,
+        note: 'This device only — multi-device Web Push (VAPID) backend not connected',
       };
 
-      setNotifications([newNotif, ...notifications]);
-      setSending(false);
+      setNotifications((prev) => {
+        const next = [newNotif, ...prev].slice(0, 50);
+        try {
+          localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
       setTitle('');
       setBody('');
       StudioAudio.playSuccessArpeggio();
-      showToast(`Broadcast sent to ${newNotif.deliveredCount} devices.`, 'success', 'Web Push Dispatched');
-    }, 700);
+      showToast('Browser notification shown on this device.', 'success', 'Dispatched Locally');
+    } catch (err: any) {
+      showToast(`Dispatch failed: ${String(err?.message || err)}`, 'error', 'Not Dispatched');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -79,7 +118,7 @@ export default function AdminNotificationsPage() {
           <span className="text-xs font-mono uppercase tracking-widest text-[#C9A84C]">Signal Broadcast</span>
           <h1 className="text-2xl sm:text-3xl font-display font-bold text-[#f5f3f0] mt-1">Push Notification Dispatcher</h1>
           <p className="text-xs font-mono text-[#8a6e2a]">
-            Broadcast Web Push notifications to installed PWAs, 9:47 PM transmission subscribers, and specific tiers.
+            Dispatches a real browser notification on this device via the Notification API. Multi-device Web Push requires a VAPID backend, which is not connected yet.
           </p>
         </div>
       </div>
@@ -94,15 +133,9 @@ export default function AdminNotificationsPage() {
           <form onSubmit={handleSend} className="space-y-4 font-mono text-xs">
             <div>
               <label className="block text-[#8a6e2a] uppercase text-[10px] mb-1">Target Audience</label>
-              <select
-                value={targetTier}
-                onChange={(e) => setTargetTier(e.target.value)}
-                className="w-full px-3 py-2 rounded bg-[#050404] border border-[rgba(201,168,76,0.25)] text-[#f5f3f0]"
-              >
-                <option value="All Architects">All Installed PWAs & Subscribers (1,420)</option>
-                <option value="Foundation & Above">Foundation & Voice Tiers (480)</option>
-                <option value="Prime Sovereign">Prime Sovereign VIPs (42)</option>
-              </select>
+              <div className="px-3 py-2 rounded bg-[#050404] border border-[rgba(201,168,76,0.25)] text-[#f5f3f0]">
+                This device (browser Notification API)
+              </div>
             </div>
 
             <div>
@@ -142,7 +175,7 @@ export default function AdminNotificationsPage() {
 
             <Button variant="primary" size="md" className="w-full" disabled={sending} type="submit">
               <Send className="w-3.5 h-3.5 mr-2" />
-              {sending ? 'Broadcasting Signal...' : 'Dispatch Web Push'}
+              {sending ? 'Dispatching...' : 'Dispatch Notification (This Device)'}
             </Button>
           </form>
         </GlassCard>
@@ -155,7 +188,7 @@ export default function AdminNotificationsPage() {
               <h3 className="font-display font-bold text-sm text-[#f5f3f0]">Device Lockscreen Preview</h3>
             </div>
 
-            {/* Simulated Notification Card */}
+            {/* Preview Notification Card */}
             <div className="p-4 rounded-xl bg-[#050404] border border-[rgba(201,168,76,0.35)] shadow-lg space-y-2">
               <div className="flex items-center justify-between text-[10px] font-mono text-[#8a6e2a]">
                 <div className="flex items-center gap-1.5">
@@ -174,15 +207,18 @@ export default function AdminNotificationsPage() {
           </div>
 
           <div className="text-[11px] font-mono text-[#8a6e2a] text-center pt-4 border-t border-[rgba(201,168,76,0.15)]">
-            Service Worker (sw.js) registers push subscriptions automatically on PWA install.
+            Preview only — the real dispatch fires through the browser Notification API / service worker.
           </div>
         </GlassCard>
       </div>
 
       {/* History */}
       <GlassCard className="p-6 space-y-4">
-        <h3 className="font-display font-bold text-sm text-[#f5f3f0]">Transmission Broadcast Log</h3>
+        <h3 className="font-display font-bold text-sm text-[#f5f3f0]">Broadcast History (This Device)</h3>
         <div className="space-y-2 font-mono text-xs">
+          {notifications.length === 0 && (
+            <p className="text-[#8a6e2a]">No broadcasts dispatched yet from this browser.</p>
+          )}
           {notifications.map((n) => (
             <div
               key={n.id}
@@ -193,8 +229,7 @@ export default function AdminNotificationsPage() {
                 <span className="text-[11px] text-[#8a6e2a]">{n.body}</span>
               </div>
               <div className="flex items-center gap-4 text-[10px] text-[#8a6e2a] shrink-0">
-                <span>{n.targetTier}</span>
-                <span className="text-emerald-400">{n.deliveredCount} delivered</span>
+                <span className="text-emerald-400">{n.deliveredCount} delivered (this device)</span>
                 <span>{n.sentAt}</span>
               </div>
             </div>

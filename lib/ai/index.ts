@@ -166,8 +166,13 @@ export async function generateText(
 
         if (data && data.length > 0) {
           const item = data[Math.floor(Math.random() * data.length)];
-          resultText = item.content || item.title || '';
-          providerUsed = 'cache';
+          const bankText = item.content || item.title || '';
+          if (bankText) {
+            // Labelled as archive material — never presented as a live answer.
+            resultText = `[OFFLINE ARCHIVE — related reading, not an answer to this prompt]\n\n${bankText}`;
+            providerUsed = 'cache';
+            fallbackTriggered = true;
+          }
         }
       } catch {
         // Non-blocking

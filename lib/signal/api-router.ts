@@ -3,7 +3,7 @@ import { signalStore } from './store';
 import { runScoutForUser } from './agents/scout';
 import { runCloserAgent } from './agents/closer';
 import { runWriterAgent } from './agents/writer';
-import { initializePaystackTransaction } from '../paystack';
+import { initializePaystackTransaction, getPaystackSecretKey } from '../paystack';
 import { SIGNAL_PLANS, SignalPlanTier } from './types';
 
 export const signalRouter = Router();
@@ -180,11 +180,12 @@ signalRouter.post('/subscribe', async (req, res) => {
   const amountKobo = (currency === 'USD' ? plan.priceUsd * 100 : plan.priceNgn * 100);
 
   try {
+    const appHost = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://jadai.dev';
     const transaction = await initializePaystackTransaction({
       email: email || 'architect@jadai.dev',
       amountKobo,
       currency: currency || 'NGN',
-      callbackUrl: `${process.env.APP_URL || 'https://jadai.dev'}/signal/pricing?status=success&tier=${tierKey}`,
+      callbackUrl: `${appHost}/api/signal/paystack-callback?tier=${tierKey}`,
       metadata: {
         product: 'jadai_signal',
         signal_tier: tierKey,
@@ -192,16 +193,60 @@ signalRouter.post('/subscribe', async (req, res) => {
       },
     });
 
-    // Update locally
-    signalStore.setPlan(tierKey);
-
+    // The plan is NOT applied here — it activates only after Paystack
+    // confirms payment via GET /api/signal/paystack-callback.
     res.json({
       ...transaction,
       plan: tierKey,
-      message: `Paystack checkout initialized for Jadai Signal ${plan.name}`,
+      message: `Paystack checkout initialized for Jadai Signal ${plan.name} — plan activates after payment confirmation`,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 5B. PAYSTACK CALLBACK — verifies the transaction, then activates the tier
+// ---------------------------------------------------------------------------
+signalRouter.get('/paystack-callback', async (req, res) => {
+  const reference = String(req.query.reference || req.query.trxref || '');
+  const back = '/signal/pricing';
+  if (!reference) return res.redirect(`${back}?status=missing_reference`);
+
+  try {
+    const secret = await getPaystackSecretKey();
+    if (!secret || secret.startsWith('sk_test_placeholder') || secret.includes('your_')) {
+      return res.redirect(`${back}?status=unconfigured`);
+    }
+
+    const resp = await fetch(
+      `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+      { headers: { Authorization: `Bearer ${secret}` } }
+    );
+    const json = await resp.json().catch(() => null);
+    if (!json?.status || json.data?.status !== 'success') {
+      return res.redirect(`${back}?status=failed`);
+    }
+
+    const meta = json.data?.metadata || {};
+    if (!meta.is_signal_subscription) return res.redirect(`${back}?status=failed`);
+
+    const tier = String(meta.signal_tier || '').toLowerCase() as SignalPlanTier;
+    const plan = SIGNAL_PLANS[tier];
+    if (!plan || tier === 'free') return res.redirect(`${back}?status=failed`);
+
+    const paidCurrency = String(json.data.currency || 'NGN').toUpperCase();
+    const expected =
+      paidCurrency === 'USD' ? Math.round(plan.priceUsd * 100) : Math.round(plan.priceNgn * 100);
+    const paid = Number(json.data.amount);
+    if (!Number.isFinite(paid) || paid < expected) {
+      return res.redirect(`${back}?status=amount_mismatch`);
+    }
+
+    signalStore.setPlan(tier);
+    return res.redirect(`${back}?status=success&tier=${tier}`);
+  } catch {
+    return res.redirect(`${back}?status=error`);
   }
 });
 

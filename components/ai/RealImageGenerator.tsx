@@ -75,6 +75,13 @@ export const RealImageGenerator: React.FC<RealImageGeneratorProps> = ({
       seeds: [1, 42, 99],
     });
 
+    if (urls.length === 0) {
+      setIsGenerating(false);
+      setGlobalError('All image providers failed (OpenAI credits exhausted) — no images were created.');
+      showToast('Generation failed — no provider returned an image.', 'error');
+      return;
+    }
+
     const newCards: GeneratedCard[] = urls.map((url, idx) => ({
       id: `img-${Date.now()}-${idx}`,
       seed: [1, 42, 99][idx] ?? idx,

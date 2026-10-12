@@ -120,13 +120,25 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
     },
   ];
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     StudioAudio.playClick();
+    const { isSupabaseConfigured } = await import('../../lib/supabase/client');
+    if (!isSupabaseConfigured()) {
+      setCheckoutError(
+        'Google verification requires Supabase OAuth — not configured for this deployment yet.'
+      );
+      return;
+    }
+    const { supabase } = await import('../../lib/supabase/client');
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined },
+    });
+    if (error) {
+      setCheckoutError(error.message);
+      return;
+    }
     setGoogleAuthenticated(true);
-    const anchor = email || 'guest@jadai.dev';
-    setEmail(anchor);
-    localStorage.setItem('jadai-user-email', anchor);
-    localStorage.setItem('jadai-email-verified', 'true');
   };
 
   const handleCompleteSubscription = async () => {

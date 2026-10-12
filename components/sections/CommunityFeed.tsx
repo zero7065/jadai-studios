@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import EdgeGlow from '../ui/EdgeGlow';
 import Button from '../ui/Button';
 import { INITIAL_POSTS, CommunityPost, ProfileCategory } from '../../lib/data/communityData';
@@ -12,13 +12,43 @@ import { Heart, MessageSquare, Share2, Plus, Sparkles, ArrowRight, UserPlus, Use
 export const CommunityFeed: React.FC<{
   onNavigate?: (path: string) => void;
 }> = ({ onNavigate }) => {
-  const [posts, setPosts] = useState<CommunityPost[]>(INITIAL_POSTS);
-  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
+  const POSTS_KEY = 'jadai_community_posts';
+  const LIKES_KEY = 'jadai_community_likes';
+
+  const [posts, setPosts] = useState<CommunityPost[]>(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(POSTS_KEY) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed as CommunityPost[];
+      }
+    } catch {}
+    return INITIAL_POSTS;
+  });
+  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(LIKES_KEY) : null;
+      if (raw) return JSON.parse(raw) as Record<string, boolean>;
+    } catch {}
+    return {};
+  });
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [newPostOpen, setNewPostOpen] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostCategory, setNewPostCategory] = useState<ProfileCategory>('Developer');
   const customization = getCustomization();
+
+  // Persist feed + likes on this device so posts and likes survive reloads.
+  useEffect(() => {
+    try {
+      if (posts.length > 0) localStorage.setItem(POSTS_KEY, JSON.stringify(posts.slice(0, 200)));
+    } catch {}
+  }, [posts]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(LIKES_KEY, JSON.stringify(likedPosts));
+    } catch {}
+  }, [likedPosts]);
   const { showToast } = useToast();
 
   const categories = ['All', 'Developer', 'Creator', 'Business Owner', 'Artist', 'Writer', 'Designer'];
@@ -61,7 +91,7 @@ export const CommunityFeed: React.FC<{
     setPosts([created, ...posts]);
     setNewPostContent('');
     setNewPostOpen(false);
-    showToast('Post dispatched to sovereign network', 'success');
+    showToast('Post published to your local feed (saved on this device)', 'success');
   };
 
   const handleUserClick = (username: string, e: React.MouseEvent) => {

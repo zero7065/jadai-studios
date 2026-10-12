@@ -28,9 +28,9 @@ const INITIAL_TRACKERS: SignalTracker[] = [
 const INITIAL_SETTINGS: SignalSettings = {
   id: 'set-default',
   userId: 'usr-default',
-  plan: 'pro',
-  signalsUsedToday: 6,
-  signalsUsedThisMonth: 142,
+  plan: 'free',
+  signalsUsedToday: 0,
+  signalsUsedThisMonth: 0,
   dailyLimit: 100,
   monthlyLimit: 3000,
   platformsWatched: ['hackernews', 'github', 'reddit', 'x', 'threads'],
@@ -39,8 +39,8 @@ const INITIAL_SETTINGS: SignalSettings = {
   autoDraftOutreach: true,
   autoDraftContent: true,
   notificationEmail: true,
-  githubConnected: true,
-  vercelConnected: true,
+  githubConnected: false,
+  vercelConnected: false,
   xConnected: false,
 };
 
@@ -156,22 +156,9 @@ class SignalStore {
   }
 
   async runImmediateScout() {
-    const newMock: Signal = {
-      id: `sig-${Date.now()}`,
-      userId: 'usr-default',
-      platform: 'hackernews',
-      sourceUrl: `https://news.ycombinator.com/item?id=${Date.now()}`,
-      author: 'founding_engineer',
-      content: 'Struggling to find an automated tool for database reliability audits before merging pull requests. Any recommendations?',
-      intentScore: 89,
-      reason: 'Author articulating concrete workflow bottleneck seeking automated reliability audits.',
-      suggestedAngle: 'Introduce Sentinel automated Core Web Vitals and database migration scanners.',
-      status: 'new',
-      detectedAt: 'Just now',
-    };
-    this.signals = [newMock, ...this.signals];
-    this.persist();
-    return { savedCount: 1, signals: this.signals };
+    // No fabricated signals — a real scan runs server-side via
+    // POST /api/signal/worker/scout. This local fallback adds nothing.
+    return { savedCount: 0, signals: this.signals, note: 'local-fallback-no-op' };
   }
 
   updateSignalStatus(id: string, status: Signal['status']) {

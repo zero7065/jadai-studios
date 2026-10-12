@@ -211,12 +211,22 @@ export const CreativeWorkspace: React.FC<CreativeWorkspaceProps> = ({
       Math.floor(Math.random() * 899999) + 100000,
     ];
 
-    // Server-first: OpenAI provider chain (falls back to Pollinations automatically)
+    // Server-first: OpenAI provider chain
     const { urls } = await requestImages(assembled, {
       width: sizeConfig.w,
       height: sizeConfig.h,
       seeds,
     });
+
+    if (urls.length === 0) {
+      setIsGenerating(false);
+      showToast(
+        'All image providers failed (OpenAI credits exhausted) — no images were created.',
+        'error',
+        'Generation Failed'
+      );
+      return;
+    }
 
     const newVariants: GeneratedAsset[] = seeds.map((seed, idx) => ({
       id: `asset-${baseTimestamp}-${idx}`,
@@ -224,7 +234,7 @@ export const CreativeWorkspace: React.FC<CreativeWorkspaceProps> = ({
       prompt: subject || customPrompt,
       assembledPrompt: assembled,
       seed,
-      url: urls[idx] || `https://image.pollinations.ai/prompt/${encodeURIComponent(assembled)}?width=${sizeConfig.w}&height=${sizeConfig.h}&seed=${seed}&nologo=true`,
+      url: urls[idx],
       width: sizeConfig.w,
       height: sizeConfig.h,
       createdAt: new Date().toISOString(),
@@ -258,28 +268,41 @@ export const CreativeWorkspace: React.FC<CreativeWorkspaceProps> = ({
     const newSeed = Math.floor(Math.random() * 899999) + 100000;
     const modifiedPrompt = `${editModalAsset.assembledPrompt}, seamlessly blended edit: ${editInstruction}, action: ${editActionType}, maintaining global scene lighting, perspective and style`;
 
-    const { urls } = await requestImages(modifiedPrompt, {
-      width: editModalAsset.width,
-      height: editModalAsset.height,
-      seeds: [newSeed],
-    });
+    try {
+      const { urls } = await requestImages(modifiedPrompt, {
+        width: editModalAsset.width,
+        height: editModalAsset.height,
+        seeds: [newSeed],
+      });
 
-    const editedAsset: GeneratedAsset = {
-      ...editModalAsset,
-      id: `asset-edit-${Date.now()}`,
-      assembledPrompt: modifiedPrompt,
-      seed: newSeed,
-      url: urls[0] || `https://image.pollinations.ai/prompt/${encodeURIComponent(modifiedPrompt)}?width=${editModalAsset.width}&height=${editModalAsset.height}&seed=${newSeed}&nologo=true`,
-      createdAt: new Date().toISOString(),
-    };
+      if (!urls[0]) {
+        setIsEditing(false);
+        showToast(
+          'Edit failed — all image providers are down or out of credits. The original asset is unchanged.',
+          'error',
+          'Edit Failed'
+        );
+        return;
+      }
 
-    setTimeout(() => {
+      const editedAsset: GeneratedAsset = {
+        ...editModalAsset,
+        id: `asset-edit-${Date.now()}`,
+        assembledPrompt: modifiedPrompt,
+        seed: newSeed,
+        url: urls[0],
+        createdAt: new Date().toISOString(),
+      };
+
       setIsEditing(false);
       saveToLibrary([editedAsset]);
       setEditModalAsset(editedAsset);
       StudioAudio.playSuccessArpeggio();
       showToast('Region edit blended in context!', 'success');
-    }, 2000);
+    } catch {
+      setIsEditing(false);
+      showToast('Edit failed — the image service did not respond.', 'error', 'Edit Failed');
+    }
   };
 
   // Handle 4K Export
@@ -348,12 +371,27 @@ export const CreativeWorkspace: React.FC<CreativeWorkspaceProps> = ({
 
     const refSeeds = refThemes.map((_, idx) => 3000 + idx * 77);
     const refUrls: string[] = [];
-    for (let idx = 0; idx < refThemes.length; idx++) {
-      const { urls } = await requestImages(
-        `${refThemes[idx]}, Book of Lies mood, stoic portraiture, aged archival texture, 35mm film`,
-        { width: 800, height: 1000, seeds: [refSeeds[idx]] }
-      );
-      refUrls.push(urls[0] || '');
+    try {
+      for (let idx = 0; idx < refThemes.length; idx++) {
+        const { urls } = await requestImages(
+          `${refThemes[idx]}, Book of Lies mood, stoic portraiture, aged archival texture, 35mm film`,
+          { width: 800, height: 1000, seeds: [refSeeds[idx]] }
+        );
+        if (!urls[0]) {
+          setLoadingReferences(false);
+          showToast(
+            'Reference generation stopped — all image providers failed. No batch was created.',
+            'error',
+            'Generation Failed'
+          );
+          return;
+        }
+        refUrls.push(urls[0]);
+      }
+    } catch {
+      setLoadingReferences(false);
+      showToast('Reference generation failed — the image service did not respond.', 'error');
+      return;
     }
 
     const newRefs: GeneratedAsset[] = refThemes.map((desc, idx) => {
@@ -364,7 +402,7 @@ export const CreativeWorkspace: React.FC<CreativeWorkspaceProps> = ({
         prompt: desc,
         assembledPrompt: desc,
         seed,
-        url: refUrls[idx] || `https://image.pollinations.ai/prompt/${encodeURIComponent(`${desc}, Book of Lies mood, stoic portraiture, aged archival texture, 35mm film`)}?width=800&height=1000&seed=${seed}&nologo=true`,
+        url: refUrls[idx],
         width: 800,
         height: 1000,
         createdAt: new Date().toISOString(),
@@ -381,11 +419,9 @@ export const CreativeWorkspace: React.FC<CreativeWorkspaceProps> = ({
     setReferenceBatch(newRefs);
     saveToLibrary(newRefs);
 
-    setTimeout(() => {
-      setLoadingReferences(false);
-      StudioAudio.playSuccessArpeggio();
-      showToast(`Generated reference batch for ${referenceProject}!`, 'success');
-    }, 1500);
+    setLoadingReferences(false);
+    StudioAudio.playSuccessArpeggio();
+    showToast(`Generated reference batch for ${referenceProject}!`, 'success');
   };
 
   return (

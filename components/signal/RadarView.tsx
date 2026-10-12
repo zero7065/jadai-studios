@@ -321,7 +321,7 @@ export const RadarView: React.FC<RadarViewProps> = ({ onNavigate }) => {
 
   const highIntentCount = signals.filter((s) => s.intentScore >= 80).length;
   const contactedCount = signals.filter((s) => ['contacted', 'replied', 'converted'].includes(s.status)).length;
-  const quotaUsed = settings?.signalsUsedToday || 6;
+  const quotaUsed = settings?.signalsUsedToday || 0;
   const quotaLimit = settings?.dailyLimit || 100;
 
   return (

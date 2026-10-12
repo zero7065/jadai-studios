@@ -318,7 +318,11 @@ export const Header: React.FC<HeaderProps> = ({
                     <p className="font-bold text-[#f5f3f0] truncate">{userSession.name || 'Member'}</p>
                     <p className="text-[10px] text-[#8a857e] truncate">{userSession.email}</p>
                     <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-[#C9A84C]/15 border border-[#C9A84C]/30 text-[9px] text-[#e8c96a]">
-                      {userSession.provider === 'google' ? 'Google Authenticated' : 'Verified Member'}
+                      {userSession.provider === 'google'
+                        ? 'Google Authenticated'
+                        : userSession.isGuest
+                          ? 'Guest Session'
+                          : 'Verified Member'}
                     </span>
                   </div>
                   <button

@@ -9,7 +9,6 @@ import { StudioAudio } from '../../lib/watermark';
 import {
   Download,
   Terminal,
-  Server,
   Layers,
   CheckCircle,
   Smartphone,
@@ -27,7 +26,7 @@ export const SignalInstallModal: React.FC<SignalInstallModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const [tab, setTab] = useState<'pwa' | 'docker' | 'cli' | 'webhook'>('pwa');
+  const [tab, setTab] = useState<'pwa' | 'api' | 'webhook'>('pwa');
   const { showToast } = useToast();
 
   const handlePwaInstall = () => {
@@ -45,26 +44,29 @@ export const SignalInstallModal: React.FC<SignalInstallModalProps> = ({
     }
   };
 
-  const dockerSnippet = `# 1. Pull the official Signal sovereign container
-docker pull ghcr.io/jadaistudios/signal-radar:latest
+  const apiSnippet = `# Real Signal API — the same endpoints this app calls
+API=https://api.jadai.dev
 
-# 2. Run independently with your own PostgreSQL or sqlite
-docker run -d \\
-  --name jadai-signal-standalone \\
-  -p 4200:4200 \\
-  -e PORT=4200 \\
-  -e JADAI_SOVEREIGN_MODE=standalone \\
-  -e RADAR_CADENCE="21:47 WAT" \\
-  ghcr.io/jadaistudios/signal-radar:latest
+# Run a scout scan across HN / GitHub / Reddit
+curl -X POST $API/api/signal/worker/scout
 
-# 3. Access standalone workspace at:
-# http://localhost:4200`;
+# Draft outreach against a captured signal
+curl -X POST $API/api/signal/worker/closer \\
+  -H "Content-Type: application/json" \\
+  -d '{"signalId":"sig-123"}'
 
-  const cliSnippet = `# Run Signal CLI directly via NPX without dependencies
-npx @jadai/signal-radar audit @your_handle --geo --velocity
+# Generate X / LinkedIn / Reddit posts
+curl -X POST $API/api/signal/worker/writer \\
+  -H "Content-Type: application/json" \\
+  -d '{"type":"launch","summary":"Shipped feature X","details":"Why it matters"}'
 
-# Or daemonize continuous social telemetry monitoring
-npx @jadai/signal-radar daemon --interval=6h --webhook=https://api.yourdomain.com/social-feed`;
+# Read funnel analytics
+curl $API/api/signal/analytics
+
+# Start a Paystack checkout for a Signal plan
+curl -X POST $API/api/signal/subscribe \\
+  -H "Content-Type: application/json" \\
+  -d '{"planTier":"pro","currency":"NGN","email":"you@example.com"}'`;
 
   const webhookSnippet = `// Sample Node.js / Express Webhook Receiver for Signal Live Intelligence
 app.post('/api/signal-telemetry', (req, res) => {
@@ -100,27 +102,15 @@ app.post('/api/signal-telemetry', (req, res) => {
           </button>
 
           <button
-            onClick={() => setTab('docker')}
+            onClick={() => setTab('api')}
             className={`flex-1 min-w-[120px] py-2 px-3 rounded-lg text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-              tab === 'docker'
-                ? 'bg-[#C9A84C] text-[#050404] shadow-md'
-                : 'text-[#8a6e2a] hover:text-[#f5f3f0]'
-            }`}
-          >
-            <Server className="w-3.5 h-3.5" />
-            <span>Docker Engine</span>
-          </button>
-
-          <button
-            onClick={() => setTab('cli')}
-            className={`flex-1 min-w-[120px] py-2 px-3 rounded-lg text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-              tab === 'cli'
+              tab === 'api'
                 ? 'bg-[#C9A84C] text-[#050404] shadow-md'
                 : 'text-[#8a6e2a] hover:text-[#f5f3f0]'
             }`}
           >
             <Terminal className="w-3.5 h-3.5" />
-            <span>NPX / CLI</span>
+            <span>REST API</span>
           </button>
 
           <button
@@ -167,30 +157,16 @@ app.post('/api/signal-telemetry', (req, res) => {
           </div>
         )}
 
-        {/* Tab 2: Docker */}
-        {tab === 'docker' && (
+        {/* Tab 2: REST API */}
+        {tab === 'api' && (
           <div className="space-y-3 text-left">
             <p className="text-xs font-mono text-[#c4c0bb]">
-              Run an isolated Signal instance on your VPS, Raspberry Pi, or local Kubernetes cluster:
+              Signal runs as a hosted service — call the live REST endpoints from your scripts, CI jobs, or other apps:
             </p>
             <CodeBlock
-              code={dockerSnippet}
+              code={apiSnippet}
               language="bash"
-              title="DOCKER_DEPLOY.SH"
-            />
-          </div>
-        )}
-
-        {/* Tab 3: CLI */}
-        {tab === 'cli' && (
-          <div className="space-y-3 text-left">
-            <p className="text-xs font-mono text-[#c4c0bb]">
-              Use the developer CLI to run automated batch audits from your terminal or CI/CD pipelines:
-            </p>
-            <CodeBlock
-              code={cliSnippet}
-              language="bash"
-              title="SIGNAL_CLI_RUNNER.SH"
+              title="SIGNAL_REST_API.SH"
             />
           </div>
         )}

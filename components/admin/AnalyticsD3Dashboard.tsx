@@ -23,118 +23,61 @@ interface ModuleDataPoint {
   color: string;
 }
 
-const generateDataForTimeframe = (mode: TimeframeMode): TrafficDataPoint[] => {
-  const now = new Date();
-  const points: TrafficDataPoint[] = [];
-
-  if (mode === '7d') {
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-      points.push({
-        date: d,
-        label: dayName,
-        visitors: Math.floor(450 + Math.sin(i * 1.3) * 120 + (6 - i) * 35),
-        requests: Math.floor(1800 + Math.sin(i * 1.5) * 400 + (6 - i) * 120),
-        cacheHits: Math.floor(1200 + Math.sin(i * 1.1) * 250 + (6 - i) * 90),
-      });
-    }
-  } else if (mode === '30d') {
-    for (let i = 29; i >= 0; i -= 2) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const label = `${d.getMonth() + 1}/${d.getDate()}`;
-      points.push({
-        date: d,
-        label,
-        visitors: Math.floor(380 + Math.cos(i * 0.4) * 140 + (30 - i) * 15),
-        requests: Math.floor(1500 + Math.cos(i * 0.5) * 500 + (30 - i) * 45),
-        cacheHits: Math.floor(950 + Math.cos(i * 0.4) * 300 + (30 - i) * 30),
-      });
-    }
-  } else {
-    // Live mode: 12 recent 10-second slots
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 10000);
-      const label = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
-      points.push({
-        date: d,
-        label,
-        visitors: Math.floor(65 + Math.random() * 25),
-        requests: Math.floor(220 + Math.random() * 80),
-        cacheHits: Math.floor(180 + Math.random() * 60),
-      });
-    }
-  }
-
-  return points;
-};
-
-const MODULE_DATA: Record<TimeframeMode, ModuleDataPoint[]> = {
-  '7d': [
-    { module: 'Book of Lies', count: 1840, avgDuration: '6m 12s', color: '#8b2e24' },
-    { module: 'PRIME Oracle', count: 1290, avgDuration: '8m 45s', color: '#C9A84C' },
-    { module: 'MIRAGE Studio', count: 960, avgDuration: '4m 30s', color: '#e8c96a' },
-    { module: 'Diagnostic', count: 680, avgDuration: '1m 15s', color: '#7a7268' },
-    { module: 'Dream Forge', count: 185, avgDuration: '12m 20s', color: '#b8941e' },
-    { module: 'JadaiHub', count: 92, avgDuration: '3m 50s', color: '#6b5520' },
-  ],
-  '30d': [
-    { module: 'Book of Lies', count: 6890, avgDuration: '7m 04s', color: '#8b2e24' },
-    { module: 'PRIME Oracle', count: 4820, avgDuration: '8m 22s', color: '#C9A84C' },
-    { module: 'MIRAGE Studio', count: 3750, avgDuration: '4m 55s', color: '#e8c96a' },
-    { module: 'Diagnostic', count: 3140, avgDuration: '1m 20s', color: '#7a7268' },
-    { module: 'Dream Forge', count: 512, avgDuration: '14m 10s', color: '#b8941e' },
-    { module: 'JadaiHub', count: 248, avgDuration: '4m 15s', color: '#6b5520' },
-  ],
-  'live': [
-    { module: 'Book of Lies', count: 42, avgDuration: 'active', color: '#8b2e24' },
-    { module: 'PRIME Oracle', count: 38, avgDuration: 'active', color: '#C9A84C' },
-    { module: 'MIRAGE Studio', count: 27, avgDuration: 'active', color: '#e8c96a' },
-    { module: 'Diagnostic', count: 14, avgDuration: 'active', color: '#7a7268' },
-    { module: 'Dream Forge', count: 6, avgDuration: 'active', color: '#b8941e' },
-    { module: 'JadaiHub', count: 3, avgDuration: 'active', color: '#6b5520' },
-  ],
-};
+// Traffic/module data is fetched from GET /api/admin/analytics — real counters
+// measured by the API process. Nothing here is synthesized.
 
 export const AnalyticsD3Dashboard: React.FC = () => {
-  const [timeframe, setTimeframe] = useState<TimeframeMode>('30d');
+  const [timeframe, setTimeframe] = useState<TimeframeMode>('live');
   const lineChartRef = useRef<SVGSVGElement>(null);
   const barChartRef = useRef<SVGSVGElement>(null);
   const [hoveredPoint, setHoveredPoint] = useState<TrafficDataPoint | null>(null);
   const [hoveredBar, setHoveredBar] = useState<ModuleDataPoint | null>(null);
-  const [trafficData, setTrafficData] = useState<TrafficDataPoint[]>(() =>
-    generateDataForTimeframe('30d')
-  );
+  const [trafficData, setTrafficData] = useState<TrafficDataPoint[]>([]);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const lastCountsRef = useRef<{ requests: number; errors: number } | null>(null);
 
-  // Update data when timeframe changes
-  useEffect(() => {
-    setTrafficData(generateDataForTimeframe(timeframe));
-  }, [timeframe]);
+  const pollTelemetry = React.useCallback(async (pushPoint: boolean) => {
+    try {
+      const res = await fetch('/api/admin/analytics');
+      const data = await res.json();
+      if (!data?.success) throw new Error(data?.error || 'load failed');
+      setAnalytics(data);
+      setLoadError(null);
 
-  // Live telemetry interval
-  useEffect(() => {
-    if (timeframe !== 'live') return;
-
-    const interval = setInterval(() => {
-      setTrafficData((prev) => {
+      if (pushPoint) {
+        const t = data.telemetry;
+        const prev = lastCountsRef.current;
+        lastCountsRef.current = { requests: t.requests, errors: t.errors5xx };
         const now = new Date();
         const label = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-        const nextPoint: TrafficDataPoint = {
+        const point: TrafficDataPoint = {
           date: now,
           label,
-          visitors: Math.floor(65 + Math.random() * 30),
-          requests: Math.floor(220 + Math.random() * 95),
-          cacheHits: Math.floor(180 + Math.random() * 70),
+          visitors: prev ? Math.max(0, t.requests - prev.requests) : 0,
+          requests: prev ? Math.max(0, t.errors5xx - prev.errors) : 0,
+          cacheHits: t.requests,
         };
-        const next = [...prev.slice(1), nextPoint];
-        return next;
-      });
-    }, 2500);
+        setTrafficData((prevPoints) => [...prevPoints.slice(11), point]);
+      }
+    } catch {
+      setLoadError('Could not reach /api/admin/analytics — live counters unavailable.');
+    }
+  }, []);
 
-    return () => clearInterval(interval);
-  }, [timeframe]);
+  // Reset + load on timeframe change; poll continuously only in live mode.
+  useEffect(() => {
+    lastCountsRef.current = null;
+    if (timeframe === 'live') {
+      setTrafficData([]);
+      pollTelemetry(true);
+      const interval = setInterval(() => pollTelemetry(true), 2500);
+      return () => clearInterval(interval);
+    }
+    // 7d / 30d: no history store is connected — show an honest empty state.
+    setTrafficData([]);
+    pollTelemetry(false);
+  }, [timeframe, pollTelemetry]);
 
   // 1. Render D3 Line Chart
   useEffect(() => {
@@ -316,7 +259,16 @@ export const AnalyticsD3Dashboard: React.FC = () => {
     const svg = d3.select(barChartRef.current);
     svg.selectAll('*').remove();
 
-    const data = MODULE_DATA[timeframe];
+    // Real top-route counters since server boot (measured, not simulated).
+    const data: ModuleDataPoint[] = (analytics?.telemetry?.topPaths || [])
+      .slice(0, 7)
+      .map((p: any, i: number) => ({
+        module: p.path.length > 22 ? `${p.path.slice(0, 21)}…` : p.path,
+        count: p.count,
+        avgDuration: 'since boot',
+        color: ['#C9A84C', '#e8c96a', '#8b2e24', '#7a7268', '#b8941e', '#6b5520', '#8a6e2a'][i % 7],
+      }));
+    if (data.length === 0) return;
     const width = 480;
     const height = 280;
     const margin = { top: 25, right: 20, bottom: 35, left: 105 };
@@ -404,7 +356,7 @@ export const AnalyticsD3Dashboard: React.FC = () => {
       .attr('font-size', '11px');
 
     g.select('.domain').remove();
-  }, [timeframe]);
+  }, [analytics]);
 
   const handleTimeframeChange = (mode: TimeframeMode) => {
     StudioAudio.playClick();
@@ -424,7 +376,7 @@ export const AnalyticsD3Dashboard: React.FC = () => {
               Telemetry & Module Vector
             </h3>
             <p className="text-[11px] font-mono text-[#8a6e2a]">
-              Interactive D3 line & bar engine with live sovereign telemetry.
+              Real request counters measured by the API server (since boot).
             </p>
           </div>
         </div>
@@ -484,16 +436,18 @@ export const AnalyticsD3Dashboard: React.FC = () => {
                 Vector 01 // D3 Line Topology
               </span>
               <h4 className="font-display font-bold text-base text-[#f5f3f0]">
-                {timeframe === 'live' ? 'Live Telemetry (10s Windows)' : `${timeframe.toUpperCase()} Traffic Progression`}
+                {timeframe === 'live'
+                  ? 'Live Server Requests (2.5s Windows)'
+                  : 'Historical Telemetry Not Retained'}
               </h4>
             </div>
 
             <div className="flex items-center gap-4 text-xs font-mono">
               <span className="flex items-center gap-1.5 text-[#C9A84C]">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#C9A84C]" /> Visitors
+                <span className="w-2.5 h-2.5 rounded-full bg-[#C9A84C]" /> Requests / Window
               </span>
               <span className="flex items-center gap-1.5 text-[#e8c96a]/70">
-                <span className="w-2.5 h-1 border-t border-dashed border-[#e8c96a]" /> Requests
+                <span className="w-2.5 h-1 border-t border-dashed border-[#e8c96a]" /> 5xx Errors
               </span>
             </div>
           </div>
@@ -505,13 +459,22 @@ export const AnalyticsD3Dashboard: React.FC = () => {
               className="w-full h-auto min-w-[500px]"
             />
 
+            {trafficData.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center text-center px-6 pointer-events-none">
+                <p className="text-xs font-mono text-[#8a6e2a] max-w-sm leading-relaxed">
+                  {loadError ||
+                    'No historical log store is connected — 7d/30d history is not collected yet. Switch to Live Telemetry to watch real request traffic as it happens.'}
+                </p>
+              </div>
+            )}
+
             {/* Hover Tooltip Overlay */}
             {hoveredPoint && (
               <div className="absolute top-2 right-4 p-3 rounded-xl bg-[#050404]/95 border border-[#C9A84C] text-xs font-mono space-y-1 shadow-xl pointer-events-none">
                 <div className="text-[#C9A84C] font-bold">{hoveredPoint.label}</div>
-                <div className="text-[#f5f3f0]">Visitors: <span className="font-bold">{hoveredPoint.visitors}</span></div>
-                <div className="text-[#c4c0bb]">Total Hits: <span>{hoveredPoint.requests}</span></div>
-                <div className="text-emerald-400">Offline PWA: <span>{hoveredPoint.cacheHits}</span></div>
+                <div className="text-[#f5f3f0]">Requests: <span className="font-bold">{hoveredPoint.visitors}</span></div>
+                <div className="text-[#c4c0bb]">5xx Errors: <span>{hoveredPoint.requests}</span></div>
+                <div className="text-emerald-400">Total Since Boot: <span>{hoveredPoint.cacheHits}</span></div>
               </div>
             )}
           </div>
@@ -525,15 +488,13 @@ export const AnalyticsD3Dashboard: React.FC = () => {
                 Vector 02 // D3 Module Engagement
               </span>
               <h4 className="font-display font-bold text-base text-[#f5f3f0]">
-                Module Synthesis Load
+                Top Routes Since Boot
               </h4>
             </div>
 
-            {timeframe === 'live' && (
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-950/60 border border-red-800 text-red-300 animate-pulse">
-                REALTIME
-              </span>
-            )}
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[rgba(201,168,76,0.1)] border border-[rgba(201,168,76,0.3)] text-[#e8c96a]">
+              MEASURED
+            </span>
           </div>
 
           <div className="w-full overflow-x-auto relative">
@@ -542,6 +503,17 @@ export const AnalyticsD3Dashboard: React.FC = () => {
               viewBox="0 0 480 280"
               className="w-full h-auto min-w-[340px]"
             />
+
+            {analytics && (analytics?.telemetry?.topPaths || []).length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center text-center px-6">
+                <p className="text-xs font-mono text-[#8a6e2a]">No requests counted yet since boot.</p>
+              </div>
+            )}
+            {!analytics && loadError && (
+              <div className="absolute inset-0 flex items-center justify-center text-center px-6">
+                <p className="text-xs font-mono text-[#8a6e2a]">{loadError}</p>
+              </div>
+            )}
 
             {/* Bar Hover Tooltip */}
             {hoveredBar && (

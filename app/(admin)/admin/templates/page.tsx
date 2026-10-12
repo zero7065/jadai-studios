@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
 import { SEED_TEMPLATES, TemplateItem } from '@/lib/data/templates';
+import { StudioAudio } from '@/lib/watermark';
 import { useToast } from '@/components/providers/ToastProvider';
 import { ShoppingBag, Plus, Eye, Edit2, Trash2, Github, ExternalLink, Download } from 'lucide-react';
 
@@ -27,6 +28,18 @@ export default function AdminTemplatesPage() {
   const [bundleProgress, setBundleProgress] = useState(0);
   const [verifiedBundlePath, setVerifiedBundlePath] = useState('');
   const [stack, setStack] = useState('Next.js 14, Tailwind, Paystack, Supabase');
+
+  // Load the real server catalog (fs-backed); falls back to local seeds offline.
+  useEffect(() => {
+    fetch('/api/templates')
+      .then((r) => r.json())
+      .then((res) => {
+        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+          setTemplates(res.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const openAddModal = () => {
     setEditingTemplate(null);
@@ -76,27 +89,68 @@ export default function AdminTemplatesPage() {
     }
   };
 
-  const handleZipUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setBundleFileName(file.name);
-      setBundleProgress(20);
-      const interval = setInterval(() => {
-        setBundleProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            const path = `templates/${(name || 'template').toLowerCase()}/${file.name}`;
-            setVerifiedBundlePath(path);
-            showToast(`Verified in Supabase Storage: "${path}"`, 'success');
-            return 100;
+  const uploadBundle = (slug: string, file: File): Promise<{ path: string; bytes: number }> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Could not read the file'));
+      reader.onload = () => {
+        const base64 = String(reader.result).split(',')[1] || '';
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/admin/templates/bundle');
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.upload.onprogress = (evt) => {
+          if (evt.lengthComputable) {
+            setBundleProgress(Math.round((evt.loaded / evt.total) * 100));
           }
-          return prev + 25;
-        });
-      }, 100);
+        };
+        xhr.onerror = () => reject(new Error('Server unreachable'));
+        xhr.onload = () => {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (data.success) resolve(data);
+            else reject(new Error(data.error || 'Upload failed'));
+          } catch {
+            reject(new Error('Invalid server response'));
+          }
+        };
+        xhr.send(JSON.stringify({ slug, fileName: file.name, fileData: base64 }));
+      };
+      reader.readAsDataURL(file);
+    });
+
+  const handleZipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      showToast('Bundle must be a .zip archive.', 'error');
+      return;
+    }
+    const slug = (editingTemplate?.slug || name || file.name.replace(/\.zip$/i, ''))
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (!slug) {
+      showToast('Enter a template name first (it becomes the storage folder).', 'error');
+      return;
+    }
+
+    setBundleFileName(file.name);
+    setBundleProgress(0);
+    setVerifiedBundlePath('');
+    try {
+      const res = await uploadBundle(slug, file);
+      setBundleProgress(100);
+      setVerifiedBundlePath(res.path);
+      showToast(`Stored ${Math.max(1, Math.round(res.bytes / 1024))} KB at ${res.path}`, 'success', 'Bundle Uploaded');
+    } catch (err: any) {
+      setBundleFileName('');
+      setBundleProgress(0);
+      showToast(`Bundle upload failed: ${String(err?.message || err)} — nothing was stored.`, 'error', 'Not Stored');
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !tagline) {
       showToast('Name and tagline are required', 'error');
@@ -105,55 +159,91 @@ export default function AdminTemplatesPage() {
 
     const updatedStack = stack.split(',').map((s) => s.trim()).filter(Boolean);
 
-    if (editingTemplate) {
-      setTemplates((prev) =>
-        prev.map((t) =>
-          t.id === editingTemplate.id
-            ? {
-                ...t,
-                name,
-                tagline,
-                category,
-                price_ngn: Number(priceNgn),
-                price_usd: Number(priceUsd),
-                lore,
-                description,
-                demo_url: demoUrl,
-                stack: updatedStack,
-              }
-            : t
-        )
-      );
-      showToast(`Template "${name}" updated.`, 'success');
-    } else {
-      const newTmpl: TemplateItem = {
-        id: `tmpl-${Date.now()}`,
-        slug: name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-        name,
-        tagline,
-        lore,
-        description,
-        category,
-        price_ngn: Number(priceNgn),
-        price_usd: Number(priceUsd),
-        stack: updatedStack,
-        demo_url: demoUrl || `https://templates.jadai.dev/${name.toLowerCase()}`,
-        preview_url: `/assets/templates/${name.toLowerCase()}.png`,
-        download_count: 0,
-        featured: true,
-        status: 'active',
-        includes: [
-          'Full-stack Next.js production codebase',
-          'Paystack checkout pipeline & webhook handler',
-          'Supabase relational schema with RLS policies',
-          'Private GitHub repository invite token',
-        ],
-      };
-      setTemplates([newTmpl, ...templates]);
-      showToast(`Template "${name}" published to Elite Market.`, 'success');
-    }
+    const template: TemplateItem = editingTemplate
+      ? {
+          ...editingTemplate,
+          name,
+          tagline,
+          category,
+          price_ngn: Number(priceNgn),
+          price_usd: Number(priceUsd),
+          lore,
+          description,
+          demo_url: demoUrl,
+          preview_url: previewUrl || editingTemplate.preview_url,
+          stack: updatedStack,
+        }
+      : {
+          id: `tmpl-${Date.now()}`,
+          slug: name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+          name,
+          tagline,
+          lore,
+          description,
+          category,
+          price_ngn: Number(priceNgn),
+          price_usd: Number(priceUsd),
+          stack: updatedStack,
+          demo_url: demoUrl || `https://templates.jadai.dev/${name.toLowerCase()}`,
+          preview_url: previewUrl,
+          download_count: 0,
+          featured: true,
+          status: 'active',
+          includes: [
+            'Full-stack Next.js production codebase',
+            'Paystack checkout pipeline & webhook handler',
+            'Supabase relational schema with RLS policies',
+            'Private GitHub repository invite token',
+          ],
+        };
 
-    setModalOpen(false);
+    try {
+      const res = await fetch('/api/admin/templates/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) {
+        throw new Error(data?.error || 'server rejected the save');
+      }
+
+      setTemplates((prev) => {
+        const idx = prev.findIndex((t) => t.slug === template.slug);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = template;
+          return copy;
+        }
+        return [template, ...prev];
+      });
+      StudioAudio.playSuccessArpeggio();
+      showToast(
+        editingTemplate
+          ? `Template "${name}" saved to the server catalog.`
+          : `Template "${name}" added to the server catalog.`,
+        'success'
+      );
+      setModalOpen(false);
+    } catch (err: any) {
+      showToast(`Save failed: ${String(err?.message || err)} — change not applied.`, 'error', 'Not Saved');
+    }
+  };
+
+  const handleDelete = async (tmpl: TemplateItem) => {
+    try {
+      const res = await fetch('/api/admin/templates/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: tmpl.slug }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'delete rejected');
+      setTemplates((prev) => prev.filter((t) => t.slug !== tmpl.slug));
+      showToast(`Template "${tmpl.name}" removed from the server catalog.`, 'success');
+    } catch (err: any) {
+      showToast(`Delete failed: ${String(err?.message || err)} — template still listed.`, 'error');
+    }
   };
 
   return (
@@ -221,10 +311,7 @@ export default function AdminTemplatesPage() {
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => {
-                      setTemplates((prev) => prev.filter((t) => t.id !== tmpl.id));
-                      showToast(`Template "${tmpl.name}" archived`, 'info');
-                    }}
+                    onClick={() => handleDelete(tmpl)}
                     className="p-1 rounded text-[#8a6e2a] hover:text-[#C0392B]"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -353,7 +440,7 @@ export default function AdminTemplatesPage() {
                   <div className="space-y-1">
                     <span className="text-[11px] font-bold text-[#f5f3f0] block truncate max-w-[180px]">{bundleFileName}</span>
                     <span className="text-[9px] text-[#e8c96a] block">
-                      {verifiedBundlePath ? `✓ Verified in Storage` : `Uploading... ${bundleProgress}%`}
+                      {verifiedBundlePath ? `✓ Stored: ${verifiedBundlePath}` : `Uploading... ${bundleProgress}%`}
                     </span>
                     <label className="text-[9px] text-[#8a6e2a] hover:text-[#C9A84C] cursor-pointer underline block">
                       Replace ZIP

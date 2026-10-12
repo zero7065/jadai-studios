@@ -27,6 +27,26 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
   const [showAgency, setShowAgency] = useState(false);
 
   useEffect(() => {
+    // Paystack callback lands here with a verified status from the server.
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get('status');
+    const tier = params.get('tier');
+    if (status === 'success' && tier) {
+      showToast(`Payment confirmed — Jadai Signal ${SIGNAL_PLANS[tier as SignalPlanTier]?.name || tier} is active.`, 'success', 'Tier Active');
+      setCurrentTier(tier as SignalPlanTier);
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (status && status !== 'success') {
+      const messages: Record<string, string> = {
+        failed: 'Payment not confirmed with Paystack — plan unchanged.',
+        amount_mismatch: 'Payment amount did not match the plan — plan unchanged.',
+        unconfigured: 'Paystack is not configured on this deployment — plan unchanged.',
+        missing_reference: 'Checkout returned without a payment reference — plan unchanged.',
+        error: 'Could not verify payment with Paystack — plan unchanged.',
+      };
+      showToast(messages[status] || 'Checkout did not complete — plan unchanged.', 'error', 'Payment Not Applied');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
     fetch('/api/signal/settings')
       .then((r) => r.json())
       .then((res) => {
@@ -53,23 +73,28 @@ export const PricingView: React.FC<PricingViewProps> = ({ onNavigate }) => {
       });
 
       const data = await res.json();
-      if (data.success) {
-        setCurrentTier(tierKey);
-        StudioAudio.playSuccess();
-        showToast(
-          `Upgraded to Jadai Signal ${SIGNAL_PLANS[tierKey].name}!`,
-          'success',
-          'Tier Active'
-        );
 
-        // If Paystack authorization URL is returned, open or notify
-        if (data.authorization_url && !data.authorization_url.includes('example.com')) {
-          window.location.href = data.authorization_url;
-        }
+      if (!data.success && !data.authorization_url) {
+        showToast(data.error || 'Subscription request failed — plan unchanged.', 'error', 'Not Activated');
+        return;
       }
+
+      if (data.authorization_url && !String(data.authorization_url).includes('example.com')) {
+        showToast('Redirecting to Paystack — your plan activates after payment confirms.', 'info', 'Secure Checkout');
+        window.location.href = data.authorization_url;
+        return;
+      }
+
+      if (data.plan === 'free' || tierKey === 'free') {
+        setCurrentTier('free');
+        StudioAudio.playSuccess();
+        showToast(`Switched to Jadai Signal ${SIGNAL_PLANS.free.name}.`, 'success', 'Tier Active');
+        return;
+      }
+
+      showToast('Checkout could not start (no payment URL returned) — plan unchanged.', 'error', 'Not Activated');
     } catch {
-      setCurrentTier(tierKey);
-      showToast(`Activated ${SIGNAL_PLANS[tierKey].name} in local workspace`, 'info');
+      showToast('Signal service unreachable — plan unchanged.', 'error', 'Not Activated');
     } finally {
       setLoadingTier(null);
     }

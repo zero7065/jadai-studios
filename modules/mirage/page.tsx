@@ -67,13 +67,18 @@ export default function MiragePage({ onNavigate }: { onNavigate?: (path: string)
         seeds: [1, 2, 3].map((i) => Date.now() + i * 9973),
       });
 
+      if (urls.length === 0) {
+        setError('All image providers failed (OpenAI credits exhausted) — no images were created.');
+        return;
+      }
+
       setImages(urls);
       try {
         StudioAudio.playSuccessArpeggio();
       } catch {}
     } catch (err: any) {
       console.error('Mirage generation failed:', err);
-      setError("PRIME's image engine is busy. Try again in 30 seconds.");
+      setError('All image providers failed (OpenAI credits exhausted or server unreachable) — no images were created.');
     } finally {
       setIsGenerating(false);
     }
@@ -98,7 +103,7 @@ export default function MiragePage({ onNavigate }: { onNavigate?: (path: string)
         return copy;
       });
     } catch {
-      setError("PRIME's image engine is busy. Try again in 30 seconds.");
+      setError('All image providers failed (OpenAI credits exhausted or server unreachable) — nothing was generated.');
     }
   };
 

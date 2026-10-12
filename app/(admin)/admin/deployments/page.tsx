@@ -5,6 +5,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import EdgeGlow from '@/components/ui/EdgeGlow';
 import { useToast } from '@/components/providers/ToastProvider';
+import { StudioAudio } from '@/lib/watermark';
 import {
   Upload,
   Layers,
@@ -30,38 +31,13 @@ interface DeploymentItem {
   createdAt: string;
 }
 
-const SEED_DEPLOYMENTS: DeploymentItem[] = [
-  {
-    id: 'dep_1',
-    slug: 'diagnostic',
-    name: 'Site Diagnostic Engine',
-    description: 'Sub-second Lighthouse Core Web Vitals health scanner',
-    icon: 'icon.svg',
-    tier: 'free',
-    type: 'spa',
-    entry: 'index.html',
-    status: 'active',
-    createdAt: '2026-09-15T12:00:00Z',
-  },
-  {
-    id: 'dep_2',
-    slug: 'oracle',
-    name: 'PRIME Oracle Terminal',
-    description: 'Adaptive living intelligence and persistent memory system',
-    icon: 'icon.svg',
-    tier: 'free',
-    type: 'spa',
-    entry: 'index.html',
-    status: 'active',
-    createdAt: '2026-09-20T10:00:00Z',
-  },
-];
-
 export default function DeploymentUploadPage() {
-  const [deployments, setDeployments] = useState<DeploymentItem[]>(SEED_DEPLOYMENTS);
+  const [deployments, setDeployments] = useState<DeploymentItem[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState<'idle' | 'upload' | 'extract'>('idle');
+  const [stagedZip, setStagedZip] = useState<File | null>(null);
   const [uploadedZipName, setUploadedZipName] = useState<string | null>(null);
   const [manifestJson, setManifestJson] = useState(`{
   "slug": "exampadi-lite",
@@ -74,30 +50,44 @@ export default function DeploymentUploadPage() {
 }`);
   const { showToast } = useToast();
 
+  const loadDeployments = () => {
+    fetch('/api/admin/deployments')
+      .then((r) => r.json())
+      .then((res) => {
+        if (res?.success && Array.isArray(res.data)) setDeployments(res.data);
+      })
+      .catch(() => {
+        showToast('Could not reach the deployment registry.', 'error');
+      });
+  };
+
+  useEffect(() => {
+    loadDeployments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleProcessZip = (file: File) => {
     if (!file.name.endsWith('.zip')) {
       showToast('Please upload a .zip archive.', 'error');
       return;
     }
+    if (file.size > 50 * 1024 * 1024) {
+      showToast('Archive exceeds the 50MB limit.', 'error');
+      return;
+    }
 
+    // Stage the archive locally — it is uploaded for real on deploy.
+    setStagedZip(file);
     setUploadedZipName(file.name);
-    setUploading(true);
-    setUploadProgress(10);
+    showToast(
+      `Staged "${file.name}" (${Math.max(1, Math.round(file.size / 1024))} KB). Press "Register & Deploy" to upload and unpack it on the server.`,
+      'info',
+      'Archive Staged'
+    );
 
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setUploading(false);
-          showToast(
-            `Archive "${file.name}" verified in storage path: deployments/${file.name}`,
-            'success',
-            'Storage Verified'
-          );
-
-          // If filename looks like a slug, prefill manifest
-          const baseSlug = file.name.replace('.zip', '').toLowerCase().replace(/[^a-z0-9]/g, '-');
-          setManifestJson(`{
+    // If filename looks like a slug, prefill manifest
+    const baseSlug = file.name.replace('.zip', '').toLowerCase().replace(/[^a-z0-9]/g, '-');
+    setManifestJson(`{
   "slug": "${baseSlug}",
   "name": "${baseSlug.charAt(0).toUpperCase() + baseSlug.slice(1)} Sovereign",
   "description": "Deployed micro-application from ${file.name}",
@@ -106,52 +96,117 @@ export default function DeploymentUploadPage() {
   "type": "spa",
   "entry": "index.html"
 }`);
-          return 100;
-        }
-        return prev + 30;
-      });
-    }, 120);
   };
 
-  const handleManifestSubmit = (e: React.FormEvent) => {
+  const handleManifestSubmit = async (e: React.MouseEvent | React.FormEvent) => {
     e.preventDefault();
+    let parsed: any;
     try {
-      const parsed = JSON.parse(manifestJson);
+      parsed = JSON.parse(manifestJson);
       if (!parsed.slug || !parsed.name) {
         showToast('Manifest must contain "slug" and "name".', 'error');
         return;
       }
-
-      const newDep: DeploymentItem = {
-        id: `dep_${Date.now()}`,
-        slug: parsed.slug,
-        name: parsed.name,
-        description: parsed.description || 'Custom sovereign deployment',
-        icon: parsed.icon || 'icon.svg',
-        tier: parsed.tier || 'free',
-        type: parsed.type || 'spa',
-        entry: parsed.entry || 'index.html',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-      };
-
-      setDeployments([newDep, ...deployments]);
-      showToast(`Service "${newDep.name}" deployed live at /services/${newDep.slug}`, 'success', 'Vault Auto-Registered');
     } catch {
       showToast('Invalid JSON schema in manifest.', 'error');
+      return;
+    }
+
+    setUploading(true);
+    setUploadPhase(stagedZip ? 'upload' : 'extract');
+    setUploadProgress(0);
+    StudioAudio.playClick();
+
+    try {
+      let archiveBase64: string | undefined;
+      if (stagedZip) {
+        archiveBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error('Could not read the staged archive'));
+          reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+          reader.readAsDataURL(stagedZip);
+        });
+      }
+
+      const payload = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/admin/deployments/deploy');
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.upload.onprogress = (evt) => {
+          if (evt.lengthComputable) {
+            setUploadPhase('upload');
+            setUploadProgress(Math.round((evt.loaded / evt.total) * 90));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Server unreachable'));
+        xhr.onload = () => {
+          setUploadPhase('extract');
+          setUploadProgress(100);
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (data.success) resolve(data);
+            else reject(new Error(data.error || 'Deploy rejected'));
+          } catch {
+            reject(new Error('Invalid server response'));
+          }
+        };
+        xhr.send(JSON.stringify({ manifest: parsed, archiveBase64 }));
+      });
+
+      showToast(
+        `${payload.note || 'Deployed.'} Live at ${payload.url}`,
+        'success',
+        'Service Deployed'
+      );
+      setStagedZip(null);
+      setUploadedZipName(null);
+      loadDeployments();
+    } catch (err: any) {
+      showToast(`Deploy failed: ${String(err?.message || err)} — nothing was published.`, 'error', 'Not Deployed');
+    } finally {
+      setUploading(false);
+      setUploadPhase('idle');
+      setUploadProgress(0);
     }
   };
 
-  const toggleStatus = (id: string) => {
-    setDeployments((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, status: d.status === 'active' ? 'paused' : 'active' } : d))
-    );
-    showToast('Deployment status toggled.', 'info');
+  const toggleStatus = async (id: string) => {
+    try {
+      const res = await fetch('/api/admin/deployments/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'Toggle rejected');
+      setDeployments((prev) =>
+        prev.map((d) => (d.id === id ? { ...d, status: data.record.status } : d))
+      );
+      showToast(
+        data.record.status === 'paused'
+          ? `Service paused — /services/${data.record.slug} no longer serves files.`
+          : `Service resumed — /services/${data.record.slug} is live again.`,
+        'success'
+      );
+    } catch (err: any) {
+      showToast(`Toggle failed: ${String(err?.message || err)}`, 'error');
+    }
   };
 
-  const deleteDeployment = (id: string) => {
-    setDeployments((prev) => prev.filter((d) => d.id !== id));
-    showToast('Deployment removed from registry.', 'info');
+  const deleteDeployment = async (id: string) => {
+    try {
+      const res = await fetch('/api/admin/deployments/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'Delete rejected');
+      setDeployments((prev) => prev.filter((d) => d.id !== id));
+      showToast(`Service files removed for /services/${data.slug}.`, 'success');
+    } catch (err: any) {
+      showToast(`Delete failed: ${String(err?.message || err)}`, 'error');
+    }
   };
 
   return (
@@ -195,7 +250,11 @@ export default function DeploymentUploadPage() {
           >
             {uploading && (
               <div className="absolute inset-0 bg-[#050404]/90 z-20 flex flex-col items-center justify-center p-6 space-y-2">
-                <span className="text-xs font-mono text-[#f5f3f0]">Extracting & Verifying Archive... {uploadProgress}%</span>
+                <span className="text-xs font-mono text-[#f5f3f0]">
+                  {uploadPhase === 'extract'
+                    ? `Unpacking on server... ${uploadProgress}%`
+                    : `Uploading Archive... ${uploadProgress}%`}
+                </span>
                 <div className="w-48 bg-[#111010] h-1.5 rounded-full overflow-hidden border border-[rgba(201,168,76,0.3)]">
                   <div
                     className="bg-gradient-to-r from-[#8a6e2a] to-[#C9A84C] h-full transition-all duration-150"
@@ -236,11 +295,11 @@ export default function DeploymentUploadPage() {
           {/* Instructions */}
           <div className="p-4 rounded-xl bg-[#0a0908] border border-[rgba(201,168,76,0.15)] text-xs font-mono text-[#c4c0bb] space-y-1.5">
             <span className="text-[#C9A84C] block uppercase font-bold text-[10px]">
-              Fulfillment Protocol:
+              Deployment Protocol:
             </span>
-            <p>1. Archive unpacked into sovereign storage bucket</p>
-            <p>2. Endpoint routed instantly at /services/{'{slug}'}</p>
-            <p>3. Dial entry injected into rotary Vault menu</p>
+            <p>1. Archive unpacked into dist/services/{'{slug}'}</p>
+            <p>2. Served instantly at /services/{'{slug}'}</p>
+            <p>3. Registered in the live services list below</p>
           </div>
         </div>
 
@@ -277,6 +336,14 @@ export default function DeploymentUploadPage() {
         </h3>
 
         <div className="space-y-3">
+          {deployments.length === 0 && (
+            <div className="p-8 rounded-xl bg-[#0a0908] border border-dashed border-[rgba(201,168,76,0.3)] text-center space-y-2">
+              <p className="text-sm font-mono text-[#c4c0bb]">No services registered on this server yet.</p>
+              <p className="text-xs font-mono text-[#8a6e2a]">
+                Deploy a ZIP above and it will appear here with a live /services/{'{slug}'} route.
+              </p>
+            </div>
+          )}
           {deployments.map((dep) => (
             <GlassCard key={dep.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-[rgba(201,168,76,0.2)] hover:border-[#C9A84C] transition-all">
               <div className="space-y-1">

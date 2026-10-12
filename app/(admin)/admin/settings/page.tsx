@@ -12,6 +12,7 @@ interface KeyConfig {
   value: string;
   revealed: boolean;
   testing: boolean;
+  configured?: boolean;
   testResult?: { ok: boolean; latency: number; msg: string };
 }
 
@@ -25,7 +26,7 @@ export default function AdminSettingsPage() {
       id: 'groq',
       label: 'Groq API Key (Primary: openai/gpt-oss-120b)',
       envKey: 'GROQ_API_KEY',
-      value: 'gsk_prod_jadai_groq_verified_key',
+      value: '',
       revealed: false,
       testing: false,
     },
@@ -33,7 +34,7 @@ export default function AdminSettingsPage() {
       id: 'gemini',
       label: 'Google Gemini API Key (Secondary Failover)',
       envKey: 'GEMINI_API_KEY',
-      value: 'AIzaSy_gemini_38_flash_primary_backup',
+      value: '',
       revealed: false,
       testing: false,
     },
@@ -41,7 +42,7 @@ export default function AdminSettingsPage() {
       id: 'paystack_secret',
       label: 'Paystack Secret Key (HMAC Verification)',
       envKey: 'PAYSTACK_SECRET_KEY',
-      value: 'sk_live_jadai_paystack_gateway_secret',
+      value: '',
       revealed: false,
       testing: false,
     },
@@ -49,7 +50,7 @@ export default function AdminSettingsPage() {
       id: 'paystack_public',
       label: 'Paystack Public Key (Client Elements)',
       envKey: 'NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY',
-      value: 'pk_live_jadai_paystack_public_token',
+      value: '',
       revealed: false,
       testing: false,
     },
@@ -57,11 +58,41 @@ export default function AdminSettingsPage() {
       id: 'google_psi',
       label: 'Google PageSpeed Insights API Key',
       envKey: 'GOOGLE_PSI_API_KEY',
-      value: 'AIzaSy_psi_edge_scanner_token',
+      value: '',
       revealed: false,
       testing: false,
     },
   ]);
+
+  // Real configured-status per key, read from the server's process.env.
+  useEffect(() => {
+    fetch('/api/admin/settings')
+      .then((r) => r.json())
+      .then((res) => {
+        const runtime = res?.runtime;
+        if (runtime) {
+          setKeys((prev) => prev.map((k) => ({ ...k, configured: Boolean(runtime[k.id]) })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load real configured-status from the server (process.env truth).
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/admin/settings')
+      .then((r) => r.json())
+      .then((res) => {
+        if (cancelled || !res?.runtime) return;
+        setKeys((prev) =>
+          prev.map((k) => ({ ...k, configured: Boolean(res.runtime[k.id]) }))
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // General Settings State
   const [siteStatus, setSiteStatus] = useState<'live' | 'maintenance' | 'coming_soon'>('live');
@@ -100,23 +131,39 @@ export default function AdminSettingsPage() {
       prev.map((k) => (k.id === id ? { ...k, testing: true, testResult: undefined } : k))
     );
 
-    // Simulate real ping
-    setTimeout(() => {
-      const latency = Math.floor(40 + Math.random() * 80);
+    // Real connectivity probe executed server-side (env keys never leave the server).
+    try {
+      const res = await fetch('/api/admin/test-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: id }),
+      });
+      const data = await res.json().catch(() => null);
+      const ok = Boolean(data?.ok);
+      const latency = Number(data?.latencyMs || 0);
+      const msg = ok
+        ? data?.msg || `Connected in ${latency}ms`
+        : data?.error || data?.msg || 'Test failed';
+
       setKeys((prev) =>
         prev.map((k) =>
           k.id === id
-            ? {
-                ...k,
-                testing: false,
-                testResult: { ok: true, latency, msg: `Verified in ${latency}ms` },
-              }
+            ? { ...k, testing: false, configured: ok ? true : k.configured, testResult: { ok, latency, msg } }
             : k
         )
       );
-      StudioAudio.playChime();
-      showToast(`Provider connection verified in ${latency}ms`, 'success');
-    }, 900);
+      showToast(msg, ok ? 'success' : 'error', ok ? 'Connection Verified' : 'Test Failed');
+      if (ok) StudioAudio.playChime();
+    } catch {
+      setKeys((prev) =>
+        prev.map((k) =>
+          k.id === id
+            ? { ...k, testing: false, testResult: { ok: false, latency: 0, msg: 'Server unreachable — test not run' } }
+            : k
+        )
+      );
+      showToast('Server unreachable — connection test could not run.', 'error');
+    }
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -124,11 +171,42 @@ export default function AdminSettingsPage() {
     setSaving(true);
     StudioAudio.playClick();
 
-    setTimeout(() => {
+    const entries: Array<[string, unknown]> = [
+      ['site_status', siteStatus],
+      ['watermark_text', watermarkText],
+      ['oracle_daily_limit', oracleDailyLimit],
+      ['contact_email', contactEmail],
+      ['contact_whatsapp', contactWhatsapp],
+      ['recovery_code', recoveryCode],
+    ];
+
+    try {
+      let saved = 0;
+      const failures: string[] = [];
+      for (const [key, value] of entries) {
+        const res = await fetch('/api/admin/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value }),
+        });
+        const data = await res.json().catch(() => null);
+        if (data?.success) saved++;
+        else failures.push(`${key}: ${data?.error || 'request failed'}`);
+      }
+
       setSaving(false);
-      StudioAudio.playSuccessArpeggio();
-      showToast('Master configuration synchronized across edge cluster.', 'success');
-    }, 700);
+      if (failures.length === 0) {
+        StudioAudio.playSuccessArpeggio();
+        showToast(`Saved ${saved} settings to admin_settings (caches invalidated).`, 'success', 'Configuration Saved');
+      } else if (saved > 0) {
+        showToast(`Saved ${saved}/${entries.length} — failures: ${failures.join('; ')}`, 'error', 'Partial Save');
+      } else {
+        showToast(`No settings saved — ${failures.join('; ')}`, 'error', 'Save Failed');
+      }
+    } catch {
+      setSaving(false);
+      showToast('Server unreachable — settings were not saved.', 'error', 'Save Failed');
+    }
   };
 
   return (
@@ -167,7 +245,11 @@ export default function AdminSettingsPage() {
                     <span className="font-bold text-[#f5f3f0]">{k.label}</span>
                     <div className="flex items-center gap-2">
                       {k.testResult && (
-                        <span className="text-[11px] text-emerald-400 flex items-center gap-1">
+                        <span
+                          className={`text-[11px] flex items-center gap-1 ${
+                            k.testResult.ok ? 'text-emerald-400' : 'text-red-400'
+                          }`}
+                        >
                           <CheckCircle className="w-3 h-3" />
                           {k.testResult.msg}
                         </span>
@@ -228,7 +310,7 @@ export default function AdminSettingsPage() {
                             showToast(data.error || 'Failed to update key', 'error');
                           }
                         } catch {
-                          showToast('Saved to local configuration cache', 'info');
+                          showToast('Server unreachable — key was not saved.', 'error', 'Save Failed');
                         }
                       }}
                       className="px-3.5 py-2 rounded bg-[#C9A84C] text-[#050404] font-bold text-xs hover:bg-[#e8c96a] transition-all cursor-pointer shadow-sm shrink-0"
@@ -239,13 +321,17 @@ export default function AdminSettingsPage() {
 
                   {/* Below each key: status indicator */}
                   <div className="pt-0.5">
-                    {isSet ? (
+                    {k.configured ? (
                       <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
-                        <CheckCircle className="w-3.5 h-3.5" /> Active ✓
+                        <CheckCircle className="w-3.5 h-3.5" /> Active — configured on server
+                      </span>
+                    ) : isSet ? (
+                      <span className="text-[11px] text-amber-400 font-bold flex items-center gap-1">
+                        <RefreshCw className="w-3.5 h-3.5" /> Value entered — click Update to persist
                       </span>
                     ) : (
                       <span className="text-[11px] text-amber-400 font-bold flex items-center gap-1">
-                        Not set — enter key to activate
+                        <Key className="w-3.5 h-3.5" /> Not set — enter key to activate
                       </span>
                     )}
                   </div>

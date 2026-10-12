@@ -21,10 +21,18 @@ import {
 } from './lib/paystack';
 import { generateGroundedContent } from './lib/ai/grounded';
 import { shortLinksDb, createShortLink } from './lib/shortlinks';
+import { listTemplates, saveTemplate, deleteTemplate, saveTemplateBundle } from './lib/data/templatesStore';
+import {
+  listDeployments,
+  deployService,
+  toggleDeployment,
+  deleteDeployment,
+} from './lib/data/deploymentsStore';
 import { isRealGroqKey, isRealGeminiKey, isRealSupabaseUrl, isRealSupabaseKey, isOpenAIKey } from './lib/config/envTrust';
 import { generateTextWatermarkFooter } from './lib/watermark';
 import { isTransmissionCadenceTime } from './lib/content/delivery';
 import { signalRouter } from './lib/signal/api-router';
+import { signalStore } from './lib/signal/store';
 import { checkRateLimit } from './lib/utils/rateLimit';
 import {
   signAdminToken,
@@ -97,6 +105,23 @@ async function startServer() {
   const app = express();
   const port = parseInt(process.env.PORT || '3000', 10);
   const isProd = process.env.NODE_ENV === 'production';
+
+  // Real runtime telemetry — counts actual requests handled by this process.
+  const telemetry = {
+    startedAt: Date.now(),
+    requests: 0,
+    errors5xx: 0,
+    byPath: {} as Record<string, number>,
+  };
+  app.use((req, res, next) => {
+    telemetry.requests += 1;
+    const path = (req.path || '').split('?')[0];
+    telemetry.byPath[path] = (telemetry.byPath[path] || 0) + 1;
+    res.on('finish', () => {
+      if (res.statusCode >= 500) telemetry.errors5xx += 1;
+    });
+    next();
+  });
 
   // ---------------------------------------------------------------------------
   // SECURITY, CORS & BODY PARSING
@@ -219,20 +244,176 @@ async function startServer() {
   // ---------------------------------------------------------------------------
   // 3. ADMIN SETTINGS
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Real admin analytics — every number below is measured or queried, never invented.
+  app.get('/api/admin/analytics', async (req, res) => {
+    const topPaths = Object.entries(telemetry.byPath)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 24)
+      .map(([routePath, count]) => ({ path: routePath, count }));
+
+    let paystack: Record<string, unknown> = { configured: false };
+    try {
+      const secret = await getPaystackSecretKey();
+      if (secret && !secret.includes('your_') && !secret.includes('placeholder')) {
+        const r = await fetch('https://api.paystack.co/balance', {
+          headers: { Authorization: `Bearer ${secret}` },
+          signal: AbortSignal.timeout(10000),
+        });
+        const j = await r.json().catch(() => null);
+        if (j?.status && j.data?.balance) {
+          paystack = { configured: true, balance: j.data.balance };
+        } else {
+          paystack = { configured: true, error: j?.message || `HTTP ${r.status}` };
+        }
+      }
+    } catch (e: any) {
+      paystack = { configured: true, error: String(e?.message || e) };
+    }
+
+    let db: { status: string } = { status: 'unknown' };
+    try {
+      const { error } = await supabaseAdmin.from('admin_settings').select('key').limit(1);
+      db = error ? { status: `error: ${error.message}` } : { status: 'connected' };
+    } catch (e: any) {
+      db = { status: `error: ${String(e?.message || e)}` };
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      success: true,
+      telemetry: {
+        startedAt: new Date(telemetry.startedAt).toISOString(),
+        uptimeSec: Math.round(process.uptime()),
+        requests: telemetry.requests,
+        errors5xx: telemetry.errors5xx,
+        topPaths,
+        rssMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      },
+      runtime: { node: process.version, env: process.env.NODE_ENV || 'development' },
+      db,
+      paystack,
+      ai: {
+        openai: isOpenAIKey(process.env.OPENAI_API_KEY),
+        groq: isRealGroqKey(process.env.GROQ_API_KEY),
+        gemini: isRealGeminiKey(process.env.GEMINI_API_KEY),
+      },
+      signal: signalStore.getAnalyticsSummary(),
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Real env/credential status — read from process.env, never fabricated.
+  const buildRuntimeStatus = () => ({
+    groq: isRealGroqKey(process.env.GROQ_API_KEY),
+    gemini: isRealGeminiKey(process.env.GEMINI_API_KEY),
+    paystack_secret: Boolean(
+      process.env.PAYSTACK_SECRET_KEY &&
+        !process.env.PAYSTACK_SECRET_KEY.includes('your_') &&
+        !process.env.PAYSTACK_SECRET_KEY.includes('placeholder')
+    ),
+    paystack_public: Boolean(
+      process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY &&
+        !process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY.includes('placeholder')
+    ),
+    google_psi: Boolean(process.env.GOOGLE_PSI_API_KEY),
+  });
+
   app.get('/api/admin/settings', async (req, res) => {
+    const runtime = buildRuntimeStatus();
     try {
       const { data, error } = await supabaseAdmin
         .from('admin_settings')
         .select('key, value, category, description, updated_at');
 
       if (error) {
-        return res.status(500).json({ success: false, error: error.message });
+        return res.status(500).json({ success: false, error: error.message, runtime });
       }
 
       res.setHeader('Cache-Control', 'no-store');
-      res.json({ success: true, settings: data || [] });
+      res.json({ success: true, settings: data || [], runtime });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      res.status(500).json({ success: false, error: err.message, runtime });
+    }
+  });
+
+  // Real connectivity test for a configured provider key.
+  app.post('/api/admin/test-key', async (req, res) => {
+    const provider = String(req.body?.provider || '');
+    const started = Date.now();
+    const timed = () => `${Date.now() - started}ms`;
+
+    try {
+      if (provider === 'groq') {
+        const k = process.env.GROQ_API_KEY;
+        if (!isRealGroqKey(k)) return res.json({ success: false, ok: false, error: 'GROQ_API_KEY is not configured on the server.' });
+        const r = await fetch('https://api.groq.com/openai/v1/models', {
+          headers: { Authorization: `Bearer ${k}` },
+          signal: AbortSignal.timeout(15000),
+        });
+        const ok = r.ok;
+        return res.json({ success: ok, ok, latencyMs: Date.now() - started, msg: ok ? `Groq API reachable — ${timed()}` : `Groq responded HTTP ${r.status}` });
+      }
+
+      if (provider === 'openai') {
+        const k = process.env.OPENAI_API_KEY;
+        if (!isOpenAIKey(k)) return res.json({ success: false, ok: false, error: 'OPENAI_API_KEY is not configured on the server.' });
+        const r = await fetch('https://api.openai.com/v1/models', {
+          headers: { Authorization: `Bearer ${k}` },
+          signal: AbortSignal.timeout(15000),
+        });
+        const ok = r.ok;
+        const detail = r.status === 429 ? ' (reachable, but the account has no credits/quota)' : '';
+        return res.json({ success: ok, ok, latencyMs: Date.now() - started, msg: ok ? `OpenAI API reachable — ${timed()}` : `OpenAI responded HTTP ${r.status}${detail}` });
+      }
+
+      if (provider === 'gemini') {
+        const k = process.env.GEMINI_API_KEY;
+        if (!isRealGeminiKey(k)) return res.json({ success: false, ok: false, error: 'GEMINI_API_KEY is not configured on the server.' });
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${k}`, {
+          signal: AbortSignal.timeout(15000),
+        });
+        const ok = r.ok;
+        return res.json({ success: ok, ok, latencyMs: Date.now() - started, msg: ok ? `Gemini API reachable — ${timed()}` : `Gemini responded HTTP ${r.status}` });
+      }
+
+      if (provider === 'paystack_secret') {
+        const k = process.env.PAYSTACK_SECRET_KEY;
+        if (!k || k.includes('your_') || k.includes('placeholder')) {
+          return res.json({ success: false, ok: false, error: 'PAYSTACK_SECRET_KEY is not configured on the server.' });
+        }
+        const r = await fetch('https://api.paystack.co/balance', {
+          headers: { Authorization: `Bearer ${k}` },
+          signal: AbortSignal.timeout(15000),
+        });
+        const ok = r.ok;
+        return res.json({ success: ok, ok, latencyMs: Date.now() - started, msg: ok ? `Paystack secret accepted — ${timed()}` : `Paystack responded HTTP ${r.status} (check key environment: live vs test)` });
+      }
+
+      if (provider === 'paystack_public') {
+        const k = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+        if (!k || k.includes('placeholder')) {
+          return res.json({ success: false, ok: false, error: 'NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY is not configured on the server.' });
+        }
+        return res.json({ success: true, ok: true, latencyMs: 0, msg: 'Public key present (client-side key — no remote ping possible)' });
+      }
+
+      if (provider === 'google_psi') {
+        const k = process.env.GOOGLE_PSI_API_KEY;
+        if (!k) return res.json({ success: false, ok: false, error: 'GOOGLE_PSI_API_KEY is not configured on the server.' });
+        const r = await fetch(`https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=https://jadai.dev&strategy=mobile&key=${k}`, {
+          signal: AbortSignal.timeout(30000),
+        });
+        const ok = r.ok;
+        return res.json({ success: ok, ok, latencyMs: Date.now() - started, msg: ok ? `PageSpeed audit completed — ${timed()}` : `PageSpeed responded HTTP ${r.status}` });
+      }
+
+      return res.status(400).json({ success: false, ok: false, error: `Unknown provider "${provider}"` });
+    } catch (err: any) {
+      const msg = err?.name === 'TimeoutError' || String(err?.message || '').includes('timeout')
+        ? 'Test timed out — network unreachable or provider down.'
+        : String(err?.message || err);
+      res.json({ success: false, ok: false, latencyMs: Date.now() - started, error: msg });
     }
   });
 
@@ -821,8 +1002,100 @@ async function startServer() {
   });
 
   // ---------------------------------------------------------------------------
-  // 6. TEMPLATES PURCHASE & DOWNLOAD
+  // TEMPLATE CATALOG (fs-backed admin store)
   // ---------------------------------------------------------------------------
+  app.get('/api/templates', (req, res) => {
+    try {
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ success: true, data: listTemplates() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || 'Catalog read failed' });
+    }
+  });
+
+  app.post('/api/admin/templates/save', (req, res) => {
+    try {
+      const template = req.body?.template;
+      if (!template || !template.slug || !template.name) {
+        return res.status(400).json({ success: false, error: 'template.slug and template.name are required' });
+      }
+      const saved = saveTemplate(template);
+      res.json({ success: true, template: saved });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || 'Save failed' });
+    }
+  });
+
+  app.post('/api/admin/templates/delete', (req, res) => {
+    try {
+      const slug = String(req.body?.slug || '');
+      if (!slug) return res.status(400).json({ success: false, error: 'slug is required' });
+      deleteTemplate(slug);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || 'Delete failed' });
+    }
+  });
+
+  app.post('/api/admin/templates/bundle', (req, res) => {
+    try {
+      const { slug, fileName, fileData } = req.body || {};
+      if (!slug || !fileName || !fileData) {
+        return res.status(400).json({ success: false, error: 'slug, fileName and fileData are required' });
+      }
+      const result = saveTemplateBundle(String(slug), String(fileName), String(fileData));
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err?.message || 'Bundle upload failed' });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // MICRO-APP DEPLOYMENTS (real files under dist/services + public/services)
+  // ---------------------------------------------------------------------------
+  app.get('/api/admin/deployments', (req, res) => {
+    try {
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ success: true, data: listDeployments() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || 'Registry read failed' });
+    }
+  });
+
+  app.post('/api/admin/deployments/deploy', (req, res) => {
+    try {
+      const { manifest, archiveBase64 } = req.body || {};
+      if (!manifest || !manifest.slug || !manifest.name) {
+        return res.status(400).json({ success: false, error: 'manifest.slug and manifest.name are required' });
+      }
+      const result = deployService(manifest, archiveBase64);
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err?.message || 'Deploy failed' });
+    }
+  });
+
+  app.post('/api/admin/deployments/toggle', (req, res) => {
+    try {
+      const id = String(req.body?.id || '');
+      if (!id) return res.status(400).json({ success: false, error: 'id is required' });
+      const record = toggleDeployment(id);
+      res.json({ success: true, record });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err?.message || 'Toggle failed' });
+    }
+  });
+
+  app.post('/api/admin/deployments/delete', (req, res) => {
+    try {
+      const id = String(req.body?.id || '');
+      if (!id) return res.status(400).json({ success: false, error: 'id is required' });
+      const result = deleteDeployment(id);
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err?.message || 'Delete failed' });
+    }
+  });
   app.post('/api/templates/purchase', rateLimit('template_purchase', { max: 20 }), async (req, res) => {
     try {
       const { template_id, currency, price, email } = req.body || {};

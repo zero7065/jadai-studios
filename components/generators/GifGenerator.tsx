@@ -150,6 +150,11 @@ export const GifGenerator: React.FC = () => {
       } catch {}
     } catch (err) {
       console.error(err);
+      showToast(
+        'Base image generation failed — all image providers are down or out of credits.',
+        'error',
+        'Generation Failed'
+      );
     } finally {
       setIsGeneratingBase(false);
     }

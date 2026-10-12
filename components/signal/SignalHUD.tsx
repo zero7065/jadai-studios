@@ -39,10 +39,10 @@ export function SignalHUD({
         showToast('Closer outreach message drafted', 'success');
       }
     } catch {
-      const fallback = `Saw your note on ${signal.platform} regarding the tooling friction. Encountered the same bottleneck recently — happy to share how we addressed it if helpful.`;
+      const fallback = `[UNSENT TEMPLATE — the outreach agent is offline; review before sending]\n\nSaw your note on ${signal.platform} regarding the tooling friction. Encountered the same bottleneck recently — happy to share how we addressed it if helpful.`;
       setDraft({ message: fallback, approach: 'helpful' });
       setMessageText(fallback);
-      showToast('Outreach draft generated', 'info');
+      showToast('Agent offline — inserted an editable template instead.', 'info');
     } finally {
       setDrafting(false);
     }

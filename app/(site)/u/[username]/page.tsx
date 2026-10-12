@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import EdgeGlow from '@/components/ui/EdgeGlow';
 import Button from '@/components/ui/Button';
 import { getProfileByUsername, COMMUNITY_PROFILES, INITIAL_POSTS, UserProfile } from '@/lib/data/communityData';
@@ -27,7 +27,14 @@ export default function UserProfilePage({
   params: { username: string };
   onNavigate?: (path: string) => void;
 }) {
-  const profile = getProfileByUsername(params.username) || COMMUNITY_PROFILES[0];
+  const rawUsername = (() => {
+    try {
+      return decodeURIComponent(params.username || '').trim();
+    } catch {
+      return String(params.username || '').trim();
+    }
+  })();
+  const profile = getProfileByUsername(rawUsername);
   const { showToast } = useToast();
 
   const [connected, setConnected] = useState(false);
@@ -35,13 +42,51 @@ export default function UserProfilePage({
   const [searchJadaiId, setSearchJadaiId] = useState('');
   const [foundUser, setFoundUser] = useState<UserProfile | null>(null);
 
-  const userPosts = INITIAL_POSTS.filter((p) => p.authorId === profile.id);
+  useEffect(() => {
+    try {
+      const list = JSON.parse(localStorage.getItem('jadai_local_connections') || '[]');
+      setConnected(list.includes(rawUsername.toLowerCase()));
+    } catch {}
+  }, [rawUsername]);
+
+  const userPosts = profile ? INITIAL_POSTS.filter((p) => p.authorId === profile.id) : [];
 
   const handleConnect = () => {
+    if (!profile || connected) return;
     StudioAudio.playSuccessArpeggio();
     setConnected(true);
-    showToast(`Connection signal transmitted to ${profile.displayName}`, 'success');
+    try {
+      const list = JSON.parse(localStorage.getItem('jadai_local_connections') || '[]');
+      if (!list.includes(rawUsername.toLowerCase())) list.push(rawUsername.toLowerCase());
+      localStorage.setItem('jadai_local_connections', JSON.stringify(list));
+    } catch {}
+    showToast(
+      `Following ${profile.displayName} on this device (saved locally — accounts arrive with Supabase)`,
+      'success'
+    );
   };
+
+  if (!profile) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6 text-[#c4c0bb]">
+        <div className="p-10 rounded-3xl bg-[#0a0908] border border-[rgba(201,168,76,0.3)] text-center space-y-4">
+          <h1 className="text-2xl font-display font-bold text-[#f5f3f0]">Profile not found</h1>
+          <p className="text-xs font-mono text-[#8a6e2a]">
+            No community member matches <span className="text-[#e8c96a]">@{rawUsername || '(empty)'}</span>.
+          </p>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() =>
+              onNavigate ? onNavigate('/') : (window.location.href = '/')
+            }
+          >
+            Back to Home
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const handleSearchJadaiId = (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,7 +184,7 @@ export default function UserProfilePage({
             {connected ? (
               <>
                 <Check className="w-4 h-4 text-emerald-400" />
-                <span>Connected in Mesh</span>
+                <span>Following (this device)</span>
               </>
             ) : (
               <>
@@ -167,7 +212,7 @@ export default function UserProfilePage({
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {profile.publicProjects.map((p) => (
+          {(profile.publicProjects || []).map((p) => (
             <div
               key={p.id}
               className="p-5 rounded-2xl bg-[#0a0908] border border-[rgba(201,168,76,0.2)] hover:border-[#C9A84C] transition-all space-y-2 group"

@@ -1,7 +1,7 @@
 // Shared image request helper for all visual tools (Mirage, Logo, Thumbnail, Creative).
-// Server-first: POST /api/mirage/generate runs the provider chain (OpenAI → Pollinations
-// → fal → HF). If the server is unreachable, falls back to building Pollinations URLs
-// directly in the browser — images still generate, just via the free provider.
+// Server-first: POST /api/mirage/generate runs the provider chain (OpenAI primary →
+// failover). If no provider produced an image, this returns an EMPTY url list so
+// callers can show an honest error — never a dead placeholder URL.
 
 export interface ImageRequestOptions {
   width?: number;
@@ -13,12 +13,8 @@ export interface ImageRequestOptions {
 
 export interface ImageRequestResult {
   urls: string[];
-  /** 'server' = provider chain ran server-side (OpenAI when available). 'browser' = Pollinations only. */
-  source: 'server' | 'browser';
-}
-
-function pollinationsUrl(prompt: string, width: number, height: number, seed: number): string {
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&seed=${seed}&nologo=true`;
+  /** 'server' = provider chain ran and returned images. 'failed' = no provider produced an image. */
+  source: 'server' | 'failed';
 }
 
 // Exact dims → server aspect bucket (the server derives its generation dims from this).
@@ -49,7 +45,7 @@ export async function requestImages(
   const seeds =
     options.seeds || Array.from({ length: count }, () => Math.floor(Math.random() * 1_000_000));
 
-  // --- Server chain first (OpenAI primary when key + credits exist) ---
+  // --- Server chain (OpenAI primary when key + credits exist) ---
   try {
     const res = await fetch('/api/mirage/generate', {
       method: 'POST',
@@ -67,12 +63,9 @@ export async function requestImages(
       }
     }
   } catch {
-    // fall through to browser generation
+    // Server unreachable — treated as provider failure below.
   }
 
-  // --- Browser fallback: free Pollinations provider ---
-  return {
-    urls: seeds.map((seed) => pollinationsUrl(fullPrompt, width, height, seed)),
-    source: 'browser',
-  };
+  // No provider produced an image. Callers must surface an honest error.
+  return { urls: [], source: 'failed' };
 }

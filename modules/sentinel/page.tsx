@@ -278,15 +278,10 @@ function ShortenTab({ ensureAccess }: { ensureAccess: () => Promise<boolean> }) 
       StudioAudio.playSuccessArpeggio();
       showToast(cloaked ? 'Cloaked short link created' : 'Short link created', 'success', 'Sentinel Link Matrix');
     } catch {
-      const shortSlug = slug || Math.random().toString(36).substring(2, 8);
-      const host = window.location.origin;
-      setResult({
-        slug: shortSlug,
-        shortUrl: `${host}/s/${shortSlug}`,
-        targetUrl: url,
-        cloaked,
-      });
-      showToast('Short link generated locally', 'info');
+      showToast(
+        'Short link service unreachable — the server did not respond, so no link was created.',
+        'error'
+      );
     }
   }
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, AlertTriangle, ShieldCheck, Mail, Lock, User, AtSign, ArrowRight } from 'lucide-react';
-import { supabase } from '../../lib/supabase/client';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase/client';
 import { StudioAudio } from '../../lib/watermark';
 
 export interface AuthModalProps {
@@ -56,18 +56,57 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         throw oauthError;
       }
     } catch (err: any) {
-      // In sandbox/preview where full Google redirect is not configured, create a verified demo user
-      const googleUser = {
-        id: `usr-google-${Date.now()}`,
-        email: email || 'architect@jadai.dev',
-        name: displayName || 'Google User',
-        username: (displayName || 'architect').toLowerCase().replace(/\s+/g, '_'),
-        avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces',
+      // No fabrication — report exactly why sign-in can't proceed.
+      setError(
+        isSupabaseConfigured()
+          ? err?.message || 'Google sign-in failed.'
+          : 'Google sign-in requires Supabase OAuth configuration — not active on this deployment yet.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!email || !password) {
+      setError('Please provide both email and password.');
+      return;
+    }
+
+    if (!isSupabaseConfigured()) {
+      setError('Sign-in requires Supabase authentication — not configured for this deployment yet.');
+      return;
+    }
+
+    try {
+      StudioAudio.playClick();
+    } catch {}
+
+    setLoading(true);
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) {
+        setError(authError.message);
+        return;
+      }
+      const user = data.user;
+      const session = {
+        id: user?.id || `usr-${Date.now()}`,
+        email: user?.email || email,
+        name: (user?.user_metadata?.full_name as string) || email.split('@')[0],
+        username:
+          (user?.user_metadata?.username as string) || email.split('@')[0].toLowerCase(),
+        avatar_url:
+          (user?.user_metadata?.avatar_url as string) ||
+          `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(email)}`,
         tier: 'member',
-        provider: 'google',
+        provider: 'supabase',
         createdAt: new Date().toISOString(),
       };
-      localStorage.setItem('jadai_user_session', JSON.stringify(googleUser));
+      localStorage.setItem('jadai_user_session', JSON.stringify(session));
       window.dispatchEvent(new CustomEvent('jadai_session_updated'));
       try {
         StudioAudio.playSuccessArpeggio();
@@ -79,39 +118,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleSignIn = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (!email || !password) {
-      setError('Please provide both email and password.');
-      return;
-    }
-
-    try {
-      StudioAudio.playClick();
-    } catch {}
-
-    const session = {
-      id: `usr-${Date.now()}`,
-      email,
-      name: email.split('@')[0],
-      username: email.split('@')[0].toLowerCase(),
-      avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(email)}`,
-      tier: 'member',
-      createdAt: new Date().toISOString(),
-    };
-
-    localStorage.setItem('jadai_user_session', JSON.stringify(session));
-    window.dispatchEvent(new CustomEvent('jadai_session_updated'));
-    try {
-      StudioAudio.playSuccessArpeggio();
-    } catch {}
-    if (onSuccess) onSuccess();
-    onClose();
-  };
-
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -130,27 +137,53 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
+    if (!isSupabaseConfigured()) {
+      setError('Registration requires Supabase authentication — not configured for this deployment yet.');
+      return;
+    }
+
     try {
       StudioAudio.playClick();
     } catch {}
 
-    const session = {
-      id: `usr-${Date.now()}`,
-      email,
-      name: displayName,
-      username: cleanUsername,
-      avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(cleanUsername)}`,
-      tier: 'member',
-      createdAt: new Date().toISOString(),
-    };
-
-    localStorage.setItem('jadai_user_session', JSON.stringify(session));
-    window.dispatchEvent(new CustomEvent('jadai_session_updated'));
+    setLoading(true);
     try {
-      StudioAudio.playSuccessArpeggio();
-    } catch {}
-    if (onSuccess) onSuccess();
-    onClose();
+      const { data, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: displayName, username: cleanUsername },
+        },
+      });
+      if (authError) {
+        setError(authError.message);
+        return;
+      }
+      if (!data.session) {
+        setError('Account created. Check your email to confirm your address, then sign in.');
+        return;
+      }
+      const user = data.user;
+      const session = {
+        id: user?.id || `usr-${Date.now()}`,
+        email: user?.email || email,
+        name: displayName,
+        username: cleanUsername,
+        avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(cleanUsername)}`,
+        tier: 'member',
+        provider: 'supabase',
+        createdAt: new Date().toISOString(),
+      };
+      localStorage.setItem('jadai_user_session', JSON.stringify(session));
+      window.dispatchEvent(new CustomEvent('jadai_session_updated'));
+      try {
+        StudioAudio.playSuccessArpeggio();
+      } catch {}
+      if (onSuccess) onSuccess();
+      onClose();
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGuestContinue = () => {

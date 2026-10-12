@@ -21,6 +21,8 @@ export interface TemplateItem {
     accent: string;
     headingFont?: string;
   };
+  /** Server-stored bundle location (set after a real ZIP upload). */
+  bundle_path?: string;
 }
 
 export const SEED_TEMPLATES: TemplateItem[] = [

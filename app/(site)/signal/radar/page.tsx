@@ -58,19 +58,22 @@ export default function SignalRadarPage({
 
     try {
       const res = await fetch('/api/worker/scout', { method: 'POST' });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       await loadSignals();
-      StudioAudio.playSuccessArpeggio();
-      showToast(
-        data.message || `Scout scan completed. ${data.result?.savedCount || 3} new signals detected.`,
-        'success'
-      );
+      if (res.ok && data?.success) {
+        StudioAudio.playSuccessArpeggio();
+        const count = data.result?.savedCount ?? 0;
+        showToast(
+          count > 0
+            ? `Scout scan completed. ${count} new signal${count === 1 ? '' : 's'} detected.`
+            : 'Scout scan completed — no new signals found.',
+          'success'
+        );
+      } else {
+        showToast(data?.error || 'Scout worker could not run — no new signals added.', 'error');
+      }
     } catch {
-      // In-memory run
-      await signalStore.runImmediateScout();
-      await loadSignals();
-      StudioAudio.playSuccessArpeggio();
-      showToast('Scout scan completed with cached developer discussions.', 'success');
+      showToast('Scout worker unreachable — no new signals added.', 'error');
     } finally {
       setScanning(false);
     }

@@ -128,10 +128,10 @@ export const ContentView: React.FC<ContentViewProps> = ({ onNavigate }) => {
         throw new Error('Writer fallback');
       }
     } catch {
-      // Local fallback generation
-      const xFallback = `Shipped ${summary}. Lesson: don't over-engineer before you verify demand. Build the floor first. #buildinpublic`;
-      const liFallback = `Reflecting on our latest release: ${summary}.\n\nWhen we started building Jadai Studios, we thought features mattered most. Turns out distribution and simplicity win every time.\n\n${details || 'Ship fast, measure intent, listen to what developers complain about.'}\n\n#SoftwareEngineering #TechFounders`;
-      const rdFallback = `Quick write-up on how we built and deployed ${summary} without adding tech debt. Details and architectural lessons inside.`;
+      // Labelled templates — never presented as agent output.
+      const xFallback = `[OFFLINE TEMPLATE — writer agent unreachable]\n\nShipped ${summary}. Lesson: don't over-engineer before you verify demand. Build the floor first. #buildinpublic`;
+      const liFallback = `[OFFLINE TEMPLATE — writer agent unreachable]\n\nReflecting on our latest release: ${summary}.\n\nWhen we started building Jadai Studios, we thought features mattered most. Turns out distribution and simplicity win every time.\n\n${details || 'Ship fast, measure intent, listen to what developers complain about.'}\n\n#SoftwareEngineering #TechFounders`;
+      const rdFallback = `[OFFLINE TEMPLATE — writer agent unreachable]\n\nQuick write-up on how we built and deployed ${summary} without adding tech debt. Details and architectural lessons inside.`;
 
       setLatestDrafts({
         x: xFallback,
@@ -140,7 +140,7 @@ export const ContentView: React.FC<ContentViewProps> = ({ onNavigate }) => {
       });
 
       StudioAudio.playSuccess();
-      showToast('Generated drafts using local Writer Agent', 'info');
+      showToast('Writer agent offline — inserted editable templates instead.', 'info');
     } finally {
       setIsGenerating(false);
     }
