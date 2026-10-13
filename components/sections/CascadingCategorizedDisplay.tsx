@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import EdgeGlow from '../ui/EdgeGlow';
 import StatusBadge from '../ui/StatusBadge';
 import ModuleIcon from '../ui/ModuleIcon';
-import SacredGeometry from '../ui/SacredGeometry';
 import { PLAYGROUND_TOOLS } from '../../lib/data/playgroundTools';
 import { StudioAudio } from '../../lib/watermark';
 import { getCustomization } from '../../lib/data/customization';

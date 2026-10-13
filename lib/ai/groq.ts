@@ -109,3 +109,117 @@ export async function callGroq(
 
   throw lastError || new Error('Groq: all model candidates failed');
 }
+
+/**
+ * Streams a Groq chat completion token-by-token.
+ * Calls `onToken` for each content delta; resolves with the full assembled text.
+ * Uses non-reasoning models first so tokens appear immediately (reasoning models
+ * burn 10-60s on chain-of-thought before emitting visible content — bad UX for chat).
+ */
+export async function streamGroq(
+  prompt: string,
+  options: GroqGenerationOptions & {
+    onToken: (delta: string) => void;
+    signal?: AbortSignal;
+  }
+): Promise<{ text: string; model: string }> {
+  const apiKey = options.apiKey || process.env.GROQ_API_KEY;
+  if (!isRealGroqKey(apiKey)) {
+    throw new Error('Groq API Key not configured');
+  }
+
+  const messages: Array<{ role: string; content: string }> = [];
+  if (options.systemPrompt) {
+    messages.push({ role: 'system', content: options.systemPrompt });
+  }
+  messages.push({ role: 'user', content: prompt });
+
+  // Streaming order: non-reasoning first (instant tokens), reasoning as last resort.
+  const streamCandidates = [
+    'qwen/qwen3.8-27b',
+    'allam-2-7b',
+    'openai/gpt-oss-20b',
+    'openai/gpt-oss-120b',
+  ];
+
+  let lastError: any = null;
+
+  for (const model of streamCandidates) {
+    const reasoningModel = model.includes('gpt-oss');
+    const maxTokens = options.maxTokens ?? (reasoningModel ? 4096 : 2048);
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: options.temperature ?? 0.7,
+          max_tokens: maxTokens,
+          stream: true,
+        }),
+        signal: options.signal,
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        const err: any = new Error(`Groq stream failure (${model}): HTTP ${response.status} - ${errorBody}`);
+        err.httpStatus = response.status;
+        throw err;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Groq stream: no response body');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullText = '';
+
+      // SSE lines look like: data: {...}\n\n  or  data: [DONE]\n\n
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const payload = trimmed.slice(5).trim();
+          if (payload === '[DONE]') continue;
+          try {
+            const json = JSON.parse(payload);
+            const choice = json.choices?.[0];
+            // Reasoning models (gpt-oss) emit chain-of-thought in reasoning_content
+            // before the visible answer lands in content — skip CoT, stream content only.
+            const delta = choice?.delta?.content || '';
+            if (delta) {
+              fullText += delta;
+              options.onToken(delta);
+            }
+          } catch {
+            // Partial JSON across chunk boundaries — skip until next complete line.
+          }
+        }
+      }
+
+      if (!fullText.trim()) {
+        const err: any = new Error(`Groq stream returned empty content for ${model}`);
+        err.emptyContent = true;
+        throw err;
+      }
+
+      return { text: fullText, model };
+    } catch (err: any) {
+      if (err.name === 'AbortError') throw err; // caller cancelled — don't fall through
+      lastError = err;
+      if (err.httpStatus === 401 || err.httpStatus === 403) break;
+      logger.warn(`Groq stream candidate failed, trying next`, { model, error: err.message });
+    }
+  }
+
+  throw lastError || new Error('Groq stream: all model candidates failed');
+}

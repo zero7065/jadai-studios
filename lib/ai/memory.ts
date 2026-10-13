@@ -329,6 +329,95 @@ export async function askPrime(options: AskPrimeOptions): Promise<AskPrimeResult
   }
 }
 
+/**
+ * Streaming variant of askPrime — consumes the SSE endpoint
+ * (/api/ai/chat/stream) and invokes onToken for each delta.
+ * Falls back to the buffered askPrime if the stream errors out.
+ */
+export async function askPrimeStream(
+  options: AskPrimeOptions & {
+    onToken: (delta: string) => void;
+    signal?: AbortSignal;
+  }
+): Promise<AskPrimeResult> {
+  const scope = options.scope || options.moduleSlug || 'oracle';
+  const payload = await buildMemoryPayload(scope);
+
+  const body: Record<string, unknown> = {
+    prompt: options.prompt,
+    systemPrompt: options.systemPrompt,
+    moduleSlug: options.moduleSlug || scope,
+    persona: options.persona,
+    temperature: options.temperature,
+    history: options.history ?? payload.history,
+    memory: options.memory ?? payload.facts,
+  };
+
+  try {
+    const res = await fetch('/api/ai/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: options.signal,
+    });
+
+    if (!res.ok || !res.body) {
+      throw new Error(`Stream request failed (${res.status})`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullText = '';
+    let provider = 'groq';
+    let error: string | undefined;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const chunks = buffer.split('\n\n');
+      buffer = chunks.pop() || '';
+      for (const chunk of chunks) {
+        const eventMatch = chunk.match(/^event: (.+)$/m);
+        const dataMatch = chunk.match(/^data: (.+)$/m);
+        if (!eventMatch || !dataMatch) continue;
+        const event = eventMatch[1].trim();
+        let json: any;
+        try {
+          json = JSON.parse(dataMatch[1]);
+        } catch {
+          continue;
+        }
+        if (event === 'token' && json.delta) {
+          fullText += json.delta;
+          options.onToken(json.delta);
+        } else if (event === 'done') {
+          provider = json.provider || provider;
+        } else if (event === 'error') {
+          error = json.error || 'Stream error';
+        }
+      }
+    }
+
+    if (error) throw new Error(error);
+
+    const text = fullText || 'Transmission received. Continue.';
+    if (!options.ephemeral) {
+      appendTranscript(scope, 'user', options.prompt);
+      appendTranscript(scope, 'assistant', text);
+    }
+    return { text, provider };
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      return { text: '', provider: 'aborted', error: 'aborted' };
+    }
+    // Stream failed mid-flight — fall back to buffered askPrime (same payload).
+    const { onToken: _omit, signal: _omitSignal, ...rest } = options;
+    return askPrime(rest);
+  }
+}
+
 export async function askGrounded(options: AskGroundedOptions): Promise<AskGroundedResult> {
   const scope = options.scope || 'ultron';
   const payload = await buildMemoryPayload(scope);

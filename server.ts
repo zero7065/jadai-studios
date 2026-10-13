@@ -23,6 +23,14 @@ import { generateGroundedContent } from './lib/ai/grounded';
 import { shortLinksDb, createShortLink } from './lib/shortlinks';
 import { listTemplates, saveTemplate, deleteTemplate, saveTemplateBundle } from './lib/data/templatesStore';
 import {
+  listProjects as listPortfolioProjects,
+  saveProject as savePortfolioProject,
+  deleteProject as deletePortfolioProject,
+  getProjectBySlug as getPortfolioProjectBySlug,
+  bumpViews as bumpPortfolioViews,
+  previewFromUrl,
+} from './lib/data/portfolioStore';
+import {
   listDeployments,
   deployService,
   toggleDeployment,
@@ -1051,6 +1059,74 @@ async function startServer() {
   });
 
   // ---------------------------------------------------------------------------
+  // PORTFOLIO (public read + admin write) & LINK PREVIEW
+  // ---------------------------------------------------------------------------
+  app.get('/api/portfolio', (req, res) => {
+    try {
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ success: true, data: listPortfolioProjects() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || 'Portfolio read failed' });
+    }
+  });
+
+  app.get('/api/portfolio/:slug', (req, res) => {
+    try {
+      const project = getPortfolioProjectBySlug(String(req.params.slug));
+      if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+      res.json({ success: true, project });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || 'Project read failed' });
+    }
+  });
+
+  app.post('/api/portfolio/:slug/view', (req, res) => {
+    try {
+      bumpPortfolioViews(String(req.params.slug));
+      res.json({ success: true });
+    } catch {
+      res.json({ success: true });
+    }
+  });
+
+  app.post('/api/admin/portfolio/save', (req, res) => {
+    try {
+      const project = req.body?.project;
+      if (!project || !project.slug || !project.title) {
+        return res.status(400).json({ success: false, error: 'project.slug and project.title are required' });
+      }
+      const saved = savePortfolioProject(project);
+      res.json({ success: true, project: saved });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || 'Save failed' });
+    }
+  });
+
+  app.post('/api/admin/portfolio/delete', (req, res) => {
+    try {
+      const slug = String(req.body?.slug || '');
+      if (!slug) return res.status(400).json({ success: false, error: 'slug is required' });
+      deletePortfolioProject(slug);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || 'Delete failed' });
+    }
+  });
+
+  // Link preview — fetches og:title/og:description/og:image from a URL so
+  // admins can "Add via Link" without typing metadata by hand.
+  app.post('/api/admin/link-preview', async (req, res) => {
+    try {
+      const url = String(req.body?.url || '').trim();
+      if (!url) return res.status(400).json({ success: false, error: 'url is required' });
+      const preview = await previewFromUrl(url);
+      res.json({ success: true, preview });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || 'Preview failed' });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
   // MICRO-APP DEPLOYMENTS (real files under dist/services + public/services)
   // ---------------------------------------------------------------------------
   app.get('/api/admin/deployments', (req, res) => {
@@ -1398,6 +1474,82 @@ async function startServer() {
       res.json({ success: true, data: result });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // SSE STREAMING CHAT — /api/ai/chat/stream
+  // Streams Groq tokens as Server-Sent Events so Oracle (and any chat UI)
+  // renders responses token-by-token instead of waiting for the full buffer.
+  // ---------------------------------------------------------------------------
+  app.post('/api/ai/chat/stream', rateLimit('ai_chat_stream', { max: 20 }), async (req, res) => {
+    const { prompt, systemPrompt, moduleSlug, persona, history, memory, temperature } = req.body;
+    if (!prompt || typeof prompt !== 'string') {
+      return res.status(400).json({ success: false, error: 'Missing prompt' });
+    }
+
+    const assembled = assembleChatRequest({
+      prompt: prompt.slice(0, 8000),
+      systemPrompt: typeof systemPrompt === 'string' ? systemPrompt.slice(0, 4000) : undefined,
+      persona: typeof persona === 'string' ? persona : undefined,
+      history: Array.isArray(history) ? history : undefined,
+      memory: Array.isArray(memory) || (memory && typeof memory === 'object') ? memory : undefined,
+    });
+
+    // SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+
+    const send = (event: string, data: unknown) => {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const abort = new AbortController();
+    // Use res 'close' (client disconnect mid-stream), NOT req 'close'
+    // (which fires as soon as the request body is consumed — aborting instantly).
+    res.on('close', () => {
+      if (!res.writableEnded) abort.abort();
+    });
+
+    try {
+      const { streamGroq } = await import('./lib/ai/groq');
+      const { isRealGroqKey } = await import('./lib/config/envTrust');
+
+      if (!isRealGroqKey(process.env.GROQ_API_KEY)) {
+        // Honest fallback: no stream available — fall back to non-streaming generateText.
+        const { generateText } = await import('./lib/ai');
+        const result = await generateText(assembled.prompt, {
+          systemPrompt: assembled.systemPrompt,
+          moduleSlug: moduleSlug || 'oracle',
+        });
+        send('token', { delta: result.text });
+        send('done', { provider: result.provider, mode: 'buffered-fallback' });
+        return res.end();
+      }
+
+      send('start', { mode: 'groq-stream' });
+
+      let fullText = '';
+      const result = await streamGroq(assembled.prompt, {
+        systemPrompt: assembled.systemPrompt,
+        temperature: typeof temperature === 'number' ? Math.min(2, Math.max(0, temperature)) : undefined,
+        signal: abort.signal,
+        onToken: (delta) => {
+          fullText += delta;
+          send('token', { delta });
+        },
+      });
+
+      send('done', { provider: 'groq', model: result.model, mode: 'stream' });
+      res.end();
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return res.end();
+      send('error', { error: err?.message || 'Stream failed' });
+      res.end();
     }
   });
 

@@ -53,7 +53,7 @@ export const Hero: React.FC<HeroProps> = ({
           {/* Card 1: 70 Parables */}
           <div
             onClick={() => scrollToTarget('work-section', '/book-of-lies')}
-            className="p-4 rounded-2xl bg-[rgba(15,14,12,0.7)] border border-[rgba(201,168,76,0.25)] hover:border-[#C9A84C] opacity-80 hover:opacity-100 transition-all duration-300 cursor-pointer backdrop-blur-xl flex flex-col justify-between text-left group shadow-lg"
+            className="p-4 rounded-2xl bg-[rgba(15,14,12,0.7)] border border-[rgba(201,168,76,0.25)] hover:border-[#C9A84C] opacity-80 hover:opacity-100 transition-all duration-300 cursor-pointer flex flex-col justify-between text-left group shadow-lg"
           >
             <span
               className="text-xl sm:text-2xl font-display font-bold text-[#C9A84C] group-hover:text-[#e8c96a] transition-colors"
@@ -69,7 +69,7 @@ export const Hero: React.FC<HeroProps> = ({
           {/* Card 2: $0 / ₦0 */}
           <div
             onClick={() => scrollToTarget('pricing-section', '/upgrade')}
-            className="p-4 rounded-2xl bg-[rgba(15,14,12,0.7)] border border-[rgba(201,168,76,0.25)] hover:border-[#C9A84C] opacity-80 hover:opacity-100 transition-all duration-300 cursor-pointer backdrop-blur-xl flex flex-col justify-between text-left group shadow-lg"
+            className="p-4 rounded-2xl bg-[rgba(15,14,12,0.7)] border border-[rgba(201,168,76,0.25)] hover:border-[#C9A84C] opacity-80 hover:opacity-100 transition-all duration-300 cursor-pointer flex flex-col justify-between text-left group shadow-lg"
           >
             <span
               className="text-xl sm:text-2xl font-display font-bold text-[#C9A84C] group-hover:text-[#e8c96a] transition-colors"
@@ -85,7 +85,7 @@ export const Hero: React.FC<HeroProps> = ({
           {/* Card 3: 5 Suites */}
           <div
             onClick={() => scrollToTarget('studio-tools-section', '/services')}
-            className="p-4 rounded-2xl bg-[rgba(15,14,12,0.7)] border border-[rgba(201,168,76,0.25)] hover:border-[#C9A84C] opacity-80 hover:opacity-100 transition-all duration-300 cursor-pointer backdrop-blur-xl flex flex-col justify-between text-left group shadow-lg"
+            className="p-4 rounded-2xl bg-[rgba(15,14,12,0.7)] border border-[rgba(201,168,76,0.25)] hover:border-[#C9A84C] opacity-80 hover:opacity-100 transition-all duration-300 cursor-pointer flex flex-col justify-between text-left group shadow-lg"
           >
             <span
               className="text-xl sm:text-2xl font-display font-bold text-[#C9A84C] group-hover:text-[#e8c96a] transition-colors"
@@ -101,7 +101,7 @@ export const Hero: React.FC<HeroProps> = ({
           {/* Card 4: Global Craft */}
           <div
             onClick={() => scrollToTarget('origins-section', '/about')}
-            className="p-4 rounded-2xl bg-[rgba(15,14,12,0.7)] border border-[rgba(201,168,76,0.25)] hover:border-[#C9A84C] opacity-80 hover:opacity-100 transition-all duration-300 cursor-pointer backdrop-blur-xl flex flex-col justify-between text-left group shadow-lg"
+            className="p-4 rounded-2xl bg-[rgba(15,14,12,0.7)] border border-[rgba(201,168,76,0.25)] hover:border-[#C9A84C] opacity-80 hover:opacity-100 transition-all duration-300 cursor-pointer flex flex-col justify-between text-left group shadow-lg"
           >
             <span
               className="text-xl sm:text-2xl font-display font-bold text-[#C9A84C] group-hover:text-[#e8c96a] transition-colors"

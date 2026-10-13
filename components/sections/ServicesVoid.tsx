@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import SacredGeometry from '../ui/SacredGeometry';
 import GlassCard from '../ui/GlassCard';
 import EdgeGlow from '../ui/EdgeGlow';
 import { StudioAudio } from '../../lib/watermark';
@@ -132,9 +131,9 @@ export const ServicesVoid: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-[#050404] via-[#050404]/85 to-[#050404]" />
       </div>
 
-      {/* 200 Gold Particles Drifting Slowly */}
-      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden opacity-40">
-        {Array.from({ length: 200 }).map((_, i) => (
+      {/* 12 Gold Particles Drifting Slowly (capped for scroll performance) */}
+      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden opacity-40" style={{ contain: 'layout style paint' }}>
+        {Array.from({ length: 12 }).map((_, i) => (
           <div
             key={i}
             className="absolute rounded-full bg-[#C9A84C]"
@@ -152,21 +151,27 @@ export const ServicesVoid: React.FC = () => {
         ))}
       </div>
 
-      {/* Central Metatron's Cube rotating 90s/rev, cursor-reactive */}
+      {/* Central Metatron ring — CSS-only, opacity-only decoration */}
       <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0 flex items-center justify-center opacity-25"
-        style={{
-          transform: `translate(-50%, -50%) translate(${mouseOffset.x * 0.3}px, ${mouseOffset.y * 0.3}px)`,
-          transition: 'transform 0.1s ease-out',
-        }}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0 flex items-center justify-center opacity-20"
+        style={{ contain: 'layout style paint' }}
       >
         <div
+          className="rounded-full border border-dashed border-[rgba(201,168,76,0.4)]"
           style={{
+            width: 560,
+            height: 560,
             animation: 'metatronSpin 90s linear infinite',
           }}
-        >
-          <SacredGeometry size={700} opacity={0.4} interactive={true} />
-        </div>
+        />
+        <div
+          className="absolute rounded-full border border-[rgba(201,168,76,0.25)]"
+          style={{
+            width: 380,
+            height: 380,
+            animation: 'metatronSpin 90s linear infinite reverse',
+          }}
+        />
       </div>
 
       {/* Vertical Rotated Text on LEFT Edge: "BUILD" */}

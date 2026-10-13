@@ -39,6 +39,7 @@ import PremiumProfilePage from '../app/(site)/account/premium/page';
 import UserProfilePage from '../app/(site)/u/[username]/page';
 import CommunityPage from '../app/(site)/community/page';
 import SignalApp from '../components/signal/SignalApp';
+import AuthCallback from '../components/auth/AuthCallback';
 import SignalLanding from '../app/(site)/signal/page';
 import SignalRadarPage from '../app/(site)/signal/radar/page';
 import SignalDetailPage from '../app/(site)/signal/radar/[id]/page';
@@ -360,6 +361,8 @@ function AppContent() {
       switch (normalized) {
         case '/':
           return <HomePage onNavigate={navigateTo} />;
+        case '/auth/callback':
+          return <AuthCallback onNavigate={navigateTo} />;
         case '/dashboard':
           return <CentralDashboard onNavigate={navigateTo} />;
         case '/create':

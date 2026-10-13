@@ -277,26 +277,26 @@ You cannot outsmart arithmetic with charisma. Build the floor.`,
     <div className="relative min-h-[92vh] py-12 px-4 sm:px-6 max-w-7xl mx-auto space-y-10 select-none overflow-hidden bg-book-atmos">
       {/* Warm Crimson Radial Glow behind carousel */}
       <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[550px] pointer-events-none blur-3xl z-0 opacity-80"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[550px] pointer-events-none blur-3xl z-0 opacity-70"
         style={{
-          background: 'radial-gradient(ellipse at center, rgba(192,57,43,0.3) 0%, rgba(201,168,76,0.12) 40%, transparent 75%)',
+          background: 'radial-gradient(ellipse at center, rgba(192,57,43,0.28) 0%, rgba(201,168,76,0.1) 40%, transparent 75%)',
+          contain: 'layout style paint',
         }}
       />
 
-      {/* Ambient Gold Particles Drifting Up */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-40">
-        {Array.from({ length: 24 }).map((_, i) => (
+      {/* Ambient Gold Particles Drifting Up (sparse, no per-particle glow) */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-35" style={{ contain: 'layout style paint' }}>
+        {Array.from({ length: 8 }).map((_, i) => (
           <div
             key={i}
             className="absolute rounded-full bg-[#C9A84C]"
             style={{
               width: `${(i % 3) + 2}px`,
               height: `${(i % 3) + 2}px`,
-              left: `${(i * 17 + 5) % 100}%`,
+              left: `${(i * 23 + 7) % 100}%`,
               bottom: `-20px`,
-              opacity: (i % 5 + 3) / 10,
-              boxShadow: '0 0 8px #C9A84C',
-              animation: `particleFloat ${7 + (i % 6)}s linear infinite ${i * 0.4}s`,
+              opacity: (i % 4 + 3) / 12,
+              animation: `particleFloat ${9 + (i % 5)}s linear infinite ${i * 0.9}s`,
             }}
           />
         ))}
@@ -311,8 +311,8 @@ You cannot outsmart arithmetic with charisma. Build the floor.`,
         <h1 className="text-4xl sm:text-6xl font-display font-bold text-[#f5f3f0] tracking-wide">
           The Book of Lies
         </h1>
-        <p className="text-sm font-serif italic text-[#c4c0bb]">
-          Philosophical fiction, moral parables, and strategic reflections.
+        <p className="text-base font-serif italic text-[#8a6e2a] max-w-lg mx-auto leading-relaxed">
+          Moral parables on the lies builders tell themselves — and the floors that remember every one of them.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
           <button

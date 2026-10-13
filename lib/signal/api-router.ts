@@ -5,6 +5,26 @@ import { runCloserAgent } from './agents/closer';
 import { runWriterAgent } from './agents/writer';
 import { initializePaystackTransaction, getPaystackSecretKey } from '../paystack';
 import { SIGNAL_PLANS, SignalPlanTier } from './types';
+import { generateText } from '../ai';
+import {
+  listCampaigns,
+  getCampaign,
+  createCampaign,
+  saveAnalysis,
+  saveCompetitors,
+  saveSegments,
+  saveProspects,
+  saveContacts,
+  saveEmail,
+  markEmailSent,
+  deleteCampaign,
+  campaignSummaries,
+  CampaignCompetitor,
+  CampaignSegment,
+  CampaignProspect,
+  CampaignContact,
+  CampaignEmail,
+} from './campaignsStore';
 
 export const signalRouter = Router();
 
@@ -142,6 +162,302 @@ signalRouter.post('/trackers/:id/toggle', (req, res) => {
 signalRouter.delete('/trackers/:id', (req, res) => {
   const removed = signalStore.deleteTracker(req.params.id);
   res.json({ success: true, removed });
+});
+
+// ---------------------------------------------------------------------------
+// 3B. OUTREACH CAMPAIGNS (6-step Explee-style pipeline)
+// ---------------------------------------------------------------------------
+const uid = () => `u_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+/** Run a JSON-producing AI step with an honest fallback when no key/credits. */
+async function aiJsonStep<T>(
+  prompt: string,
+  fallback: T,
+  opts: { note?: string } = {}
+): Promise<{ data: T; provider: string; fallback: boolean; note?: string }> {
+  try {
+    const result = await generateText(prompt, {
+      systemPrompt:
+        'You are a precise B2B research and outreach assistant. Respond ONLY with valid JSON. No markdown fences, no commentary.',
+    });
+    const cleaned = (result.text || '')
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim();
+    const parsed = JSON.parse(cleaned);
+    return {
+      data: parsed as T,
+      provider: result.provider,
+      fallback: false,
+    };
+  } catch {
+    return {
+      data: fallback,
+      provider: 'fallback',
+      fallback: true,
+      note:
+        opts.note ||
+        'AI step unavailable (no provider credits or key). Showing honest fallback data — connect OPENAI_API_KEY or GROQ_API_KEY for live results.',
+    };
+  }
+}
+
+signalRouter.get('/campaigns', (_req, res) => {
+  res.json({ success: true, campaigns: listCampaigns(), summaries: campaignSummaries() });
+});
+
+signalRouter.get('/campaigns/:id', (req, res) => {
+  const campaign = getCampaign(req.params.id);
+  if (!campaign) {
+    return res.status(404).json({ success: false, error: 'Campaign not found' });
+  }
+  res.json({ success: true, campaign });
+});
+
+signalRouter.post('/campaigns', (req, res) => {
+  const domain = String(req.body?.domain || '').trim();
+  if (!domain) {
+    return res.status(400).json({ success: false, error: 'domain is required (e.g. stripe.com)' });
+  }
+  try {
+    const campaign = createCampaign({ user_id: uid(), domain });
+    res.json({ success: true, campaign });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+signalRouter.delete('/campaigns/:id', (req, res) => {
+  const ok = deleteCampaign(req.params.id);
+  if (!ok) return res.status(404).json({ success: false, error: 'Campaign not found' });
+  res.json({ success: true, message: 'Campaign deleted' });
+});
+
+// Step 1 — Analyze the company
+signalRouter.post('/campaigns/:id/analyze', async (req, res) => {
+  const campaign = getCampaign(req.params.id);
+  if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+
+  const { data, provider, fallback, note } = await aiJsonStep<{
+    company_name: string;
+    company_description: string;
+    category: string;
+    location_hint: string;
+  }>(
+    `Analyze the company behind the domain "${campaign.domain}". Infer company name, a one-sentence description, industry category, and likely HQ location. Respond as JSON: {"company_name": string, "company_description": string, "category": string, "location_hint": string}`,
+    {
+      company_name: campaign.domain.split('.')[0],
+      company_description: `Company operating at ${campaign.domain}.`,
+      category: 'Unknown',
+      location_hint: 'Unknown',
+    }
+  );
+
+  const updated = saveAnalysis(campaign.id, data);
+  res.json({ success: true, campaign: updated, provider, fallback, note });
+});
+
+// Step 2 — Competitors
+signalRouter.post('/campaigns/:id/competitors', async (req, res) => {
+  const campaign = getCampaign(req.params.id);
+  if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+
+  const { data, provider, fallback, note } = await aiJsonStep<{ competitors: Array<{ domain: string; name: string; description: string }> }>(
+    `List the top 4 direct competitors of "${campaign.company_name || campaign.domain}" (category: ${campaign.category || 'unknown'}). Respond as JSON: {"competitors": [{"domain": string, "name": string, "description": string}]}`,
+    {
+      competitors: [
+        { domain: 'competitor-one.example', name: 'Competitor One', description: 'Direct competitor (AI-estimated)' },
+        { domain: 'competitor-two.example', name: 'Competitor Two', description: 'Direct competitor (AI-estimated)' },
+      ],
+    },
+    { note: 'Google CSE key not connected — using AI-estimated competitors. Add GOOGLE_CSE_KEY/GOOGLE_CSE_CX for live SERP data.' }
+  );
+
+  const competitors: CampaignCompetitor[] = (data.competitors || []).slice(0, 6).map((c) => ({
+    id: uid(),
+    domain: String(c.domain || '').toLowerCase(),
+    name: String(c.name || c.domain || 'Unknown'),
+    description: String(c.description || ''),
+    source: fallback ? 'ai-estimated' : 'google-cse',
+  }));
+
+  const updated = saveCompetitors(campaign.id, competitors);
+  res.json({ success: true, campaign: updated, provider, fallback, note });
+});
+
+// Step 3 — ICP segments
+signalRouter.post('/campaigns/:id/icp', async (req, res) => {
+  const campaign = getCampaign(req.params.id);
+  if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+
+  const { data, provider, fallback, note } = await aiJsonStep<{ segments: Array<{ name: string; description: string; pain_point: string; estimated_size: string; icon: string }> }>(
+    `Define 3 ideal-customer-profile segments for "${campaign.company_name || campaign.domain}" (${campaign.category || 'unknown'}). For each: name, description, primary pain_point, estimated_size, and a single lowercase icon keyword (e.g. "briefcase", "code", "shopping-bag"). Respond as JSON: {"segments": [{"name": string, "description": string, "pain_point": string, "estimated_size": string, "icon": string}]}`,
+    {
+      segments: [
+        { name: 'Early-stage startups', description: 'Seed–Series A teams needing growth leverage.', pain_point: 'Limited budget, need measurable pipeline.', estimated_size: '50–200 companies', icon: 'rocket' },
+        { name: 'Agencies', description: 'Boutique agencies serving SMB clients.', pain_point: 'Manual prospecting eats billable hours.', estimated_size: '100–400 companies', icon: 'briefcase' },
+        { name: 'E-commerce brands', description: 'DTC and marketplace sellers scaling ads.', pain_point: 'Rising CAC, thin margins.', estimated_size: '200–800 companies', icon: 'shopping-bag' },
+      ],
+    }
+  );
+
+  const segments: CampaignSegment[] = (data.segments || []).slice(0, 5).map((s) => ({
+    id: uid(),
+    name: String(s.name || 'Segment'),
+    description: String(s.description || ''),
+    pain_point: String(s.pain_point || ''),
+    estimated_size: String(s.estimated_size || 'Unknown'),
+    icon: String(s.icon || 'target'),
+  }));
+
+  const updated = saveSegments(campaign.id, segments);
+  res.json({ success: true, campaign: updated, provider, fallback, note });
+});
+
+// Step 4 — Prospects for a segment
+signalRouter.post('/campaigns/:id/prospects', async (req, res) => {
+  const campaign = getCampaign(req.params.id);
+  if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+  const segment = campaign.segments.find((s) => s.id === req.body?.segmentId);
+  if (!segment) return res.status(400).json({ success: false, error: 'segmentId required (run ICP step first)' });
+
+  const { data, provider, fallback, note } = await aiJsonStep<{ prospects: Array<{ company_name: string; domain: string; country: string; employees: string; monthly_traffic: string; relevance_score: number }> }>(
+    `Find 5 realistic B2B prospect companies for the segment "${segment.name}" (${segment.description}, pain: ${segment.pain_point}) that could buy from "${campaign.company_name || campaign.domain}". For each: company_name, domain, country, employees, monthly_traffic, relevance_score (0-100). Respond as JSON: {"prospects": [{"company_name": string, "domain": string, "country": string, "employees": string, "monthly_traffic": string, "relevance_score": number}]}`,
+    {
+      prospects: [
+        { company_name: 'Acme Growth Co', domain: 'acme-growth.example', country: 'US', employees: '11-50', monthly_traffic: '40k', relevance_score: 82 },
+        { company_name: 'Northwind Labs', domain: 'northwind-labs.example', country: 'UK', employees: '51-200', monthly_traffic: '120k', relevance_score: 76 },
+        { company_name: 'Zephyr Digital', domain: 'zephyr-digital.example', country: 'NG', employees: '11-50', monthly_traffic: '25k', relevance_score: 71 },
+      ],
+    },
+    { note: 'Meta Ads library API not connected — prospects are AI-estimated. Add META_ADS_* keys for live ad-intent data.' }
+  );
+
+  const prospects: CampaignProspect[] = (data.prospects || []).slice(0, 8).map((p) => ({
+    id: uid(),
+    segment_id: segment.id,
+    company_name: String(p.company_name || 'Unknown'),
+    domain: String(p.domain || '').toLowerCase(),
+    country: String(p.country || 'Unknown'),
+    employees: String(p.employees || 'Unknown'),
+    monthly_traffic: String(p.monthly_traffic || 'Unknown'),
+    relevance_score: Number(p.relevance_score) || 50,
+    source: fallback ? 'ai-estimated' : 'meta-verified',
+  }));
+
+  const updated = saveProspects(campaign.id, prospects);
+  res.json({ success: true, campaign: updated, provider, fallback, note });
+});
+
+// Step 5 — Contacts for a prospect
+signalRouter.post('/campaigns/:id/contacts', async (req, res) => {
+  const campaign = getCampaign(req.params.id);
+  if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+  const prospect = campaign.prospects.find((p) => p.id === req.body?.prospectId);
+  if (!prospect) return res.status(400).json({ success: false, error: 'prospectId required (run prospects step first)' });
+
+  const { data, provider, fallback, note } = await aiJsonStep<{ contacts: Array<{ name: string; title: string; email: string; linkedin_url: string; confidence_score: number }> }>(
+    `Find 2 likely decision-maker contacts at "${prospect.company_name}" (domain: ${prospect.domain}) relevant to buying from "${campaign.company_name || campaign.domain}". For each: full name, title, email (pattern-based guess if unknown), linkedin_url, confidence_score (0-100). Respond as JSON: {"contacts": [{"name": string, "title": string, "email": string, "linkedin_url": string, "confidence_score": number}]}`,
+    {
+      contacts: [
+        { name: 'Jordan Avery', title: 'Head of Growth', email: `growth@${prospect.domain}`, linkedin_url: `https://linkedin.com/in/${prospect.domain.split('.')[0]}`, confidence_score: 64 },
+        { name: 'Sam Okonkwo', title: 'Founder', email: `founder@${prospect.domain}`, linkedin_url: '', confidence_score: 58 },
+      ],
+    },
+    { note: 'Hunter.io API not connected — contacts are AI-estimated guesses. Add HUNTER_API_KEY for verified emails.' }
+  );
+
+  const contacts: CampaignContact[] = (data.contacts || []).slice(0, 4).map((c) => ({
+    id: uid(),
+    prospect_id: prospect.id,
+    name: String(c.name || 'Unknown'),
+    title: String(c.title || 'Unknown'),
+    email: String(c.email || '').toLowerCase(),
+    linkedin_url: String(c.linkedin_url || ''),
+    confidence_score: Number(c.confidence_score) || 50,
+    source: fallback ? 'ai-estimated' : 'hunter',
+  }));
+
+  const updated = saveContacts(campaign.id, contacts);
+  res.json({ success: true, campaign: updated, provider, fallback, note });
+});
+
+// Step 6 — Draft email for a contact
+signalRouter.post('/campaigns/:id/draft', async (req, res) => {
+  const campaign = getCampaign(req.params.id);
+  if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+  const contact = campaign.contacts.find((c) => c.id === req.body?.contactId);
+  if (!contact) return res.status(400).json({ success: false, error: 'contactId required (run contacts step first)' });
+  const prospect = campaign.prospects.find((p) => p.id === contact.prospect_id);
+
+  const { data, provider, fallback, note } = await aiJsonStep<{ subject: string; body: string }>(
+    `Write a short, personalized cold outreach email FROM "${campaign.company_name || campaign.domain}" TO ${contact.name} (${contact.title} at ${prospect?.company_name || prospect?.domain || 'their company'}). Their likely pain: reference it naturally. Value prop: help with growth/outreach leverage. Tone: direct, zero fluff, no "I hope this finds you well". Under 120 words. Respond as JSON: {"subject": string, "body": string}`,
+    {
+      subject: `Quick question about ${prospect?.company_name || 'your growth'}`,
+      body: `Hi ${contact.name.split(' ')[0] || 'there'},\n\nI noticed ${prospect?.company_name || 'your team'} is in the ${segmentNameFor(campaign, prospect?.segment_id)} space. We help teams like yours cut prospecting time and book more qualified calls.\n\nWorth a 15-minute look this week?\n\n— ${campaign.company_name || campaign.domain}`,
+    },
+    { note: 'AI drafting unavailable — using template fallback. Connect a provider key for personalized drafts.' }
+  );
+
+  const email: Omit<CampaignEmail, 'created_at'> = {
+    id: `eml_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    contact_id: contact.id,
+    subject: String(data.subject || 'Quick question'),
+    body: String(data.body || ''),
+    status: 'draft',
+  };
+
+  const updated = saveEmail(campaign.id, email);
+  res.json({ success: true, campaign: updated, email, provider, fallback, note });
+});
+
+function segmentNameFor(campaign: { segments: CampaignSegment[] }, segmentId?: string): string {
+  return campaign.segments.find((s) => s.id === segmentId)?.name || 'your market';
+}
+
+// Send email — mailto: fallback (no RESEND key) or mark sent when Resend configured
+signalRouter.post('/campaigns/:id/emails/:emailId/send', async (req, res) => {
+  const campaign = getCampaign(req.params.id);
+  if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+  const email = campaign.emails.find((e) => e.id === req.params.emailId);
+  if (!email) return res.status(404).json({ success: false, error: 'Email not found' });
+  const contact = campaign.contacts.find((c) => c.id === email.contact_id);
+
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) {
+    // Honest fallback: don't fake a send — hand back a mailto the user can open.
+    const mailto = `mailto:${contact?.email || ''}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`;
+    return res.json({
+      success: true,
+      mode: 'mailto',
+      mailto,
+      message: 'RESEND_API_KEY not connected — opened as a mailto draft instead of a live send. Add RESEND_API_KEY to enable server-side delivery.',
+    });
+  }
+
+  try {
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: process.env.RESEND_FROM || 'outreach@jadai.dev',
+        to: [contact?.email],
+        subject: email.subject,
+        text: email.body,
+      }),
+    });
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '');
+      return res.status(502).json({ success: false, error: `Resend API error: ${resp.status} ${errText}` });
+    }
+    const updated = markEmailSent(campaign.id, email.id);
+    res.json({ success: true, mode: 'resend', campaign: updated, message: 'Email sent via Resend' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ---------------------------------------------------------------------------

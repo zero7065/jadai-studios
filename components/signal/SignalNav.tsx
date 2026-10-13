@@ -10,16 +10,18 @@ import {
   Sparkles,
   ArrowLeft,
   Crown,
+  Rocket,
 } from 'lucide-react';
 
 interface SignalNavProps {
-  currentTab: 'radar' | 'content' | 'analytics' | 'settings' | 'pricing' | 'home' | 'social';
+  currentTab: 'radar' | 'content' | 'analytics' | 'settings' | 'pricing' | 'home' | 'social' | 'outreach';
   onNavigate?: (path: string) => void;
   onOpenInstall?: () => void;
 }
 
 export const SignalNav: React.FC<SignalNavProps> = ({ currentTab, onNavigate, onOpenInstall }) => {
   const tabs = [
+    { id: 'outreach', label: 'Outreach', path: '/signal/outreach', icon: Rocket },
     { id: 'radar', label: 'Radar', path: '/signal/radar', icon: Radio },
     { id: 'social', label: 'Social Audit', path: '/signal/social', icon: Sparkles },
     { id: 'content', label: 'Content', path: '/signal/content', icon: PenTool },

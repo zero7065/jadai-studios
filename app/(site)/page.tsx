@@ -16,6 +16,7 @@ import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import SacredGeometry from '@/components/ui/SacredGeometry';
 import NewsletterForm from '@/components/forms/NewsletterForm';
+import Reveal from '@/components/ui/Reveal';
 import DefensiveFallback from '@/components/ui/DefensiveFallback';
 import { getAllBookOfLies } from '@/lib/data/book-of-lies';
 import { StudioAudio } from '@/lib/watermark';
@@ -129,17 +130,22 @@ export default function HomePage({ onNavigate }: HomePageProps = {}) {
       </div>
 
       {/* 2. CATEGORIZED CASCADING DISPLAY (Playground Section) */}
-      <section id="studio-tools-section" className="relative w-full pt-4">
-        <CascadingCategorizedDisplay onNavigate={handleNavigate} />
-      </section>
+      <Reveal>
+        <section id="studio-tools-section" className="relative w-full pt-4">
+          <CascadingCategorizedDisplay onNavigate={handleNavigate} />
+        </section>
+      </Reveal>
 
       {/* 3. The Three Pillars in the Void */}
-      <section id="work-section" className="relative w-full">
-        <ServicesVoid />
-      </section>
+      <Reveal delay={60}>
+        <section id="work-section" className="relative w-full">
+          <ServicesVoid />
+        </section>
+      </Reveal>
 
       {/* 4. The Book of Lies & Quotes Sliding Showcase */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
+      <Reveal delay={60}>
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-[rgba(201,168,76,0.2)] pb-4">
           <div>
             <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-[#C0392B] flex items-center gap-1.5">
@@ -200,15 +206,19 @@ export default function HomePage({ onNavigate }: HomePageProps = {}) {
             </div>
           </div>
         </GlassCard>
-      </section>
+        </section>
+      </Reveal>
 
       {/* 5. COMMUNITY FEED SECTION (Section 10) */}
-      <section className="relative w-full">
-        <CommunityFeed onNavigate={handleNavigate} />
-      </section>
+      <Reveal delay={60}>
+        <section className="relative w-full">
+          <CommunityFeed onNavigate={handleNavigate} />
+        </section>
+      </Reveal>
 
       {/* 6. Newsletter Signup Section */}
-      <section className="max-w-3xl mx-auto px-4 sm:px-6">
+      <Reveal delay={60}>
+        <section className="max-w-3xl mx-auto px-4 sm:px-6">
         <GlassCard className="p-8 text-center space-y-4 border-[rgba(201,168,76,0.25)]">
           <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-[#C9A84C] block">
             Autonomous Dispatch
@@ -224,7 +234,8 @@ export default function HomePage({ onNavigate }: HomePageProps = {}) {
             <NewsletterForm source="home_footer_card" />
           </div>
         </GlassCard>
-      </section>
+        </section>
+      </Reveal>
 
       {/* Floating Glassmorphic AI Chat Trigger (Floating Bottom Right) */}
       <div className="fixed bottom-6 right-6 z-[85]">

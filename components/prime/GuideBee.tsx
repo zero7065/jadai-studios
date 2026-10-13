@@ -81,9 +81,14 @@ export const GuideBee: React.FC<GuideBeeProps> = ({ onNavigate }) => {
       setShowTooltip(false);
     }, 9000);
 
+    // Sigil double-click / double-tap opens the guide panel
+    const handleOpenGuide = () => setIsOpen(true);
+    window.addEventListener('jadai_open_guidebee', handleOpenGuide);
+
     return () => {
       clearTimeout(tooltipTimer);
       clearTimeout(dismissTimer);
+      window.removeEventListener('jadai_open_guidebee', handleOpenGuide);
     };
   }, []);
 

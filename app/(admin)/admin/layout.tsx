@@ -32,6 +32,7 @@ import {
   Globe,
   Upload,
   Film,
+  Radio,
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -42,24 +43,13 @@ interface AdminLayoutProps {
 
 export const ADMIN_NAV_ITEMS = [
   { label: 'Dashboard', path: '/admin', icon: Activity },
-  { label: 'Theme Swapper', path: '/admin/themes', icon: Palette },
-  { label: 'Deployments', path: '/admin/deployments', icon: CloudUpload },
   { label: 'Portfolio', path: '/admin/portfolio', icon: Layers },
   { label: 'Content', path: '/admin/content', icon: FileText },
-  { label: 'Book of Lies', path: '/admin/book-of-lies', icon: BookOpen },
-  { label: 'Templates', path: '/admin/templates', icon: ShoppingBag },
-  { label: 'Hub Approvals', path: '/admin/hub', icon: Users },
-  { label: 'Users & Tiers', path: '/admin/users', icon: ShieldCheck },
-  { label: 'Prime AI Studio', path: '/admin/prime', icon: Sparkles },
-  { label: 'Photos Manager', path: '/admin/photos', icon: Camera },
-  { label: 'Media & Videos', path: '/admin/media', icon: Film },
-  { label: 'Section Controller', path: '/admin/sections', icon: ToggleLeft },
-  { label: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
-  { label: 'Settings & Keys', path: '/admin/settings', icon: Settings },
-  { label: 'Self-Diagnostic', path: '/admin/diagnostic', icon: Activity },
-  { label: 'Notifications', path: '/admin/notifications', icon: Bell },
-  { label: 'Footer Manager', path: '/admin/footer', icon: Sparkles },
-  { label: 'Recovery Terminal', path: '/admin/recovery', icon: Terminal },
+  { label: 'Community', path: '/admin/hub', icon: Users },
+  { label: 'Users', path: '/admin/users', icon: ShieldCheck },
+  { label: 'Signal', path: '/admin/signal', icon: Radio },
+  { label: 'Media', path: '/admin/media', icon: Film },
+  { label: 'Settings', path: '/admin/settings', icon: Settings },
 ];
 
 export default function AdminLayout({
@@ -239,7 +229,7 @@ export default function AdminLayout({
             >
               <Menu className="w-5 h-5" />
             </button>
-            <span className="text-xs font-mono text-[#8a6e2a] hidden sm:inline">Studio Lounge</span>
+            <span className="text-xs font-mono text-[#8a6e2a] hidden sm:inline">Control Deck</span>
             <ChevronRight className="w-3.5 h-3.5 text-[#8a6e2a] hidden sm:inline" />
             <span className="text-xs font-mono text-[#f5f3f0] capitalize">
               {currentSubpath.replace('/admin/', '').replace('/admin', 'Dashboard')}

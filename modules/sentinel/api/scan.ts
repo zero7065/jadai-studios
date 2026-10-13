@@ -88,44 +88,28 @@ export async function runSentinelScan(url: string) {
       scannedAt: new Date().toISOString(),
     };
   } catch (err: any) {
-    // Deterministic fallback with realistic metrics
+    // Honest failure — no fabricated scores. PSI is the only source of truth.
     const host = new URL(url).hostname;
+    const message = String(err?.message || err);
+    const missingKey = !psiKey;
     return {
       url,
-      scores: {
-        performance: 94,
-        accessibility: 96,
-        bestPractices: 98,
-        seo: 92,
-      },
-      metrics: {
-        fcp: '0.8s',
-        lcp: '1.2s',
-        cls: '0.001',
-        tbt: '35ms',
-        speedIndex: '0.9s',
-      },
-      issues: [
-        {
-          id: 'unused-javascript',
-          title: 'Reduce unused JavaScript and defer third-party scripts',
-          description: 'Defer scripts until user interaction to reduce main thread blocking.',
-          savings: 140,
-          impact: 'medium',
-        },
-        {
-          id: 'modern-image-formats',
-          title: 'Serve images in next-gen formats',
-          description: 'Image formats like WebP and AVIF often provide better compression than PNG or JPEG.',
-          savings: 260,
-          impact: 'high',
-        },
-      ],
+      scores: null,
+      metrics: null,
+      issues: [],
       ssl: { secure: url.startsWith('https://') },
-      fixGuide: `### SENTINEL AUDIT REPORT // ${host.toUpperCase()}
-1. CRITICAL: Enforce HTTP/3 and automated Brotli compression on cloud origin.
-2. IMPORTANT: Preload hero fonts and critical viewport stylesheets.
-3. OPTIMIZE: Enable service-worker background asset sync.`,
+      error: true,
+      errorReason: missingKey
+        ? 'GOOGLE_PSI_API_KEY is not configured — PageSpeed Insights requires a key for reliable scans. Add it in Settings & Keys.'
+        : `PageSpeed Insights scan failed: ${message}. No scores were fabricated — retry or check the URL.`,
+      fixGuide: `### SENTINEL // SCAN UNAVAILABLE FOR ${host}
+
+Live PSI scoring could not be completed for this URL${missingKey ? ' (missing GOOGLE_PSI_API_KEY)' : ''}.
+
+No fallback scores were invented. To enable live diagnostics:
+1. Obtain a Google PageSpeed Insights API key (free tier available).
+2. Add it as GOOGLE_PSI_API_KEY in server env or Admin → Settings & Keys.
+3. Re-run the scan.`,
       scannedAt: new Date().toISOString(),
     };
   }

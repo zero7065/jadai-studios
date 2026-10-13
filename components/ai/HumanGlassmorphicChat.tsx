@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import EdgeGlow from '../ui/EdgeGlow';
 import { StudioAudio } from '../../lib/watermark';
 import { JADAI_ROSTER, JadaiCharacter } from '../../lib/data/jadaiArt';
-import { askPrime, primeWelcome } from '../../lib/ai/memory';
+import { askPrime, askPrimeStream, primeWelcome } from '../../lib/ai/memory';
 import WarmFallbackModal from './WarmFallbackModal';
 import {
   Send,
@@ -169,8 +169,12 @@ export const HumanGlassmorphicChat: React.FC<HumanGlassmorphicChatProps> = ({
     setLoading(true);
 
     try {
-      // Unified memory transport — builderId + facts + history attached automatically
-      const result = await askPrime({
+      // Stream tokens live from the SSE endpoint (falls back to buffered askPrime internally).
+      setIsStreaming(true);
+      setStreamingText('');
+      let liveText = '';
+
+      const result = await askPrimeStream({
         prompt: query.trim(),
         systemPrompt: `You are PRIME chatting with a founder or builder in your signature voice:
 - Short, punchy sentences.
@@ -185,11 +189,15 @@ User: "I don't know where to start." -> You: "Start with the smallest thing you'
 User: "Can you help me write a book?" -> You: "Yeah. But I need two things first — the theme, and the lie you're trying to kill with it. What is it? 📖"`,
         moduleSlug: 'oracle',
         scope: 'oracle-human',
+        onToken: (delta) => {
+          liveText += delta;
+          setStreamingText(liveText);
+        },
       });
 
       if (result.error && !result.text) throw new Error(result.error);
 
-      let reply = result.text || "Got it. Let's build the floor first. ⬡";
+      let reply = result.text || liveText || "Got it. Let's build the floor first. ⬡";
 
       // Detect if user asked for art/character/visuals
       const lower = query.toLowerCase();
@@ -219,8 +227,8 @@ User: "Can you help me write a book?" -> You: "Yeah. But I need two things first
   └─────────────┘`;
       }
 
-      // Stream the response
-      streamMessage(reply, () => {
+      // Live tokens already rendered via streamingText — commit the final message directly.
+      const commitAssistant = () => {
         const assistantMsg: HumanChatMessage = {
           id: `ai-${Date.now()}`,
           role: 'assistant',
@@ -231,7 +239,14 @@ User: "Can you help me write a book?" -> You: "Yeah. But I need two things first
         };
         setMessages((prev) => [...prev, assistantMsg]);
         setStreamingText('');
-      });
+      };
+
+      if (liveText && liveText.length > 0) {
+        // Tokens were streamed live — commit without replaying a local animation.
+        commitAssistant();
+      } else {
+        streamMessage(reply, commitAssistant);
+      }
     } catch (err) {
       // Warm fallback trigger
       setFallbackModalOpen(true);
@@ -249,6 +264,7 @@ User: "Can you help me write a book?" -> You: "Yeah. But I need two things first
         setStreamingText('');
       });
     } finally {
+      setIsStreaming(false);
       setLoading(false);
     }
   };

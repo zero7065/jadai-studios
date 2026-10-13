@@ -1,14 +1,12 @@
 import React from 'react';
 import WorkCarousel from '@/components/sections/WorkCarousel';
-import PortfolioCard from '@/components/content/PortfolioCard';
-import { getAllProjects } from '@/lib/data/portfolio';
+import WorkArchive from '@/components/sections/WorkArchive';
 
 import DefensiveFallback from '@/components/ui/DefensiveFallback';
 
 export default function WorkPage() {
-  let projects: any[] = [];
   try {
-    projects = getAllProjects();
+    // Page shell only — data loading lives in WorkArchive (client).
   } catch (err) {
     console.warn('WorkPage error:', err);
     return <DefensiveFallback />;
@@ -32,31 +30,8 @@ export default function WorkPage() {
       {/* Main Feature: Holographic Browser Frame Carousel */}
       <WorkCarousel />
 
-      {/* Comprehensive Grid of all projects */}
-      <div className="space-y-6 pt-12 border-t border-[rgba(201,168,76,0.15)]">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-display font-bold text-[#f5f3f0]">
-            Complete Repository & Frame Archive
-          </h2>
-          <span className="text-xs font-mono text-[#8a6e2a]">
-            {projects.length} Works Registered
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((p, idx) => (
-            <PortfolioCard
-              key={p.id}
-              project={p}
-              index={idx}
-              onClick={() => {
-                const src = p.preview_url || p.live_url;
-                if (src) window.open(src, '_blank', 'noopener');
-              }}
-            />
-          ))}
-        </div>
-      </div>
+      {/* Comprehensive Grid of all projects (live registry + preview modal) */}
+      <WorkArchive />
     </div>
   );
 }

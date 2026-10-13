@@ -14,14 +14,12 @@ export interface Futuristic12DCanvasProps {
   };
 }
 
+const FRAME_MS = 42; // ~24fps cap — decorative background does not need 60fps
+
 /**
- * 12D COSMIC VASTNESS & CELESTIAL CANVAS
- * Enhanced with:
- * - Distant rotating black hole gravitational accretion disk
- * - Wandering celestial planets & moons with atmospheric rim glow
- * - Detailed real-time geometric compass ring & latitude/longitude telemetry
- * - Interactive starfield with shooting stars & nebula cosmic gas clouds
- * - Code-level golden/cyan DNA helix & Metatron geometric projection
+ * Ambient cosmic backdrop for the hero.
+ * Performance rules: 24fps cap, no canvas shadowBlur (GPU-expensive),
+ * max 12 star particles, prefers-reduced-motion renders one static frame.
  */
 export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
   className = '',
@@ -54,8 +52,8 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
     };
     window.addEventListener('resize', handleResize);
 
-    // Cosmic starfield with variable depths
-    const stars = Array.from({ length: 90 }).map(() => ({
+    // Max 12 particles (performance rule: background particles capped)
+    const stars = Array.from({ length: 12 }).map(() => ({
       x: Math.random() * width,
       y: Math.random() * height,
       r: Math.random() * 1.8 + 0.4,
@@ -66,7 +64,7 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
       orbitSpeed: (Math.random() - 0.5) * 0.006,
     }));
 
-    // Celestial planets
+    // Celestial planets — rendered with gradient rims, never shadowBlur
     const planets = [
       {
         orbitR: 320,
@@ -97,8 +95,32 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
     let surgeEnergy = 0;
     let surgeTimer = 0;
     let time = 0;
+    let lastFrame = 0;
 
-    const render = () => {
+    const motionQuery =
+      typeof window !== 'undefined' && window.matchMedia
+        ? window.matchMedia('(prefers-reduced-motion: reduce)')
+        : null;
+    let reducedMotion = Boolean(motionQuery?.matches);
+    const handleMotionChange = (e: MediaQueryListEvent) => {
+      reducedMotion = e.matches;
+    };
+    motionQuery?.addEventListener?.('change', handleMotionChange);
+
+    const render = (now: number) => {
+      animFrameRef.current = requestAnimationFrame(render);
+
+      // 24fps cap — skip frames between FRAME_MS ticks
+      if (now - lastFrame < FRAME_MS) return;
+      lastFrame = now;
+
+      // Reduced motion: draw ONE static frame, then stop the loop
+      if (reducedMotion) {
+        if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+        return;
+      }
+
       time += 0.015;
       ctx.clearRect(0, 0, width, height);
 
@@ -106,7 +128,7 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
       const cy = height / 2;
 
       // -------------------------------------------------------------
-      // 1. DISTANT BLACK HOLE & ACCRETION DISK (Center-Right Depth)
+      // 1. DISTANT BLACK HOLE & ACCRETION DISK
       // -------------------------------------------------------------
       if (activeToggles.celestialBodies !== false) {
         const bhX = cx + Math.min(width * 0.28, 380);
@@ -116,7 +138,7 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
         ctx.save();
         ctx.translate(bhX, bhY);
 
-        // Gravitational Lensing Outer Warp Glow
+        // Gravitational lensing glow (gradient only — no shadowBlur)
         const lensGrad = ctx.createRadialGradient(0, 0, bhRadius * 0.5, 0, 0, bhRadius * 4.2);
         lensGrad.addColorStop(0, 'rgba(0, 0, 0, 0.98)');
         lensGrad.addColorStop(0.3, 'rgba(201, 168, 76, 0.22)');
@@ -127,10 +149,10 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
         ctx.arc(0, 0, bhRadius * 4.2, 0, Math.PI * 2);
         ctx.fill();
 
-        // Accretion Disk Swirling Ellipse
+        // Accretion disk
         ctx.save();
         ctx.rotate(time * 0.4);
-        ctx.scale(1, 0.32); // Inclined orbit plane
+        ctx.scale(1, 0.32);
         const diskGrad = ctx.createLinearGradient(-bhRadius * 3.5, 0, bhRadius * 3.5, 0);
         diskGrad.addColorStop(0, 'transparent');
         diskGrad.addColorStop(0.25, 'rgba(253, 224, 139, 0.65)');
@@ -151,13 +173,13 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
         ctx.stroke();
         ctx.restore();
 
-        // Event Horizon (Absolute Singularity)
+        // Event horizon
         ctx.fillStyle = '#030202';
         ctx.beginPath();
         ctx.arc(0, 0, bhRadius, 0, Math.PI * 2);
         ctx.fill();
 
-        // Photon Sphere Bright Ring
+        // Photon sphere
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
         ctx.lineWidth = 1.2;
         ctx.beginPath();
@@ -168,7 +190,7 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
       }
 
       // -------------------------------------------------------------
-      // 2. CELESTIAL PLANETS & ORBITING BODIES
+      // 2. CELESTIAL PLANETS (rim glow via radial gradient, no shadowBlur)
       // -------------------------------------------------------------
       if (activeToggles.celestialBodies !== false) {
         planets.forEach((p) => {
@@ -183,16 +205,22 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
           ctx.arc(cx, cy, p.orbitR * 0.38, 0, Math.PI * 2);
           ctx.stroke();
 
-          // Planet Body
+          // Rim glow (radial gradient halo instead of shadowBlur)
+          const rim = ctx.createRadialGradient(px, py, p.radius * 0.8, px, py, p.radius * 2.2);
+          rim.addColorStop(0, p.rimColor);
+          rim.addColorStop(1, 'transparent');
+          ctx.fillStyle = rim;
+          ctx.beginPath();
+          ctx.arc(px, py, p.radius * 2.2, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Planet body + crescent shadow
           ctx.save();
           ctx.fillStyle = p.color;
-          ctx.shadowColor = p.rimColor;
-          ctx.shadowBlur = 10;
           ctx.beginPath();
           ctx.arc(px, py, p.radius, 0, Math.PI * 2);
           ctx.fill();
 
-          // Planet Crescent Shadow
           const pGrad = ctx.createRadialGradient(
             px - p.radius * 0.3,
             py - p.radius * 0.3,
@@ -213,7 +241,7 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
       }
 
       // -------------------------------------------------------------
-      // 3. ORBITING STARS & SATELLITES
+      // 3. ORBITING STARS (max 12)
       // -------------------------------------------------------------
       if (activeToggles.stars) {
         stars.forEach((s, idx) => {
@@ -226,26 +254,17 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
           ctx.beginPath();
           ctx.arc(starX, starY, s.r, 0, Math.PI * 2);
           ctx.fill();
-
-          if (idx % 7 === 0) {
-            ctx.strokeStyle = `rgba(201, 168, 76, 0.15)`;
-            ctx.lineWidth = 0.5;
-            ctx.beginPath();
-            ctx.arc(cx, cy, s.orbitR * 0.45, s.orbitAngle - 0.3, s.orbitAngle);
-            ctx.stroke();
-          }
         });
       }
 
       // -------------------------------------------------------------
-      // 4. FUNCTIONAL GEOMETRIC COMPASS & TELEMETRY COORDINATES
+      // 4. COMPASS & TELEMETRY
       // -------------------------------------------------------------
       if (activeToggles.compassCoordinates !== false) {
         const compassRadius = Math.min(width, height) * 0.38;
         ctx.save();
         ctx.translate(cx, cy);
 
-        // Outer Fine Compass Ring
         ctx.strokeStyle = 'rgba(201, 168, 76, 0.18)';
         ctx.lineWidth = 0.75;
         ctx.setLineDash([2, 6]);
@@ -254,7 +273,6 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Compass Cardinal Coordinates (N, S, E, W + Azimuth)
         const cardinals = [
           { label: '000° N', angle: -Math.PI / 2 },
           { label: '090° E', angle: 0 },
@@ -273,7 +291,7 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
           ctx.fillText(c.label, tx, ty);
         });
 
-        // Slow Compass Reticle Pointer
+        // Slow reticle
         ctx.save();
         ctx.rotate(-time * 0.05);
         ctx.strokeStyle = 'rgba(201, 168, 76, 0.25)';
@@ -290,18 +308,18 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
       }
 
       // -------------------------------------------------------------
-      // 5. CODE-LEVEL DNA DOUBLE HELIX
+      // 5. DNA DOUBLE HELIX (16 steps — halved for frame cost)
       // -------------------------------------------------------------
       if (activeToggles.dna) {
         const dnaLength = Math.min(width * 0.7, 580);
         const startX = cx - dnaLength / 2;
-        const steps = 32;
+        const steps = 16;
         const stepWidth = dnaLength / steps;
         const amplitude = 38;
 
         for (let i = 0; i <= steps; i++) {
           const x = startX + i * stepWidth;
-          const angle = time * 1.8 + i * 0.28;
+          const angle = time * 1.8 + i * 0.56;
           const y1 = cy + Math.sin(angle) * amplitude;
           const y2 = cy - Math.sin(angle) * amplitude;
           const z1 = Math.cos(angle);
@@ -309,13 +327,11 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
           const alpha1 = 0.35 + 0.45 * (z1 * 0.5 + 0.5);
           const alpha2 = 0.35 + 0.45 * (-z1 * 0.5 + 0.5);
 
-          // Strand 1 (Gold)
           ctx.fillStyle = `rgba(201, 168, 76, ${alpha1})`;
           ctx.beginPath();
           ctx.arc(x, y1, 2.2 + z1 * 0.8, 0, Math.PI * 2);
           ctx.fill();
 
-          // Strand 2 (Crimson/Opal)
           ctx.fillStyle = `rgba(192, 57, 43, ${alpha2})`;
           ctx.beginPath();
           ctx.arc(x, y2, 2.2 - z1 * 0.8, 0, Math.PI * 2);
@@ -336,7 +352,7 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
       }
 
       // -------------------------------------------------------------
-      // 6. SACRED GEOMETRIC MOTION
+      // 6. SACRED GEOMETRIC RINGS (opacity-only motion)
       // -------------------------------------------------------------
       if (activeToggles.sacredGeometry) {
         ctx.save();
@@ -360,7 +376,7 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
             const ptAngle = (k * Math.PI) / 3;
             const px = Math.cos(ptAngle) * r;
             const py = Math.sin(ptAngle) * r;
-            ctx.fillStyle = `rgba(201, 168, 76, 0.25)`;
+            ctx.fillStyle = 'rgba(201, 168, 76, 0.25)';
             ctx.beginPath();
             ctx.arc(px, py, 1.2, 0, Math.PI * 2);
             ctx.fill();
@@ -373,7 +389,7 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
       }
 
       // -------------------------------------------------------------
-      // 7. ENHANCED ELECTRIC SURGES & EDGE BLOOM
+      // 7. ELECTRIC SURGES (gradient stroke — no shadowBlur)
       // -------------------------------------------------------------
       if (activeToggles.surges) {
         surgeTimer++;
@@ -384,10 +400,11 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
         if (surgeEnergy > 0.02) {
           surgeEnergy *= 0.93;
 
-          ctx.strokeStyle = `rgba(255, 230, 150, ${surgeEnergy * 0.7})`;
+          const surgeGrad = ctx.createLinearGradient(cx - 240, cy - 240, cx + 240, cy + 240);
+          surgeGrad.addColorStop(0, `rgba(255, 230, 150, ${surgeEnergy * 0.7})`);
+          surgeGrad.addColorStop(1, `rgba(201, 168, 76, ${surgeEnergy * 0.3})`);
+          ctx.strokeStyle = surgeGrad;
           ctx.lineWidth = 1.5;
-          ctx.shadowColor = '#C9A84C';
-          ctx.shadowBlur = 15;
 
           ctx.beginPath();
           const startAngle = Math.random() * Math.PI * 2;
@@ -411,23 +428,24 @@ export const Futuristic12DCanvas: React.FC<Futuristic12DCanvasProps> = ({
             ctx.lineTo(curX, curY);
           }
           ctx.stroke();
-          ctx.shadowBlur = 0;
         }
       }
-
-      animFrameRef.current = requestAnimationFrame(render);
     };
 
     animFrameRef.current = requestAnimationFrame(render);
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      motionQuery?.removeEventListener?.('change', handleMotionChange);
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
   }, [activeToggles]);
 
   return (
-    <div className={`relative w-full h-full overflow-hidden pointer-events-none select-none ${className}`}>
+    <div
+      className={`relative w-full h-full overflow-hidden pointer-events-none select-none ${className}`}
+      style={{ contain: 'layout style paint' }}
+    >
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
       <div
         className="absolute inset-0 pointer-events-none"

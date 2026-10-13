@@ -291,16 +291,38 @@ export const EpisodeReader: React.FC<EpisodeReaderProps> = ({
             </div>
           </div>
         ) : (
-          <article className="prose prose-invert max-w-none text-[#c4c0bb] font-serif text-lg leading-[1.8] space-y-6 select-text">
+          <article className="prose prose-invert max-w-none text-[#c4c0bb] font-serif text-lg leading-[1.85] space-y-6 select-text">
             {(editedStoryText || '').split('\n\n').map((paragraph, idx) => {
+              // Style emphasis already present in the canon text (no AI rewrite needed).
+              const styled = paragraph
+                .replace(/\*\*([^*]+)\*\*/g, '<strong class="text-[#e8c96a] font-semibold not-italic">$1</strong>')
+                .replace(/\*([^*]+)\*/g, '<em class="text-[#f5f3f0] not-italic font-medium">$1</em>')
+                .replace(/"([^"]+)"/g, '<q class="text-[#e8c96a] not-italic">&ldquo;$1&rdquo;</q>');
+
+              // Short standalone paragraphs read as pull-quotes / invariant lines.
+              const isPullQuote = paragraph.trim().length < 140;
+
               if (idx === 0) {
                 return (
-                  <p key={idx} className="first-letter:text-5xl first-letter:font-display first-letter:text-[#C9A84C] first-letter:float-left first-letter:mr-3 first-letter:leading-none">
-                    {paragraph}
-                  </p>
+                  <p
+                    key={idx}
+                    className="first-letter:text-6xl first-letter:font-display first-letter:text-[#C9A84C] first-letter:float-left first-letter:mr-3 first-letter:mt-1 first-letter:leading-[0.8]"
+                    dangerouslySetInnerHTML={{ __html: styled }}
+                  />
                 );
               }
-              return <p key={idx}>{paragraph}</p>;
+
+              if (isPullQuote) {
+                return (
+                  <blockquote
+                    key={idx}
+                    className="my-8 pl-5 border-l-2 border-[#C9A84C] text-[#e8c96a] italic text-xl leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: styled }}
+                  />
+                );
+              }
+
+              return <p key={idx} dangerouslySetInnerHTML={{ __html: styled }} />;
             })}
           </article>
         )}

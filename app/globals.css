@@ -352,6 +352,7 @@ small, .label, label {
 .bg-signal {
   background: radial-gradient(ellipse at top-right, rgba(255,140,60,0.15), transparent 50%), var(--void);
   animation: signalDrift 25s ease-in-out infinite;
+  contain: layout style paint;
 }
 
 @keyframes signalDrift {
@@ -770,7 +771,6 @@ div.md\:hidden.fixed.bottom-0 button:has(svg.lucide-help-circle) {
 .card-3d {
   transform-style: preserve-3d;
   transition: transform 400ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 400ms ease;
-  will-change: transform;
 }
 
 .card-3d:hover {
@@ -805,7 +805,6 @@ div.md\:hidden.fixed.bottom-0 button:has(svg.lucide-help-circle) {
 
 /* Parallax on scroll */
 .parallax-bg {
-  will-change: transform;
   transform: translateY(calc(var(--scroll-y, 0px) * 0.5));
 }
 
@@ -813,7 +812,6 @@ div.md\:hidden.fixed.bottom-0 button:has(svg.lucide-help-circle) {
 .hero__card {
   transform-style: preserve-3d;
   transition: transform 300ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 300ms ease;
-  will-change: transform;
   transform: perspective(1000px);
   cursor: pointer;
 }
@@ -903,9 +901,28 @@ body {
   }
 }
 
+/* 90s-per-rotation sigil spin — shared by hero ring + Sigil component */
+@keyframes jadaiSigilSpin90 {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes jadaiSigilSpin90r {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
 .animate-atmosphere {
   animation: slowAtmosphereZoom 25s ease-in-out infinite alternate;
-  will-change: transform;
+  contain: layout style paint;
 }
 
 /* Futuristic Gyro Ring Keyframes */
@@ -943,23 +960,19 @@ body {
 
 .animate-gyro-ring {
   animation: gyroSpin 22s linear infinite;
-  will-change: transform;
 }
 
 .animate-gyro-ring-fast {
   animation: gyroSpin 6s linear infinite;
-  will-change: transform;
 }
 
 .animate-gyro-counter {
   animation: gyroCounterSpin 16s linear infinite;
-  will-change: transform;
 }
 
 .animate-radar-sweep {
   animation: radarSweepPulse 4s linear infinite;
   transform-origin: center center;
-  will-change: transform;
 }
 
 /* Product previews slow floating drift (4s loop, translateY ±4px) */

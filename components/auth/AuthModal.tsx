@@ -47,7 +47,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+          redirectTo:
+            typeof window !== 'undefined'
+              ? `${window.location.origin}/auth/callback`
+              : undefined,
         },
       });
 

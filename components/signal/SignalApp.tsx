@@ -9,6 +9,7 @@ import SettingsView from './SettingsView';
 import PricingView from './PricingView';
 import SocialDiagnosticView from './SocialDiagnosticView';
 import SignalInstallModal from './SignalInstallModal';
+import OutreachAgent from './outreach/OutreachAgent';
 import SignalLandingPage from '../../app/(site)/signal/page';
 
 interface SignalAppProps {
@@ -22,6 +23,7 @@ export const SignalApp: React.FC<SignalAppProps> = ({
 }) => {
   // Determine active tab from URL path
   const getTabFromPath = (path: string) => {
+    if (path.includes('/outreach')) return 'outreach';
     if (path.includes('/social')) return 'social';
     if (path.includes('/radar')) return 'radar';
     if (path.includes('/content')) return 'content';
@@ -31,7 +33,7 @@ export const SignalApp: React.FC<SignalAppProps> = ({
     return 'home';
   };
 
-  const [currentTab, setCurrentTab] = useState<'home' | 'radar' | 'content' | 'analytics' | 'settings' | 'pricing' | 'social'>(
+  const [currentTab, setCurrentTab] = useState<'home' | 'radar' | 'content' | 'analytics' | 'settings' | 'pricing' | 'social' | 'outreach'>(
     getTabFromPath(initialPath)
   );
   const [installModalOpen, setInstallModalOpen] = useState(false);
@@ -70,6 +72,7 @@ export const SignalApp: React.FC<SignalAppProps> = ({
 
       {/* Main Tab Viewport */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-32 relative z-10">
+        {currentTab === 'outreach' && <OutreachAgent />}
         {currentTab === 'social' && <SocialDiagnosticView />}
         {currentTab === 'radar' && <RadarView onNavigate={handleTabChange} />}
         {currentTab === 'content' && <ContentView onNavigate={handleTabChange} />}

@@ -103,33 +103,25 @@ function DiagnoseTab({ ensureAccess }: { ensureAccess: () => Promise<boolean> })
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setResult(data);
-      StudioAudio.playSuccessArpeggio();
-      showToast('Diagnostic scan completed successfully', 'success');
+      if (data.error) {
+        showToast(data.errorReason || 'Scan could not complete — no scores were fabricated.', 'error');
+      } else {
+        StudioAudio.playSuccessArpeggio();
+        showToast('Diagnostic scan completed via live PageSpeed Insights', 'success');
+      }
     } catch (e: any) {
       console.error(e);
-      // Deterministic fallback report
+      // Honest failure — show the real reason instead of inventing scores.
       setResult({
         url,
-        scores: { performance: 95, accessibility: 98, bestPractices: 100, seo: 96 },
-        metrics: { fcp: '0.6s', lcp: '1.1s', cls: '0.001', tbt: '25ms', speedIndex: '0.8s' },
-        issues: [
-          {
-            id: 'images-nextgen',
-            title: 'Serve images in modern WebP / AVIF formats',
-            description: 'Modern formats reduce bytes by 30-50% while preserving visual clarity.',
-            impact: 'high',
-          },
-          {
-            id: 'render-blocking',
-            title: 'Eliminate render-blocking stylesheets',
-            description: 'Inline critical CSS and defer secondary typography stylesheets.',
-            impact: 'medium',
-          },
-        ],
-        fixGuide: `### PRIORITIZED ARCHITECTURAL FIX GUIDE\n\n#### CRITICAL\n- Verify HTTP/2 or HTTP/3 edge transport.\n- Preconnect to asset origins.\n\n#### IMPORTANT\n- Minify JavaScript chunks.\n- Ensure high contrast ratios on mobile viewports.\n\n#### OPTIMIZE\n- Cache static SVG assets with max-age immutable headers.`,
+        scores: null,
+        metrics: null,
+        issues: [],
+        error: true,
+        errorReason: e?.message || 'Scan request failed. No scores were fabricated.',
+        fixGuide: `### SCAN UNAVAILABLE\n\nLive PageSpeed Insights could not score this URL. No fallback scores were invented — retry, or verify the URL and API key.`,
       });
-      StudioAudio.playSuccessArpeggio();
-      showToast('Scan evaluated via local engine', 'info');
+      showToast(e?.message || 'Scan failed — no fabricated scores shown', 'error');
     } finally {
       setLoading(false);
     }
@@ -156,7 +148,20 @@ function DiagnoseTab({ ensureAccess }: { ensureAccess: () => Promise<boolean> })
 
       {result && (
         <div className="space-y-6">
-          {/* Score circles */}
+          {/* Honest failure banner — no fabricated scores */}
+          {result.error && (
+            <div className="p-5 rounded-2xl bg-red-950/30 border border-red-500/40 space-y-2">
+              <div className="text-red-400 font-mono text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+                <span>⚠</span> Scan Unavailable — No Scores Fabricated
+              </div>
+              <p className="text-red-300/90 text-xs font-mono leading-relaxed">
+                {result.errorReason || 'PageSpeed Insights could not score this URL. No fallback numbers were invented.'}
+              </p>
+            </div>
+          )}
+
+          {/* Score circles (only when real PSI data exists) */}
+          {result.scores && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {Object.entries(result.scores || {}).map(([key, val]: [string, any]) => (
               <div
@@ -176,8 +181,10 @@ function DiagnoseTab({ ensureAccess }: { ensureAccess: () => Promise<boolean> })
               </div>
             ))}
           </div>
+          )}
 
           {/* Metrics */}
+          {result.metrics && (
           <div className="p-6 rounded-2xl bg-[#0a0908] border border-[rgba(201,168,76,0.2)] space-y-4">
             <h3 className="text-[#e8c96a] font-display font-bold text-base">
               Core Web Vitals Telemetry
@@ -191,6 +198,7 @@ function DiagnoseTab({ ensureAccess }: { ensureAccess: () => Promise<boolean> })
               ))}
             </div>
           </div>
+          )}
 
           {/* Issues Found */}
           {result.issues && result.issues.length > 0 && (
