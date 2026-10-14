@@ -5,6 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import { supabaseAdmin } from '../supabase/admin';
+import { withStoreLock, withStoreLockSync } from '../utils/storeLock';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const STORE_FILE = path.join(DATA_DIR, 'entitlements.json');
@@ -77,7 +78,7 @@ function expiresAtFrom(interval: string): string {
  * Idempotent on `reference` — replaying the same reference does not double-grant.
  * Returns the granted tier, or null on failure.
  */
-export function grantSubscriptionFs(params: {
+export async function grantSubscriptionFs(params: {
   userId?: string | null;
   email?: string | null;
   tier: string;
@@ -86,40 +87,49 @@ export function grantSubscriptionFs(params: {
   amountMinor: number;
   currency: string;
   reference: string;
-}): string | null {
+}): Promise<string | null> {
   if (!params.tier || !params.reference) return null;
-  const store = readStore();
+  const record = await withStoreLock('entitlements', (): EntitlementRecord | null => {
+    const store = readStore();
 
-  const existing = store.subscriptions.find((s) => s.reference === params.reference);
-  if (existing) return existing.tier;
+    const existing = store.subscriptions.find((s) => s.reference === params.reference);
+    if (existing) return null; // idempotent replay — no new grant, mirror skipped below
 
-  const lastForUser = params.userId
-    ? store.subscriptions
-        .filter((s) => s.userId === params.userId && s.status === 'active')
-        .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]
-    : undefined;
-  const consecutive = (lastForUser?.consecutivePayments || 0) + 1;
+    const lastForUser = params.userId
+      ? store.subscriptions
+          .filter((s) => s.userId === params.userId && s.status === 'active')
+          .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]
+      : undefined;
+    const consecutive = (lastForUser?.consecutivePayments || 0) + 1;
 
-  const record: EntitlementRecord = {
-    id: `ent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    userId: params.userId || null,
-    email: params.email ? params.email.toLowerCase().trim() : null,
-    tier: params.tier,
-    plan: params.plan,
-    status: 'active',
-    interval: params.interval || 'monthly',
-    amountMinor: Math.round(params.amountMinor),
-    currency: (params.currency || 'NGN').toUpperCase(),
-    reference: params.reference,
-    startedAt: new Date().toISOString(),
-    expiresAt: expiresAtFrom(params.interval || 'monthly'),
-    consecutivePayments: consecutive,
-  };
+    const created: EntitlementRecord = {
+      id: `ent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      userId: params.userId || null,
+      email: params.email ? params.email.toLowerCase().trim() : null,
+      tier: params.tier,
+      plan: params.plan,
+      status: 'active',
+      interval: params.interval || 'monthly',
+      amountMinor: Math.round(params.amountMinor),
+      currency: (params.currency || 'NGN').toUpperCase(),
+      reference: params.reference,
+      startedAt: new Date().toISOString(),
+      expiresAt: expiresAtFrom(params.interval || 'monthly'),
+      consecutivePayments: consecutive,
+    };
 
-  store.subscriptions.push(record);
-  writeStore(store);
+    store.subscriptions.push(created);
+    writeStore(store);
+    return created;
+  });
 
-  // Mirror to Supabase when configured (non-blocking).
+  if (!record) {
+    // Replay of an existing reference — surface its tier without re-mirroring.
+    const store = readStore();
+    return store.subscriptions.find((s) => s.reference === params.reference)?.tier || params.tier;
+  }
+
+  // Mirror to Supabase when configured (non-blocking, outside the lock).
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -167,18 +177,20 @@ export function recordTemplateOrderFs(params: {
   currency: string;
 }): boolean {
   if (!params.reference || !params.templateId) return false;
-  const store = readStore();
-  if (store.templateOrders.some((o) => o.reference === params.reference)) return true;
-  store.templateOrders.push({
-    reference: params.reference,
-    templateId: params.templateId,
-    email: params.email ? params.email.toLowerCase().trim() : null,
-    paidMinor: Math.round(params.paidMinor),
-    currency: (params.currency || 'NGN').toUpperCase(),
-    paidAt: new Date().toISOString(),
+  return withStoreLockSync('entitlements', () => {
+    const store = readStore();
+    if (store.templateOrders.some((o) => o.reference === params.reference)) return true;
+    store.templateOrders.push({
+      reference: params.reference,
+      templateId: params.templateId,
+      email: params.email ? params.email.toLowerCase().trim() : null,
+      paidMinor: Math.round(params.paidMinor),
+      currency: (params.currency || 'NGN').toUpperCase(),
+      paidAt: new Date().toISOString(),
+    });
+    writeStore(store);
+    return true;
   });
-  writeStore(store);
-  return true;
 }
 
 /**
@@ -226,18 +238,20 @@ export function getConsecutivePayments(identity: { userId?: string | null; email
  * Marks expired subscriptions (expiresAt in the past) as expired. Returns count affected.
  * Called by the daily renewal cron.
  */
-export function expireOverdueSubscriptions(): number {
-  const store = readStore();
-  const nowIso = new Date().toISOString();
-  let affected = 0;
-  for (const s of store.subscriptions) {
-    if (s.status === 'active' && s.expiresAt <= nowIso) {
-      s.status = 'expired';
-      affected++;
+export async function expireOverdueSubscriptions(): Promise<number> {
+  return withStoreLock('entitlements', () => {
+    const store = readStore();
+    const nowIso = new Date().toISOString();
+    let affected = 0;
+    for (const s of store.subscriptions) {
+      if (s.status === 'active' && s.expiresAt <= nowIso) {
+        s.status = 'expired';
+        affected++;
+      }
     }
-  }
-  if (affected > 0) writeStore(store);
-  return affected;
+    if (affected > 0) writeStore(store);
+    return affected;
+  });
 }
 
 /**

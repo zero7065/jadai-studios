@@ -829,7 +829,7 @@ async function startServer() {
     if (subErr) console.warn('[PAYMENT] subscription record warning:', subErr.message);
 
     // Always write to the fs entitlement store — works even when Supabase is unconfigured.
-    grantSubscriptionFs({
+    await grantSubscriptionFs({
       userId: profileId,
       email: params.email,
       tier,
@@ -1493,7 +1493,7 @@ async function startServer() {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     try {
-      const expired = expireOverdueSubscriptions();
+      const expired = await expireOverdueSubscriptions();
       const expiringSoon = getExpiringSoon(7);
       res.json({
         success: true,
@@ -1720,6 +1720,16 @@ async function startServer() {
     res.flushHeaders?.();
 
     const send = (event: string, data: unknown) => {
+      // Backpressure guard: if the client is slow and our write buffer has
+      // ballooned past ~2MB, stop buffering and end the stream honestly.
+      // Without this, a stalled reader makes res.write grow memory unbounded.
+      if (res.writableLength > 2 * 1024 * 1024) {
+        if (!res.writableEnded) {
+          send('error', { error: 'Stream aborted: client too slow to consume tokens.' });
+          res.end();
+        }
+        return;
+      }
       res.write(`event: ${event}\n`);
       res.write(`data: ${JSON.stringify(data)}\n\n`);
     };

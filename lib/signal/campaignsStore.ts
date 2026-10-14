@@ -99,7 +99,11 @@ function readStore(): CampaignStoreFile {
 
 function writeStore(store: CampaignStoreFile): void {
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2));
+  // Atomic write: temp file + rename so a crash mid-write can't leave a
+  // truncated JSON file that would wipe every campaign on next read.
+  const tmp = `${STORE_FILE}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(store, null, 2));
+  fs.renameSync(tmp, STORE_FILE);
 }
 
 function touch(campaign: SignalCampaign): void {
