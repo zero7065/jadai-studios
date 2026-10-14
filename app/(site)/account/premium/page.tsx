@@ -1,94 +1,79 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import EdgeGlow from '@/components/ui/EdgeGlow';
+import { motion } from 'motion/react';
 import VerifiedBadge from '@/components/ui/VerifiedBadge';
 import StatusBadge from '@/components/ui/StatusBadge';
-import Button from '@/components/ui/Button';
 import { getLocalDrafts } from '@/lib/data/draftWorkspace';
-import { PLAYGROUND_TOOLS } from '@/lib/data/playgroundTools';
 import { StudioAudio } from '@/lib/watermark';
 import { useToast } from '@/components/providers/ToastProvider';
 import {
   Crown,
   Sparkles,
   Gift,
-  Award,
-  Zap,
-  CheckCircle2,
   FolderGit2,
-  Users,
-  ShieldCheck,
   TrendingUp,
   Tag,
-  ArrowRight,
 } from 'lucide-react';
 
 export default function PremiumProfilePage({ onNavigate }: { onNavigate?: (path: string) => void }) {
   const { showToast } = useToast();
-  const [tier, setTier] = useState<string>('prime');
-  const [consecutivePayments, setConsecutivePayments] = useState<number>(3);
-  const [activityScore, setActivityScore] = useState<number>(88);
-  const [discountPercent, setDiscountPercent] = useState<number>(25);
-  const [discountCode, setDiscountCode] = useState<string>('JADAI-CONV-25');
+  const [tier, setTier] = useState<string>('free');
+  const [consecutivePayments, setConsecutivePayments] = useState<number>(0);
+  const [isLoadingTier, setIsLoadingTier] = useState(true);
   const [surpriseBoxOpened, setSurpriseBoxOpened] = useState(false);
   const [boxReward, setBoxReward] = useState<string | null>(null);
-  const [teamMemberOfferAccepted, setTeamMemberOfferAccepted] = useState(false);
-  const [teamMemberOfferDeclined, setTeamMemberOfferDeclined] = useState(false);
 
   const drafts = getLocalDrafts();
 
-  const [userEmail, setUserEmail] = useState('architect@jadai.studio');
-  const [userName, setUserName] = useState('Studio Member');
+  const [userEmail, setUserEmail] = useState('guest@jadai.studio');
+  const [userName, setUserName] = useState('Studio Guest');
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedSession = localStorage.getItem('jadai_user_session');
-      if (savedSession) {
+    let cancelled = false;
+    (async () => {
+      if (typeof window !== 'undefined') {
+        const savedSession = localStorage.getItem('jadai_user_session');
+        if (savedSession) {
+          try {
+            const parsed = JSON.parse(savedSession);
+            if (parsed.email) setUserEmail(parsed.email);
+            if (parsed.name) setUserName(parsed.name);
+          } catch {}
+        }
+
+        // Fetch the real verified tier from the server — never default to a paid tier.
         try {
-          const parsed = JSON.parse(savedSession);
-          if (parsed.email) setUserEmail(parsed.email);
-          if (parsed.name) setUserName(parsed.name);
-          if (parsed.tier) setTier(parsed.tier);
-        } catch {}
+          const builderId = localStorage.getItem('jadai_builder_id') || '';
+          const res = await fetch(`/api/account/tier${builderId ? `?builderId=${encodeURIComponent(builderId)}` : ''}`);
+          const data = await res.json();
+          if (!cancelled && data?.success) {
+            setTier(data.tier || 'free');
+            setConsecutivePayments(Number(data.consecutivePayments) || 0);
+          }
+        } catch {
+          if (!cancelled) setTier('free');
+        } finally {
+          if (!cancelled) setIsLoadingTier(false);
+        }
       }
-
-      const savedTier = localStorage.getItem('jadai-user-tier');
-      if (savedTier) setTier(savedTier);
-
-      const savedPayments = localStorage.getItem('jadai-consecutive-payments');
-      if (savedPayments) {
-        const count = parseInt(savedPayments, 10);
-        setConsecutivePayments(Math.max(count, 3));
-      }
-    }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const handleOpenSurpriseBox = () => {
     StudioAudio.playSuccessArpeggio();
     setSurpriseBoxOpened(true);
+    // Gamified perk — clearly a loyalty perk preview, not a paid entitlement.
     const rewards = [
-      '30% Architectural Lifetime Discount (Code: SOVEREIGN-30)',
-      'Direct 30-Min Strategy Dispatch with Founder Jehu Nanpan',
-      'Exclusive Access to Unreleased Book of Lies Act VIII Drafts',
-      'Free Production Template License for "Vendor OS"',
+      'Early access to new template drops',
+      'Priority review queue for studio services',
+      'Exclusive Book of Lies draft chapters',
+      'Founder strategy session lottery entry',
     ];
     const picked = rewards[Math.floor(Math.random() * rewards.length)];
     setBoxReward(picked);
-    showToast('Surprise reward unlocked!', 'success');
-  };
-
-  const handleAcceptTeamOffer = () => {
-    StudioAudio.playSuccessArpeggio();
-    setTeamMemberOfferAccepted(true);
-    showToast('You accepted the Jadai Team Member honorary mantle!', 'success');
-  };
-
-  const handleDeclineTeamOffer = () => {
-    StudioAudio.playClick();
-    setTeamMemberOfferDeclined(true);
-    showToast('Offer declined. Your independent architect status remains intact.', 'info');
+    showToast('Loyalty perk revealed', 'success');
   };
 
   return (
@@ -121,32 +106,34 @@ export default function PremiumProfilePage({ onNavigate }: { onNavigate?: (path:
           </div>
         </div>
 
-        {/* Reward Tag & Discount Numbers (Section 13) */}
+        {/* Verified tier status — real, fetched */}
         <div className="relative z-10 p-4 rounded-2xl bg-[#050404] border border-[rgba(201,168,76,0.25)] space-y-1.5 md:text-right">
           <div className="flex md:justify-end items-center gap-1.5 text-xs font-mono text-[#C9A84C] font-bold">
             <Tag className="w-3.5 h-3.5" />
-            <span>Reward Tag: Tier-Loyalty Milestone</span>
+            <span>Verified Account Tier</span>
           </div>
           <p className="text-lg font-mono font-bold text-[#f5f3f0]">
-            {discountPercent}% Dedicated Discount
+            {isLoadingTier ? 'Verifying…' : tier.toUpperCase()}
           </p>
           <span className="text-[11px] font-mono text-[#8a6e2a] block">
-            Unique Code: <span className="text-[#e8c96a] font-bold">{discountCode}</span>
+            {tier === 'free'
+              ? 'Upgrade anytime from Pricing to unlock premium engines.'
+              : 'Active subscription — premium engines unlocked.'}
           </span>
         </div>
       </div>
 
-      {/* SECTION 13 — SURPRISE SHAKING BOX ANIMATION */}
+      {/* LOYALTY PERK — Gamified reveal (clearly a perk preview, not a paid entitlement) */}
       <div className="p-6 sm:p-8 rounded-3xl bg-[rgba(201,168,76,0.06)] border border-[rgba(201,168,76,0.3)] space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-mono text-[#C9A84C]">
             <Gift className="w-4 h-4" />
             <span className="font-bold uppercase tracking-wider">
-              Consecutive Payment Milestone Reward
+              Loyalty Perk Vault
             </span>
           </div>
           <span className="text-[11px] font-mono text-[#8a6e2a]">
-            {consecutivePayments}/3 payments logged
+            {consecutivePayments} verified payment{consecutivePayments === 1 ? '' : 's'} on record
           </span>
         </div>
 
@@ -165,7 +152,7 @@ export default function PremiumProfilePage({ onNavigate }: { onNavigate?: (path:
                   ease: 'easeInOut',
                 }}
                 className="w-16 h-16 rounded-2xl bg-[#050404] border border-[#C9A84C] flex items-center justify-center text-[#e8c96a] shadow-[0_0_20px_rgba(201,168,76,0.35)] cursor-pointer"
-                title="Click to open surprise box!"
+                title="Click to open perk vault!"
               >
                 <Gift className="w-8 h-8" />
               </motion.button>
@@ -178,12 +165,12 @@ export default function PremiumProfilePage({ onNavigate }: { onNavigate?: (path:
             <div>
               <h4 className="font-display font-bold text-base text-[#f5f3f0]">
                 {!surpriseBoxOpened
-                  ? 'Surprise Vault Box Waiting to be Unsealed'
-                  : 'Member Reward Disclosed!'}
+                  ? 'Perk Vault Waiting to be Opened'
+                  : 'Perk Disclosed!'}
               </h4>
               <p className="text-xs font-mono text-[#8a6e2a]">
                 {!surpriseBoxOpened
-                  ? 'Click the shaking box to reveal your random premium perk.'
+                  ? 'Click the vault to reveal a loyalty perk preview.'
                   : boxReward}
               </p>
             </div>
@@ -194,103 +181,40 @@ export default function PremiumProfilePage({ onNavigate }: { onNavigate?: (path:
               onClick={handleOpenSurpriseBox}
               className="px-5 py-2.5 rounded-xl bg-[#C9A84C] text-[#050404] font-mono text-xs font-bold hover:bg-[#e8c96a] transition-all shadow-md cursor-pointer shrink-0"
             >
-              Unseal Reward
+              Open Perk Vault
             </button>
           )}
         </div>
       </div>
 
-      {/* LEADERBOARD & TEAM MEMBER OFFER (Section 13) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Leaderboard */}
-        <div className="lg:col-span-7 p-6 rounded-3xl bg-[#0a0908] border border-[rgba(201,168,76,0.25)] space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-mono text-[#C9A84C] font-bold">
-              <TrendingUp className="w-4 h-4" />
-              <span>Architect Activity Leaderboard (Q3)</span>
+      {/* ACCOUNT STATUS — honest, no fabricated leaderboard or fake offers */}
+      <div className="p-6 rounded-3xl bg-[#0a0908] border border-[rgba(201,168,76,0.25)] space-y-4">
+        <div className="flex items-center gap-2 text-xs font-mono text-[#C9A84C] font-bold">
+          <TrendingUp className="w-4 h-4" />
+          <span>Account Status</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
+          <div className="p-4 rounded-xl bg-[#050404] border border-[rgba(201,168,76,0.15)] space-y-1">
+            <div className="text-[#8a6e2a] uppercase tracking-wider text-[10px]">Current Tier</div>
+            <div className="text-[#f5f3f0] text-base font-bold">
+              {isLoadingTier ? '…' : tier.toUpperCase()}
             </div>
-            <span className="text-[10px] font-mono text-[#8a6e2a]">3-Month Cohort</span>
           </div>
-
-          <div className="space-y-2 font-mono text-xs">
-            <div className="p-3 rounded-xl bg-[rgba(201,168,76,0.12)] border border-[#C9A84C] flex items-center justify-between text-[#f5f3f0]">
-              <div className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-[#C9A84C] text-[#050404] flex items-center justify-center font-bold text-xs">
-                  1
-                </span>
-                <div>
-                  <span className="font-bold block">You (architect@jadai.studio)</span>
-                  <span className="text-[10px] text-[#8a6e2a]">Top Architect Rank</span>
-                </div>
-              </div>
-              <span className="text-[#e8c96a] font-bold">Score: 96.4 pts</span>
-            </div>
-
-            <div className="p-3 rounded-xl bg-[#050404] border border-neutral-800 flex items-center justify-between text-neutral-400">
-              <div className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-neutral-800 text-neutral-400 flex items-center justify-center font-bold text-xs">
-                  2
-                </span>
-                <span>kalu.engineer@orbit.ng</span>
-              </div>
-              <span>91.2 pts</span>
-            </div>
-
-            <div className="p-3 rounded-xl bg-[#050404] border border-neutral-800 flex items-center justify-between text-neutral-400">
-              <div className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-neutral-800 text-neutral-400 flex items-center justify-center font-bold text-xs">
-                  3
-                </span>
-                <span>amara.craft@jos.io</span>
-              </div>
-              <span>88.0 pts</span>
-            </div>
+          <div className="p-4 rounded-xl bg-[#050404] border border-[rgba(201,168,76,0.15)] space-y-1">
+            <div className="text-[#8a6e2a] uppercase tracking-wider text-[10px]">Verified Payments</div>
+            <div className="text-[#f5f3f0] text-base font-bold">{consecutivePayments}</div>
+          </div>
+          <div className="p-4 rounded-xl bg-[#050404] border border-[rgba(201,168,76,0.15)] space-y-1">
+            <div className="text-[#8a6e2a] uppercase tracking-wider text-[10px]">Workspace Drafts</div>
+            <div className="text-[#f5f3f0] text-base font-bold">{drafts.length}</div>
           </div>
         </div>
 
-        {/* Team Member Offer Card */}
-        <div className="lg:col-span-5 p-6 rounded-3xl bg-[#0a0908] border border-[rgba(201,168,76,0.3)] flex flex-col justify-between space-y-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-mono text-[#C9A84C] font-bold">
-              <Award className="w-4 h-4" />
-              <span>Jadai Team Member Offer</span>
-            </div>
-            <h4 className="font-display font-bold text-lg text-[#f5f3f0]">
-              Honorary Studio Fellowship
-            </h4>
-            <p className="text-xs text-[#c4c0bb] font-mono leading-relaxed">
-              As the top-ranked user across 3 consecutive months, you are formally offered the{' '}
-              <span className="text-[#e8c96a] font-bold">"Jadai Team Member"</span> mantle.
-              Direct review rights on incoming templates and founder sessions.
-            </p>
-          </div>
-
-          {!teamMemberOfferAccepted && !teamMemberOfferDeclined ? (
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                onClick={handleDeclineTeamOffer}
-                className="w-1/2 py-2.5 rounded-xl border border-[rgba(201,168,76,0.2)] text-[#8a6e2a] hover:text-white font-mono text-xs transition-colors cursor-pointer"
-              >
-                Decline
-              </button>
-              <button
-                onClick={handleAcceptTeamOffer}
-                className="w-1/2 py-2.5 rounded-xl bg-[#C9A84C] text-[#050404] hover:bg-[#e8c96a] font-mono text-xs font-bold transition-all shadow-md cursor-pointer"
-              >
-                Accept Offer
-              </button>
-            </div>
-          ) : teamMemberOfferAccepted ? (
-            <div className="p-3 rounded-xl bg-[rgba(201,168,76,0.15)] border border-[#C9A84C] text-xs font-mono text-[#e8c96a] flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Mantle Accepted. Verified in studio council ledger.</span>
-            </div>
-          ) : (
-            <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-700 text-xs font-mono text-neutral-400">
-              Offer politely declined. You remain an independent sovereign architect.
-            </div>
-          )}
-        </div>
+        <p className="text-[11px] text-[#8a857e] font-mono leading-relaxed">
+          Loyalty rewards, leaderboards, and milestone discounts activate once real payment history
+          is recorded through Paystack. No scores or offers are fabricated.
+        </p>
       </div>
 
       {/* WORKSPACE & DRAFTS QUICK ACCESS */}

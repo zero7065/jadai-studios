@@ -1,5 +1,6 @@
 import { getSetting } from '@/lib/settings';
 import { generateText } from '@/lib/ai';
+import { probeTls } from '@/lib/net/tls';
 
 export async function runSentinelScan(url: string) {
   try {
@@ -8,7 +9,10 @@ export async function runSentinelScan(url: string) {
     throw new Error('Invalid URL format');
   }
 
+  const host = new URL(url).hostname;
   const psiKey = await getSetting('google_psi_api_key');
+  // Real TLS probe runs regardless of PSI outcome — SSL is measured, not inferred from the scheme.
+  const tlsProbe = await probeTls(host);
 
   try {
     const psiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(
@@ -51,8 +55,6 @@ export async function runSentinelScan(url: string) {
       .sort((a: any, b: any) => b.savings - a.savings)
       .slice(0, 10);
 
-    const isHttps = url.startsWith('https://');
-
     let fixGuide = '';
     try {
       const guide = await generateText(
@@ -83,13 +85,17 @@ export async function runSentinelScan(url: string) {
       scores,
       metrics,
       issues,
-      ssl: { secure: isHttps },
+      ssl: {
+        secure: tlsProbe.secure,
+        grade: tlsProbe.grade,
+        expiry: tlsProbe.expiry,
+        issuer: tlsProbe.issuer,
+      },
       fixGuide,
       scannedAt: new Date().toISOString(),
     };
   } catch (err: any) {
-    // Honest failure — no fabricated scores. PSI is the only source of truth.
-    const host = new URL(url).hostname;
+    // Honest failure — no fabricated scores. PSI is the only source of truth for Lighthouse metrics.
     const message = String(err?.message || err);
     const missingKey = !psiKey;
     return {
@@ -97,7 +103,12 @@ export async function runSentinelScan(url: string) {
       scores: null,
       metrics: null,
       issues: [],
-      ssl: { secure: url.startsWith('https://') },
+      ssl: {
+        secure: tlsProbe.secure,
+        grade: tlsProbe.grade,
+        expiry: tlsProbe.expiry,
+        issuer: tlsProbe.issuer,
+      },
       error: true,
       errorReason: missingKey
         ? 'GOOGLE_PSI_API_KEY is not configured — PageSpeed Insights requires a key for reliable scans. Add it in Settings & Keys.'

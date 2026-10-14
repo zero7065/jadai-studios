@@ -1,7 +1,7 @@
-import tls from 'tls';
 import { generateText } from '../ai';
 import { generateFixGuide, generateMarketingStrategy } from '../ai/prompts';
 import { logger } from '../utils/logger';
+import { probeTls } from '../net/tls';
 
 export interface ScanResult {
   url: string;
@@ -11,14 +11,14 @@ export interface ScanResult {
     seo: number;
     accessibility: number;
     bestPractices: number;
-  };
+  } | null;
   metrics: {
     fcp: string;
     lcp: string;
     cls: string;
     tbt: string;
     ttfb: string;
-  };
+  } | null;
   ssl: {
     secure: boolean;
     grade: string;
@@ -38,48 +38,11 @@ export interface ScanResult {
   resources: {
     total_requests: number;
     total_size_kb: number;
-  };
+  } | null;
+  error?: boolean;
+  errorReason?: string;
   fix_guide: string;
   marketing_strategy: string;
-}
-
-/**
- * Checks SSL certificate of a host using native Node TLS.
- */
-async function checkSsl(hostname: string): Promise<ScanResult['ssl']> {
-  return new Promise((resolve) => {
-    try {
-      const socket = tls.connect(443, hostname, { servername: hostname, timeout: 4000 }, () => {
-        const cert = socket.getPeerCertificate();
-        socket.end();
-
-        if (cert && cert.valid_to) {
-          const validTo = new Date(cert.valid_to);
-          const daysRemaining = Math.round((validTo.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-          const issuerOrg = Array.isArray(cert.issuer?.O) ? cert.issuer.O.join(', ') : cert.issuer?.O;
-          resolve({
-            secure: true,
-            grade: daysRemaining > 30 ? 'A+' : 'B',
-            expiry: `${daysRemaining} days remaining (${validTo.toISOString().slice(0, 10)})`,
-            issuer: issuerOrg || 'Trusted CA',
-          });
-        } else {
-          resolve({ secure: false, grade: 'F', expiry: 'Expired or Invalid' });
-        }
-      });
-
-      socket.on('error', () => {
-        resolve({ secure: false, grade: 'F', expiry: 'Handshake Failed' });
-      });
-
-      socket.on('timeout', () => {
-        socket.destroy();
-        resolve({ secure: false, grade: 'C', expiry: 'Timeout' });
-      });
-    } catch {
-      resolve({ secure: false, grade: 'F', expiry: 'Unreachable' });
-    }
-  });
 }
 
 /**
@@ -125,17 +88,23 @@ export async function runDiagnosticScan(targetUrl: string, options: { psiApiKey?
   const hostname = parsed.hostname;
   const timestamp = new Date().toISOString();
 
-  // 1. SSL check via TLS
-  const sslPromise = checkSsl(hostname);
+  // 1. SSL check via real TLS probe
+  const sslPromise = probeTls(hostname).then((r) => ({
+    secure: r.secure,
+    grade: r.grade,
+    expiry: r.expiry,
+    issuer: r.issuer,
+  }));
 
   // 2. Domain RDAP check
   const domainParts = hostname.split('.');
   const baseDomain = domainParts.slice(-2).join('.');
   const rdapPromise = checkRdap(baseDomain);
 
-  // 3. PageSpeed Insights or fallback heuristic
-  let scores = { performance: 88, seo: 92, accessibility: 95, bestPractices: 90 };
-  let metrics = { fcp: '1.1s', lcp: '2.0s', cls: '0.02', tbt: '90ms', ttfb: '180ms' };
+  // 3. PageSpeed Insights — no fabrication when unavailable
+  let scores: ScanResult['scores'] = null;
+  let metrics: ScanResult['metrics'] = null;
+  let psiError: string | undefined;
 
   if (options.psiApiKey) {
     try {
@@ -148,46 +117,42 @@ export async function runDiagnosticScan(targetUrl: string, options: { psiApiKey?
 
         if (cats) {
           scores = {
-            performance: Math.round((cats.performance?.score || 0.88) * 100),
-            seo: Math.round((cats.seo?.score || 0.92) * 100),
-            accessibility: Math.round((cats.accessibility?.score || 0.95) * 100),
-            bestPractices: Math.round((cats['best-practices']?.score || 0.90) * 100),
+            performance: Math.round((cats.performance?.score || 0) * 100),
+            seo: Math.round((cats.seo?.score || 0) * 100),
+            accessibility: Math.round((cats.accessibility?.score || 0) * 100),
+            bestPractices: Math.round((cats['best-practices']?.score || 0) * 100),
           };
         }
         if (audits) {
           metrics = {
-            fcp: audits['first-contentful-paint']?.displayValue || '1.1s',
-            lcp: audits['largest-contentful-paint']?.displayValue || '2.0s',
-            cls: audits['cumulative-layout-shift']?.displayValue || '0.02',
-            tbt: audits['total-blocking-time']?.displayValue || '90ms',
-            ttfb: audits['server-response-time']?.displayValue || '180ms',
+            fcp: audits['first-contentful-paint']?.displayValue || '—',
+            lcp: audits['largest-contentful-paint']?.displayValue || '—',
+            cls: audits['cumulative-layout-shift']?.displayValue || '—',
+            tbt: audits['total-blocking-time']?.displayValue || '—',
+            ttfb: audits['server-response-time']?.displayValue || '—',
           };
         }
+      } else {
+        psiError = `PageSpeed Insights returned HTTP ${psiRes.status}`;
       }
-    } catch {
-      logger.info('PSI API call skipped or timed out, utilizing local telemetry engine');
+    } catch (e: any) {
+      psiError = `PageSpeed Insights unavailable: ${e?.message || 'timeout'}`;
+      logger.info('PSI API call failed — returning honest null scores', { psiError });
     }
+  } else {
+    psiError = 'GOOGLE_PSI_API_KEY is not configured — PageSpeed Insights requires a key. Add it in Settings & Keys.';
   }
 
   const [ssl, domain] = await Promise.all([sslPromise, rdapPromise]);
 
-  const accessibility = {
-    violations: [
-      { id: 'color-contrast', impact: 'moderate', description: 'Elements must have sufficient color contrast' },
-      { id: 'button-name', impact: 'critical', description: 'Interactive elements must have accessible text' },
-    ],
-  };
+  // Real axe-core accessibility data is not collected in this pipeline — return empty, not fabricated violations.
+  const accessibility = { violations: [] as ScanResult['accessibility']['violations'] };
 
   const broken_links: Array<{ url: string; status: number }> = [];
-  const naming_conflicts = [
-    { domain: `${baseDomain.split('.')[0]}.io`, similarity: 0.88 },
-    { domain: `${baseDomain.split('.')[0]}.co`, similarity: 0.86 },
-  ];
-
-  const resources = {
-    total_requests: 38,
-    total_size_kb: 840,
-  };
+  // RDAP does not provide lookalike-domain similarity — return empty rather than invented conflicts.
+  const naming_conflicts: Array<{ domain: string; similarity: number }> = [];
+  // Resource weight requires a real fetch/har pass — unknown here.
+  const resources: ScanResult['resources'] = null;
 
   // Intermediate result for AI generation
   const interimResult = {
@@ -225,6 +190,8 @@ export async function runDiagnosticScan(targetUrl: string, options: { psiApiKey?
     broken_links,
     naming_conflicts,
     resources,
+    error: scores === null,
+    errorReason: scores === null ? psiError : undefined,
     fix_guide: fixGuideRes.text,
     marketing_strategy: marketingRes.text,
   };

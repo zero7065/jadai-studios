@@ -1624,6 +1624,42 @@ async function startServer() {
     }
   });
 
+  // GET — real verified account tier for /account/premium. Never fabricates a paid tier.
+  app.get('/api/account/tier', rateLimit('account_tier', { max: 60 }), async (req, res) => {
+    const builderId = req.query.builderId;
+    const fallback = { success: true, tier: 'free', consecutivePayments: 0, source: 'default' };
+
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+      const supabaseReady = Boolean(supabaseUrl) && !supabaseUrl.includes('demo-placeholder') && Boolean(supabaseKey) && !supabaseKey.includes('placeholder');
+      if (typeof builderId === 'string' && builderId.length >= 8 && builderId.length <= 64 && supabaseReady) {
+        const { data: profile } = await supabaseAdmin
+          .from('user_profiles')
+          .select('subscription_tier, subscription_status')
+          .eq('id', builderId)
+          .maybeSingle();
+
+        if (profile?.subscription_tier && profile?.subscription_status === 'active') {
+          const { count } = await supabaseAdmin
+            .from('subscriptions')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', builderId)
+            .eq('status', 'active');
+          return res.json({
+            success: true,
+            tier: profile.subscription_tier,
+            consecutivePayments: count ?? 0,
+            source: 'supabase',
+          });
+        }
+      }
+      return res.json(fallback);
+    } catch {
+      return res.json(fallback);
+    }
+  });
+
   // GET — restore server-synced memory (facts + transcript) for a builder.
   app.get('/api/ai/memory', rateLimit('ai_memory', { max: 30 }), async (req, res) => {
     const builderId = req.query.builderId;

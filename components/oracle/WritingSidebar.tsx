@@ -540,7 +540,11 @@ export const WritingSidebar: React.FC<WritingSidebarProps> = ({
               </div>
               <div className="flex items-center justify-between text-xs font-mono">
                 <span className="text-[#8a6e2a]">Cadence Integrity:</span>
-                <span className="text-emerald-400 font-bold">{memoryProfile.voiceProfile.cadenceScore}%</span>
+                <span className={`font-bold ${memoryProfile.voiceProfile.cadenceScore > 0 ? 'text-emerald-400' : 'text-[#4a4744]'}`}>
+                  {memoryProfile.voiceProfile.cadenceScore > 0
+                    ? `${memoryProfile.voiceProfile.cadenceScore}%`
+                    : 'Measuring…'}
+                </span>
               </div>
             </div>
 

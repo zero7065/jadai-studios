@@ -51,7 +51,9 @@ export const PLAYGROUND_TOOLS: PlaygroundTool[] = [
     previewGif: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Document description or paste text',
     defaultInputPlaceholder: 'Contract agreement, executive slide deck, or product one-pager...',
-    mockResultGenerator: () => `FORGE RECONSTRUCTION COMPLETE: 6 editable text blocks, 2 images, 1 vector table detected.`
+    mockResultGenerator: () => `DEMO RESULT — FORGE RECONSTRUCTION PREVIEW
+Live OCR and layout reconstruction runs in the full Forge engine at /playground/forge.
+This is a demonstration preview.`
   },
   {
     slug: 'oracle',
@@ -80,7 +82,9 @@ export const PLAYGROUND_TOOLS: PlaygroundTool[] = [
     previewGif: 'https://images.unsplash.com/photo-1507499739999-097706ad8914?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Strategic Prompt or Query',
     defaultInputPlaceholder: 'Design a resilient fault-tolerant distributed sync engine...',
-    mockResultGenerator: () => `ORACLE TRANSMISSION: Architecture synthesized with zero single points of failure.`
+    mockResultGenerator: () => `DEMO RESULT — ORACLE PREVIEW
+Live reasoning runs via the full Oracle engine at /oracle with multi-provider AI fallback.
+This is a demonstration preview.`
   },
   {
     slug: 'mirage',
@@ -109,7 +113,9 @@ export const PLAYGROUND_TOOLS: PlaygroundTool[] = [
     previewGif: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Visual prompt or brand identity',
     defaultInputPlaceholder: 'Floating citadel above golden cloud sea with sacred geometry sigil...',
-    mockResultGenerator: () => `MIRAGE ARTIFACT: Rendered at 2048x2048 with dual gold-crimson edge glow.`
+    mockResultGenerator: () => `DEMO RESULT — MIRAGE PREVIEW
+Live generation runs via the full Mirage engine at /playground/mirage with multi-provider fallback.
+This is a demonstration preview.`
   },
   {
     slug: 'sentinel',
@@ -138,7 +144,9 @@ export const PLAYGROUND_TOOLS: PlaygroundTool[] = [
     previewGif: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Target URL or Domain Name',
     defaultInputPlaceholder: 'https://example.com or companydomain.io',
-    mockResultGenerator: () => `SENTINEL AUDIT COMPLETE: 96/100 Health Score. All 14 security headers verified.`
+    mockResultGenerator: () => `DEMO RESULT — SENTINEL PREVIEW
+Live scoring requires GOOGLE_PSI_API_KEY. This is a demonstration preview, not a real audit.
+No scores are fabricated. Run the real engine at /playground/sentinel for measured results.`
   },
   {
     slug: 'diagnostic',
@@ -167,12 +175,10 @@ export const PLAYGROUND_TOOLS: PlaygroundTool[] = [
     previewGif: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Target URL or IP Address',
     defaultInputPlaceholder: 'https://example.com',
-    mockResultGenerator: (url) => `DIAGNOSTIC REPORT FOR: ${url}
-STATUS: OPERATIONAL (Score: 94/100)
-- Edge Latency: 42ms (Lagos / London peering)
-- Security: TLS 1.3 Active, HSTS enabled, CSP strict
-- DOM Weight: 28KB (Pristine)
-- Fix recommendation: Compress background SVG meshes for sub-30ms first paint.`
+    mockResultGenerator: (url) => `DEMO RESULT — DIAGNOSTIC REPORT FOR: ${url}
+Live scanning requires the Sentinel engine with GOOGLE_PSI_API_KEY configured.
+This is a demonstration preview, not a real audit. No scores are fabricated.
+Run the real engine at /playground/sentinel or /diagnostic for measured results.`
   },
   {
     slug: 'doc-analyzer',
@@ -201,10 +207,9 @@ STATUS: OPERATIONAL (Score: 94/100)
     previewGif: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Document Content or Clause',
     defaultInputPlaceholder: 'Paste the terms of service, partnership clause, or contract excerpt here...',
-    mockResultGenerator: (text) => `DOCUMENT AUDIT COMPLETE
-- Risk Quotient: Moderate (2 traps detected)
-- Critical Flag: Section 4.2 gives unilateral termination without cure period.
-- Protective Counter: "Add standard 30-day written cure notice before cessation."`
+    mockResultGenerator: (text) => `DEMO RESULT — DOC ANALYZER PREVIEW
+Live forensic clause analysis runs via the full Doc Analyzer engine at /doc-analyzer.
+This is a demonstration preview, not a real audit of your document.`
   },
   {
     slug: 'link-shortener',
@@ -233,10 +238,9 @@ STATUS: OPERATIONAL (Score: 94/100)
     previewGif: 'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Long Destination URL',
     defaultInputPlaceholder: 'https://mywebsite.com/very/long/complex/resource/path',
-    mockResultGenerator: (url) => `SHORT LINK CREATED:
-https://jadai.studio/s/${Math.random().toString(36).substring(2, 7)}
-Destination: ${url}
-Redirect Latency: ~14ms | Encryption: AES-256 routing`
+    mockResultGenerator: (url) => `DEMO RESULT — LINK SHORTENER PREVIEW
+Live short-link generation with real redirects runs via the Sentinel shortener engine.
+This is a demonstration preview — no real link was created.`
   },
   {
     slug: 'gif-maker',
@@ -265,11 +269,9 @@ Redirect Latency: ~14ms | Encryption: AES-256 routing`
     previewGif: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Animation Description or Frame Script',
     defaultInputPlaceholder: 'e.g. Glowing gold particle burst rotating around a black vault dial',
-    mockResultGenerator: (desc) => `GIF SYNTHESIZED:
-Asset: ${desc.slice(0, 30)}...
-Frames: 48 frames @ 24fps
-Loop Mode: Seamless Ping-Pong
-File Weight: 1.18 MB (Compressed with Jadai Void Quantizer)`
+    mockResultGenerator: (desc) => `DEMO RESULT — GIF MAKER PREVIEW
+Live GIF synthesis from uploaded clips runs in the full media pipeline.
+This is a demonstration preview — no file was generated.`
   },
   {
     slug: 'thumbnail-generator',
@@ -297,10 +299,9 @@ File Weight: 1.18 MB (Compressed with Jadai Void Quantizer)`
     previewGif: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Headline / Episode Title',
     defaultInputPlaceholder: 'e.g. The Lie of Minimum Viable Product',
-    mockResultGenerator: (title) => `THUMBNAIL BLUEPRINT GENERATED:
-Primary Focus: "${title.toUpperCase()}"
-Palette: Obsidian (#050404) + Imperial Gold (#C9A84C) + Sepia Highlight
-Safe Zones: Verified for YouTube 16:9 and Twitter Card 1.91:1`
+    mockResultGenerator: (title) => `DEMO RESULT — THUMBNAIL BLUEPRINT PREVIEW
+Live thumbnail generation with real canvas rendering runs in the full media pipeline.
+This is a demonstration preview — no image was generated.`
   },
   {
     slug: 'resume-editor',
@@ -328,10 +329,9 @@ Safe Zones: Verified for YouTube 16:9 and Twitter Card 1.91:1`
     previewGif: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Existing CV Bullet or Bio',
     defaultInputPlaceholder: 'Paste your current resume section or experience draft...',
-    mockResultGenerator: (text) => `REFINED CAREER DOSSIER:
-• Spearheaded architecture migration for: ${text.slice(0, 40)}
-• Engineered resilient multi-tier fallback architecture, eliminating 99.8% of user-facing outages.
-• Designed deterministic testing harness cutting QA release cycle from 4 days to 40 minutes.`
+    mockResultGenerator: (text) => `DEMO RESULT — RESUME EDITOR PREVIEW
+Live X-Y-Z formula rewriting runs via the full Resume Editor engine at /resume-editor.
+This is a demonstration preview — your text was not modified.`
   },
   {
     slug: 'logo-designer',
@@ -359,11 +359,9 @@ Safe Zones: Verified for YouTube 16:9 and Twitter Card 1.91:1`
     previewGif: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Brand Name & Concept',
     defaultInputPlaceholder: 'e.g. Aether Dynamics — Orbital satellite logistics',
-    mockResultGenerator: (brand) => `SIGIL SPECIFICATION FOR: ${brand}
-- Geometry: Concentric Dodecagram with dual outer orbit rings
-- Aspect: 1:1 Sacred Hexagonal Matrix
-- Stroke: 1.5px gold hairline with 0.8 contrast ratio
-- Vector Coordinates: Rendered to clean inline SVG blueprint`
+    mockResultGenerator: (brand) => `DEMO RESULT — SIGIL SPECIFICATION PREVIEW
+Live sacred-geometry vector generation runs in the full Logo Designer engine.
+This is a demonstration preview — no SVG was generated.`
   },
   {
     slug: 'writing-assistant',
@@ -391,9 +389,9 @@ Safe Zones: Verified for YouTube 16:9 and Twitter Card 1.91:1`
     previewGif: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Draft Paragraph to Hone',
     defaultInputPlaceholder: 'Paste your draft essay, article, or announcement here...',
-    mockResultGenerator: (text) => `POLISHED PROSE:
-${text.split('. ').map(s => s.trim()).filter(Boolean).slice(0, 2).join('. ')}.
-No decoration. No hesitation. When the foundation holds, everything above it stands on bedrock.`
+    mockResultGenerator: (text) => `DEMO RESULT — WRITING ASSISTANT PREVIEW
+Live jargon-stripping and prose polishing runs via the full Writing Assistant engine.
+This is a demonstration preview — your draft was not modified.`
   },
   {
     slug: 'ghostwriter',
@@ -421,12 +419,9 @@ No decoration. No hesitation. When the foundation holds, everything above it sta
     previewGif: 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Raw Thoughts / Notes',
     defaultInputPlaceholder: 'Jot down raw thoughts, bullet points, or voice memo transcript...',
-    mockResultGenerator: (notes) => `GHOSTWRITTEN DISPATCH:
-Hook: Most builders mistake motion for progress. Here is what actually happened:
-1. ${notes.slice(0, 60)}
-2. We stopped debating edge cases and codified the invariant.
-3. Within 14 days, throughput doubled while error rates plunged to zero.
-Takeaway: Structure precedes speed.`
+    mockResultGenerator: (notes) => `DEMO RESULT — GHOSTWRITER PREVIEW
+Live executive-voice synthesis runs via the full Ghostwriter engine.
+This is a demonstration preview — no article was generated.`
   },
   {
     slug: 'book-writer',
@@ -454,12 +449,9 @@ Takeaway: Structure precedes speed.`
     previewGif: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Book Theme & Target Lie',
     defaultInputPlaceholder: 'e.g. The Myth of Overnight Success in African Tech Ecosystems',
-    mockResultGenerator: (theme) => `BOOK ARCHITECTURE BLUEPRINT:
-Title: THE FOUNDATION PRINCIPLE
-Theme: ${theme}
-• Act I: The Illusion (Chapters 1-3) — Dismantling the false promise
-• Act II: The Crucible (Chapters 4-7) — Surviving the valley of obscurity
-• Act III: The Resilient Citadel (Chapters 8-10) — Enduring durability`
+    mockResultGenerator: (theme) => `DEMO RESULT — BOOK ARCHITECTURE PREVIEW
+Live 10-chapter manuscript outlining runs via the full Book Writer engine.
+This is a demonstration preview — no outline was generated.`
   },
   {
     slug: 'growth-maker',
@@ -487,11 +479,9 @@ Theme: ${theme}
     previewGif: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'Product Concept & Value Prop',
     defaultInputPlaceholder: 'e.g. Collaborative design suite for West African animators',
-    mockResultGenerator: (prod) => `GROWTH STRATEGY BLUEPRINT:
-Product: ${prod}
-Vector 1: Open Source Starter Kernels (Top of Funnel)
-Vector 2: Watermarked Asset Sharing (Organic Viral Coefficient: 1.34)
-Vector 3: High-Signal Developer Bounties & Showcase Hall`
+    mockResultGenerator: (prod) => `DEMO RESULT — GROWTH STRATEGY PREVIEW
+Live organic distribution roadmap generation runs via the full Growth Maker engine at /growth-maker.
+This is a demonstration preview — no strategy was generated.`
   },
   {
     slug: 'blueprint-sketcher',
@@ -519,15 +509,9 @@ Vector 3: High-Signal Developer Bounties & Showcase Hall`
     previewGif: 'https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=400&auto=format&fit=crop&q=80',
     defaultInputLabel: 'System Description',
     defaultInputPlaceholder: 'e.g. Next.js web client, Express proxy, Supabase DB, Redis cache, Paystack webhook',
-    mockResultGenerator: (sys) => `SYSTEM TOPOLOGY FOR: ${sys.slice(0, 30)}
-┌─────────────┐       ┌──────────────┐       ┌─────────────┐
-│ Client (Web)│ ───>  │  Edge Proxy  │ ───>  │ Primary DB  │
-└─────────────┘       └──────┬───────┘       └─────────────┘
-                             │
-                             ▼
-                      ┌──────────────┐
-                      │  Fallback AI │
-                      └──────────────┘`
+    mockResultGenerator: (sys) => `DEMO RESULT — SYSTEM TOPOLOGY PREVIEW
+Live ASCII and Mermaid.js diagram synthesis runs via the full Blueprint Sketcher engine.
+This is a demonstration preview — no diagram was generated.`
   },
 ];
 

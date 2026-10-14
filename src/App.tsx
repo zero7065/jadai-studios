@@ -87,6 +87,7 @@ import AdminDiagnosticPage from '../app/(admin)/admin/diagnostic/page';
 import AdminNotificationsPage from '../app/(admin)/admin/notifications/page';
 import AdminRecoveryPage from '../app/(admin)/admin/recovery/page';
 import AdminFooterPage from '../app/(admin)/admin/footer/page';
+import AdminSignalPage from '../app/(admin)/admin/signal/page';
 
 function AppContent() {
   const [currentPath, setCurrentPath] = useState('/');
@@ -284,6 +285,8 @@ function AppContent() {
         return <AdminRecoveryPage />;
       case '/admin/footer':
         return <AdminFooterPage />;
+      case '/admin/signal':
+        return <AdminSignalPage />;
       case '/admin':
       default:
         return <AdminDashboardPage />;
@@ -409,6 +412,8 @@ function AppContent() {
           return <PremiumProfilePage onNavigate={navigateTo} />;
 
       // Module pages (imported above, previously unrouted)
+      case '/diagnostic':
+        return <DiagnosticPage />;
       case '/resume-editor':
         return <ResumeEditorPage />;
       case '/doc-analyzer':

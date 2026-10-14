@@ -15,6 +15,7 @@ import {
   saveWriterMemory,
   recordAcceptedSuggestion,
   recordRejectedSuggestion,
+  computeCadenceScore,
 } from '@/modules/oracle/lib/writing-modes';
 import { useToast } from '@/components/providers/ToastProvider';
 import { StudioAudio } from '@/lib/watermark';
@@ -84,7 +85,7 @@ export default function GhostwritingWorkspace() {
       primaryTone: 'direct',
       avgSentenceLength: 'varied',
       vocabularyLevel: 'philosophical',
-      cadenceScore: 94,
+      cadenceScore: 0,
     },
     totalSessions: 1,
     lastUpdated: new Date().toISOString(),
@@ -167,6 +168,21 @@ In the highland fog outside the workshop, the transformer hummed in a low B-flat
     setDocContent(e.target.value);
     setIsSaved(false);
   };
+
+  // Recompute real cadence score from actual prose (debounced) — never fabricated.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const score = computeCadenceScore(docContent);
+      setMemoryProfile((prev) => {
+        if (prev.voiceProfile.cadenceScore === score) return prev;
+        return {
+          ...prev,
+          voiceProfile: { ...prev.voiceProfile, cadenceScore: score },
+        };
+      });
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [docContent]);
 
   // Metrics
   const wordCount = docContent

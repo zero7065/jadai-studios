@@ -3,7 +3,7 @@ import Button from '../../components/ui/Button';
 import GlassCard from '../../components/ui/GlassCard';
 import StatusBadge from '../../components/ui/StatusBadge';
 import CodeBlock from '../../components/ui/CodeBlock';
-import { Activity, ShieldCheck, Zap, Globe, Sparkles } from 'lucide-react';
+import { Activity, ShieldCheck, ShieldAlert, Zap, Globe, Sparkles } from 'lucide-react';
 import type { ScanResult } from '../../lib/diagnostics/scanner';
 
 export default function DiagnosticPage() {
@@ -90,20 +90,47 @@ export default function DiagnosticPage() {
       {/* Results View */}
       {result && (
         <div className="space-y-6">
-          {/* Score Gauges */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: 'Performance', val: result.scores.performance, color: '#C9A84C' },
-              { label: 'SEO Audit', val: result.scores.seo, color: '#e8c96a' },
-              { label: 'Accessibility', val: result.scores.accessibility, color: '#C9A84C' },
-              { label: 'Best Practices', val: result.scores.bestPractices, color: '#8a6e2a' },
-            ].map((s) => (
-              <GlassCard key={s.label} className="p-4 text-center">
-                <div className="text-3xl font-display font-bold text-[#f5f3f0]">{s.val}</div>
-                <div className="text-xs font-mono uppercase tracking-wider text-[#8a6e2a] mt-1">{s.label}</div>
-              </GlassCard>
-            ))}
-          </div>
+          {/* Honest error banner when PSI unavailable — no fabricated scores */}
+          {result.error && (
+            <div className="p-4 rounded-lg bg-[rgba(192,57,43,0.12)] border border-[#C0392B]/50 space-y-2">
+              <div className="flex items-center gap-2 text-[#C0392B] text-sm font-mono font-bold uppercase tracking-wider">
+                <ShieldAlert className="w-4 h-4" />
+                PageSpeed Scores Unavailable
+              </div>
+              <p className="text-xs text-[#c4c0bb] font-mono leading-relaxed">
+                {result.errorReason || 'No scores were fabricated. TLS and domain checks below are real and measured.'}
+              </p>
+              <p className="text-[10px] text-[#8a6e2a] font-mono">
+                TLS certificate, issuer, expiry, and domain registration shown below are live measurements from this scan.
+              </p>
+            </div>
+          )}
+
+          {/* Score Gauges (only when real PSI data exists) */}
+          {result.scores ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Performance', val: result.scores.performance, color: '#C9A84C' },
+                { label: 'SEO Audit', val: result.scores.seo, color: '#e8c96a' },
+                { label: 'Accessibility', val: result.scores.accessibility, color: '#C9A84C' },
+                { label: 'Best Practices', val: result.scores.bestPractices, color: '#8a6e2a' },
+              ].map((s) => (
+                <GlassCard key={s.label} className="p-4 text-center">
+                  <div className="text-3xl font-display font-bold text-[#f5f3f0]">{s.val}</div>
+                  <div className="text-xs font-mono uppercase tracking-wider text-[#8a6e2a] mt-1">{s.label}</div>
+                </GlassCard>
+              ))}
+            </div>
+          ) : (
+            <GlassCard className="p-6 text-center">
+              <div className="text-sm font-mono text-[#8a6e2a]">
+                Lighthouse category scores not available — GOOGLE_PSI_API_KEY required.
+              </div>
+              <div className="text-xs text-[#4a4744] font-mono mt-1">
+                Real TLS & domain telemetry still reported below.
+              </div>
+            </GlassCard>
+          )}
 
           {/* Vitals & SSL */}
           <div className="grid md:grid-cols-2 gap-6">
@@ -112,24 +139,30 @@ export default function DiagnosticPage() {
                 <Zap className="w-4 h-4" />
                 <h3 className="text-sm font-mono uppercase tracking-wider">Core Web Vitals</h3>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-xs font-mono pt-2">
-                <div className="p-2.5 rounded bg-[#050404] border border-[rgba(201,168,76,0.15)]">
-                  <div className="text-[#8a6e2a]">FCP (First Contentful)</div>
-                  <div className="text-base text-[#f5f3f0] mt-0.5">{result.metrics.fcp}</div>
+              {result.metrics ? (
+                <div className="grid grid-cols-2 gap-3 text-xs font-mono pt-2">
+                  <div className="p-2.5 rounded bg-[#050404] border border-[rgba(201,168,76,0.15)]">
+                    <div className="text-[#8a6e2a]">FCP (First Contentful)</div>
+                    <div className="text-base text-[#f5f3f0] mt-0.5">{result.metrics.fcp}</div>
+                  </div>
+                  <div className="p-2.5 rounded bg-[#050404] border border-[rgba(201,168,76,0.15)]">
+                    <div className="text-[#8a6e2a]">LCP (Largest Contentful)</div>
+                    <div className="text-base text-[#f5f3f0] mt-0.5">{result.metrics.lcp}</div>
+                  </div>
+                  <div className="p-2.5 rounded bg-[#050404] border border-[rgba(201,168,76,0.15)]">
+                    <div className="text-[#8a6e2a]">CLS (Layout Shift)</div>
+                    <div className="text-base text-[#f5f3f0] mt-0.5">{result.metrics.cls}</div>
+                  </div>
+                  <div className="p-2.5 rounded bg-[#050404] border border-[rgba(201,168,76,0.15)]">
+                    <div className="text-[#8a6e2a]">TBT (Blocking Time)</div>
+                    <div className="text-base text-[#f5f3f0] mt-0.5">{result.metrics.tbt}</div>
+                  </div>
                 </div>
-                <div className="p-2.5 rounded bg-[#050404] border border-[rgba(201,168,76,0.15)]">
-                  <div className="text-[#8a6e2a]">LCP (Largest Contentful)</div>
-                  <div className="text-base text-[#f5f3f0] mt-0.5">{result.metrics.lcp}</div>
+              ) : (
+                <div className="text-xs font-mono text-[#4a4744] pt-2">
+                  Core Web Vitals require a PageSpeed Insights key — not fabricated.
                 </div>
-                <div className="p-2.5 rounded bg-[#050404] border border-[rgba(201,168,76,0.15)]">
-                  <div className="text-[#8a6e2a]">CLS (Layout Shift)</div>
-                  <div className="text-base text-[#f5f3f0] mt-0.5">{result.metrics.cls}</div>
-                </div>
-                <div className="p-2.5 rounded bg-[#050404] border border-[rgba(201,168,76,0.15)]">
-                  <div className="text-[#8a6e2a]">TBT (Blocking Time)</div>
-                  <div className="text-base text-[#f5f3f0] mt-0.5">{result.metrics.tbt}</div>
-                </div>
-              </div>
+              )}
             </GlassCard>
 
             <GlassCard className="p-5 space-y-3">
@@ -152,7 +185,11 @@ export default function DiagnosticPage() {
                 </div>
                 <div className="flex justify-between py-1">
                   <span className="text-[#8a6e2a]">Payload Size</span>
-                  <span className="text-[#f5f3f0]">{result.resources.total_size_kb} KB ({result.resources.total_requests} requests)</span>
+                  <span className="text-[#f5f3f0]">
+                    {result.resources
+                      ? `${result.resources.total_size_kb} KB (${result.resources.total_requests} requests)`
+                      : 'Not measured'}
+                  </span>
                 </div>
               </div>
             </GlassCard>

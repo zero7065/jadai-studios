@@ -72,10 +72,8 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
         try { return JSON.parse(saved); } catch {}
       }
     }
-    return [
-      { id: 'mem-1', key: 'sovereign_builder', value: 'High drive for architectural independence', confidence: 0.95 },
-      { id: 'mem-2', key: 'location_anchor', value: 'Rooted in West African tech ecosystem', confidence: 0.98 },
-    ];
+    // No fabricated default memories — start empty; real facts hydrate from server/localStorage.
+    return [];
   });
 
   const [dailyQueriesUsed, setDailyQueriesUsed] = useState<number>(() => {

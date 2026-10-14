@@ -304,11 +304,43 @@ const DEFAULT_MEMORY_PROFILE: WriterMemoryProfile = {
     primaryTone: 'direct',
     avgSentenceLength: 'varied',
     vocabularyLevel: 'philosophical',
-    cadenceScore: 92,
+    cadenceScore: 0,
   },
   totalSessions: 1,
   lastUpdated: new Date().toISOString(),
 };
+
+/**
+ * Computes a real cadence/rhythm score (0-100) from actual prose.
+ * Measures sentence-length consistency: a healthy rhythm has varied but patterned
+ * sentence lengths (coefficient of variation near 0.4-0.7). Returns 0 when there
+ * is not enough text to measure — never fabricates a score.
+ */
+export function computeCadenceScore(text: string): number {
+  const cleaned = text.replace(/^#.*$/gm, '').replace(/["'*_>`-]/g, '').trim();
+  if (cleaned.length < 80) return 0;
+
+  const sentences = cleaned
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.split(/\s+/).length >= 3);
+  if (sentences.length < 3) return 0;
+
+  const lengths = sentences.map((s) => s.split(/\s+/).length);
+  const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+  if (mean === 0) return 0;
+  const variance = lengths.reduce((acc, len) => acc + (len - mean) ** 2, 0) / lengths.length;
+  const stdDev = Math.sqrt(variance);
+  const cv = stdDev / mean;
+
+  // Map CV to 0-100: ideal rhythm band 0.35-0.75 → high score; too uniform or too chaotic → lower.
+  let score: number;
+  if (cv < 0.15) score = 45 + cv * 100;
+  else if (cv <= 0.75) score = 70 + (cv - 0.15) * 50;
+  else score = Math.max(30, 100 - (cv - 0.75) * 60);
+
+  return Math.round(Math.min(98, Math.max(0, score)));
+}
 
 export async function loadWriterMemory(): Promise<WriterMemoryProfile> {
   try {
