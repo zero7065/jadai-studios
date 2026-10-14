@@ -1,5 +1,3 @@
-import { supabaseAdmin } from '../supabase/admin';
-
 export const ADMIN_EMAIL = 'jadaistudiosoffcl@gmail.com';
 export const FREE_TOOL_USAGE_LIMIT = 3;
 
@@ -17,7 +15,10 @@ export type UserSubscriptionTier =
   | 'architecture'
   | 'prime';
 
-const TIER_LEVELS: Record<string, number> = {
+// Numeric tier rank so any paid tier satisfies any lower requirement.
+// Exported so server-side entitlement gating (lib/server/requireEntitlement)
+// and the client paywall share one source of truth.
+export const TIER_LEVELS: Record<string, number> = {
   free: 0,
   foundation: 1,
   studio_premium: 1,
@@ -168,66 +169,4 @@ export function checkAccessToFeature(
   }
 
   return { allowed: true };
-}
-
-/**
- * Validates whether a user's subscription tier satisfies the required tier.
- */
-export async function checkTierAccess(
-  userId?: string,
-  requiredTier: string = 'free',
-  userEmail?: string
-): Promise<{ allowed: boolean; userTier: string; reason?: string }> {
-  // Admin bypass
-  if (isMasterAdmin(userEmail)) {
-    return { allowed: true, userTier: 'prime', reason: 'Master Admin bypass' };
-  }
-
-  // Free tier is unblocked
-  if (requiredTier === 'free') {
-    return { allowed: true, userTier: 'free' };
-  }
-
-  if (!userId) {
-    return {
-      allowed: false,
-      userTier: 'free',
-      reason: 'Authentication and active subscription required.',
-    };
-  }
-
-  try {
-    const { data: profile } = await supabaseAdmin
-      .from('user_profiles')
-      .select('email, role, subscription_tier, subscription_status')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (isMasterAdmin(profile?.email) || profile?.role === 'admin') {
-      return { allowed: true, userTier: 'prime', reason: 'Admin bypass' };
-    }
-
-    const currentTier = (profile?.subscription_tier as string) || 'free';
-    const isActive = profile?.subscription_status === 'active';
-
-    if (!isActive && requiredTier !== 'free') {
-      return {
-        allowed: false,
-        userTier: currentTier,
-        reason: 'Subscription is inactive or cancelled.',
-      };
-    }
-
-    const currentLevel = TIER_LEVELS[currentTier] || 0;
-    const requiredLevel = TIER_LEVELS[requiredTier] || 0;
-    const hasTier = currentLevel >= requiredLevel;
-
-    return {
-      allowed: hasTier,
-      userTier: currentTier,
-      reason: hasTier ? undefined : `Requires ${requiredTier.toUpperCase()} tier or higher.`,
-    };
-  } catch {
-    return { allowed: false, userTier: 'free', reason: 'Failed to verify tier access' };
-  }
 }

@@ -65,6 +65,7 @@ import { generateTextWatermarkFooter } from './lib/watermark';
 import { isTransmissionCadenceTime } from './lib/content/delivery';
 import { signalRouter } from './lib/signal/api-router';
 import { signalStore } from './lib/signal/store';
+import { requireEntitlement } from './lib/server/requireEntitlement';
 import { checkRateLimit } from './lib/utils/rateLimit';
 import {
   signAdminToken,
@@ -1612,7 +1613,11 @@ async function startServer() {
     }
   };
 
-  app.post('/api/ai/chat', rateLimit('ai_chat', { max: 20 }), async (req, res) => {
+  app.post(
+    '/api/ai/chat',
+    rateLimit('ai_chat', { max: 20 }),
+    requireEntitlement({ minTier: 'voice', feature: 'AI chat', priceNgn: '₦8,000 / mo', priceUsd: '$9 / mo' }),
+    async (req, res) => {
     const { prompt, systemPrompt, moduleSlug, bypassCache, persona, history, memory, builderId, scope, temperature } = req.body;
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ success: false, error: 'Missing prompt' });
@@ -1674,14 +1679,19 @@ async function startServer() {
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
-  });
+  }
+  );
 
   // ---------------------------------------------------------------------------
   // SSE STREAMING CHAT — /api/ai/chat/stream
   // Streams Groq tokens as Server-Sent Events so Oracle (and any chat UI)
   // renders responses token-by-token instead of waiting for the full buffer.
   // ---------------------------------------------------------------------------
-  app.post('/api/ai/chat/stream', rateLimit('ai_chat_stream', { max: 20 }), async (req, res) => {
+  app.post(
+    '/api/ai/chat/stream',
+    rateLimit('ai_chat_stream', { max: 20 }),
+    requireEntitlement({ minTier: 'voice', feature: 'AI chat streaming', priceNgn: '₦8,000 / mo', priceUsd: '$9 / mo' }),
+    async (req, res) => {
     const { prompt, systemPrompt, moduleSlug, persona, history, memory, temperature, builderId } = req.body;
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ success: false, error: 'Missing prompt' });
@@ -1777,7 +1787,8 @@ async function startServer() {
       send('error', { error: err?.message || 'Stream failed' });
       res.end();
     }
-  });
+  }
+  );
 
   app.get('/api/ai/status', (req, res) => {
     const groqKey = process.env.GROQ_API_KEY;

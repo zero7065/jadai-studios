@@ -6,6 +6,8 @@ import { runWriterAgent } from './agents/writer';
 import { initializePaystackTransaction, getPaystackSecretKey } from '../paystack';
 import { SIGNAL_PLANS, SignalPlanTier } from './types';
 import { generateText } from '../ai';
+import { getEntitlement } from '../entitlements/store';
+import { TIER_LEVELS, isMasterAdmin } from '../auth/tier';
 import {
   listCampaigns,
   getCampaign,
@@ -27,6 +29,60 @@ import {
 } from './campaignsStore';
 
 export const signalRouter = Router();
+
+// ---------------------------------------------------------------------------
+// WRITE-ACTION ENTITLEMENT GATE
+// Signal's outbound engine (scout/closer/writer, campaign edits, trackers,
+// content) is a paid feature. GET reads stay open so the radar, pricing page,
+// and public views render without a subscription; every mutating action
+// (POST/PUT/PATCH/DELETE) requires an active Signal Pro+ entitlement.
+//
+// Identity resolves from ?email / x-user-email or ?builderId / x-builder-id,
+// same as /api/account/tier. Fails closed. `/subscribe` and the paystack
+// callback are exempt so a user can actually buy their way in.
+// ---------------------------------------------------------------------------
+const SIGNAL_WRITE_EXEMPT = new Set([
+  '/subscribe',
+  '/paystack-callback',
+  '/settings', // POST /settings has its own granular plan-change gate below.
+]);
+
+signalRouter.use((req, res, next) => {
+  const isWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
+  const path = (req.path || '').replace(/\/+$/, '');
+  if (!isWrite || SIGNAL_WRITE_EXEMPT.has(path)) return next();
+
+  const email = String(req.query.email || req.headers['x-user-email'] || '').trim();
+  const builderId = String(req.query.builderId || req.headers['x-builder-id'] || '').trim();
+
+  // Master admin always passes.
+  if (isMasterAdmin(email)) return next();
+
+  try {
+    const ent = getEntitlement({
+      userId: builderId.length >= 8 ? builderId : null,
+      email: email.includes('@') ? email : null,
+    });
+    const required = TIER_LEVELS['signal_pro'] ?? 3;
+    const current = ent ? (TIER_LEVELS[ent.tier] ?? 0) : 0;
+    if (ent && current >= required) return next();
+
+    res.status(402).json({
+      success: false,
+      requiresPayment: true,
+      error: 'Signal outbound actions require an active Signal Pro subscription. Purchase via /signal/pricing.',
+      requiredTier: 'signal_pro',
+      currentTier: ent?.tier || 'free',
+    });
+  } catch {
+    res.status(402).json({
+      success: false,
+      requiresPayment: true,
+      error: 'Could not verify Signal subscription. Purchase via /signal/pricing.',
+      requiredTier: 'signal_pro',
+    });
+  }
+});
 
 // ---------------------------------------------------------------------------
 // 1. SIGNALS
