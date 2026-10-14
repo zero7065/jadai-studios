@@ -100,6 +100,42 @@ export default function GhostwritingWorkspace() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastSuggestionRef = useRef<string | null>(null);
 
+  // Returns the highlighted selection when the user has one, otherwise the
+  // final non-empty paragraph. Keeps the "Rewrite Highlighted Paragraph"
+  // promise honest: a selection is rewritten in place, not the last paragraph.
+  const getTargetParagraph = (): { text: string; isSelection: boolean } => {
+    const ta = textareaRef.current;
+    if (ta) {
+      const start = ta.selectionStart ?? -1;
+      const end = ta.selectionEnd ?? -1;
+      if (start >= 0 && end > start) {
+        const selected = docContent.slice(start, end);
+        if (selected.trim().length > 0) return { text: selected, isSelection: true };
+      }
+    }
+    const lines = docContent.split('\n\n').filter((l) => l.trim().length > 0);
+    return { text: lines[lines.length - 1] || docContent, isSelection: false };
+  };
+
+  // Applies a transformation to the target paragraph. Rewrites the highlighted
+  // selection in place when present; otherwise replaces the last paragraph.
+  const applyParagraphTransform = (transformed: string, isSelection: boolean) => {
+    const ta = textareaRef.current;
+    if (isSelection && ta) {
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      setDocContent((prev) => prev.slice(0, start) + transformed + prev.slice(end));
+    } else {
+      const lines = docContent.split('\n\n').filter((l) => l.trim().length > 0);
+      if (lines.length > 0) {
+        lines[lines.length - 1] = transformed;
+        setDocContent(lines.join('\n\n'));
+      } else {
+        setDocContent(transformed);
+      }
+    }
+  };
+
   // Load Initial Data from Storage / IndexedDB
   useEffect(() => {
     try {
@@ -271,70 +307,67 @@ STYLE INVARIANTS:
 
   // 3. Rewrite Paragraph
   const handleRewriteParagraph = async () => {
-    const lines = docContent.split('\n\n').filter((l) => l.trim().length > 0);
-    const lastParagraph = lines[lines.length - 1] || docContent;
+    const { text, isSelection } = getTargetParagraph();
 
     const rewritten = await callWriterAI(
       'Rewrite the following paragraph with sharper sensory contrast, zero fluff, and stronger cadence.',
-      lastParagraph
+      text
     );
 
     if (rewritten) {
-      if (lines.length > 0) {
-        lines[lines.length - 1] = rewritten;
-        setDocContent(lines.join('\n\n'));
-      } else {
-        setDocContent(rewritten);
-      }
+      applyParagraphTransform(rewritten, isSelection);
       StudioAudio.playSuccessArpeggio();
-      showToast('Paragraph rewritten with enhanced cadence', 'success');
+      showToast(
+        isSelection ? 'Highlighted passage rewritten' : 'Last paragraph rewritten',
+        'success'
+      );
     }
   };
 
   // 4. Simplify
   const handleSimplify = async () => {
-    const lines = docContent.split('\n\n').filter((l) => l.trim().length > 0);
-    const lastParagraph = lines[lines.length - 1] || docContent;
+    const { text, isSelection } = getTargetParagraph();
     const simplified = await callWriterAI(
       'Simplify this paragraph to its irreducible, crisp core declarations. Remove every redundant word.',
-      lastParagraph
+      text
     );
     if (simplified) {
-      lines[lines.length - 1] = simplified;
-      setDocContent(lines.join('\n\n'));
-      showToast('Prose simplified', 'info');
+      applyParagraphTransform(simplified, isSelection);
+      showToast(
+        isSelection ? 'Highlighted passage simplified' : 'Last paragraph simplified',
+        'info'
+      );
     }
   };
 
   // 5. Expand
   const handleExpand = async () => {
-    const lines = docContent.split('\n\n').filter((l) => l.trim().length > 0);
-    const lastParagraph = lines[lines.length - 1] || docContent;
+    const { text, isSelection } = getTargetParagraph();
     const expanded = await callWriterAI(
       'Expand this paragraph by deepening the physical atmosphere, internal stakes, and philosophical resonance.',
-      lastParagraph
+      text
     );
     if (expanded) {
-      lines[lines.length - 1] = expanded;
-      setDocContent(lines.join('\n\n'));
-      showToast('Prose expanded', 'info');
+      applyParagraphTransform(expanded, isSelection);
+      showToast(
+        isSelection ? 'Highlighted passage expanded' : 'Last paragraph expanded',
+        'info'
+      );
     }
   };
 
   // 6. Change Tone
   const handleChangeToneSubmit = async (targetTone: ToneId) => {
-    const lines = docContent.split('\n\n').filter((l) => l.trim().length > 0);
-    if (lines.length === 0) return;
-    const lastParagraph = lines[lines.length - 1];
+    const { text, isSelection } = getTargetParagraph();
+    if (!text.trim()) return;
 
     const shifted = await callWriterAI(
       `Transform the tone of this paragraph to be distinctly ${targetTone.toUpperCase()}. Keep the core message but align vocabulary and cadence.`,
-      lastParagraph
+      text
     );
 
     if (shifted) {
-      lines[lines.length - 1] = shifted;
-      setDocContent(lines.join('\n\n'));
+      applyParagraphTransform(shifted, isSelection);
       showToast(`Tone shifted to ${targetTone.toUpperCase()}`, 'success');
     }
   };

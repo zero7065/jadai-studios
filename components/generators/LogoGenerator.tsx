@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { requestImages } from '@/lib/ai/imageClient';
-import { Download, RefreshCw, Sparkles, AlertCircle, FileCode, Layers } from 'lucide-react';
+import { Download, RefreshCw, Sparkles, AlertCircle, Layers } from 'lucide-react';
 import { StudioAudio } from '@/lib/watermark';
 
 interface LogoConcept {
@@ -131,33 +131,6 @@ export const LogoGenerator: React.FC = () => {
     }
   };
 
-  const handleDownloadSvg = (url: string, index: number) => {
-    try {
-      StudioAudio.playClick();
-      // SVG wrapper with embedded raster image for vector graphics tools
-      const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
-  <defs>
-    <filter id="crisp">
-      <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/>
-    </filter>
-  </defs>
-  <rect width="800" height="800" fill="#050404"/>
-  <image href="${url}" width="800" height="800" filter="url(#crisp)"/>
-</svg>`;
-      const blob = new Blob([svgContent], { type: 'image/svg+xml' });
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `${brandName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-logo-concept-${index + 1}.svg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      window.open(url, '_blank');
-    }
-  };
-
   return (
     <div className="p-6 rounded-3xl bg-[rgba(10,9,8,0.7)] border border-[rgba(201,168,76,0.3)] backdrop-blur-2xl space-y-6 text-[#f5f3f0]">
       <div>
@@ -166,7 +139,7 @@ export const LogoGenerator: React.FC = () => {
         </span>
         <h2 className="text-xl sm:text-2xl font-display font-bold">Logo & Brand Concept Generator</h2>
         <p className="text-xs font-mono text-[#8a857e] mt-1">
-          Enter your brand name and vibe keywords to forge 3 distinct vector-ready logo marks.
+          Enter your brand name and vibe keywords to forge 3 distinct high-resolution logo concepts.
         </p>
       </div>
 
@@ -270,16 +243,6 @@ export const LogoGenerator: React.FC = () => {
                   </button>
 
                   <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadSvg(concept.url, index)}
-                      className="px-2.5 py-1.5 rounded-lg border border-[rgba(201,168,76,0.3)] hover:border-[#C9A84C] bg-white/5 hover:bg-white/10 text-[11px] font-mono text-[#e8c96a] flex items-center gap-1 transition-all cursor-pointer"
-                      title="Download Vector SVG"
-                    >
-                      <FileCode className="w-3 h-3" />
-                      <span>SVG</span>
-                    </button>
-
                     <button
                       type="button"
                       onClick={() => handleDownloadPng(concept.url, index)}
