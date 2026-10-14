@@ -109,18 +109,20 @@ export default function HomePage({ onNavigate }: HomePageProps = {}) {
   return (
     <div className="space-y-20 sm:space-y-28 pb-32 relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 w-full overflow-hidden">
       {/* 1. Hero Section */}
-      <Hero
-        onSeeWork={() => handleNavigate('/work')}
-        onMeetPrime={() => setChatOpen(true)}
-        onOpenAuth={() => {
-          window.dispatchEvent(new CustomEvent('jadai_open_auth'));
-        }}
-        onExploreGuest={() => {
-          const el = document.getElementById('studio-tools-section') || document.getElementById('playground-section');
-          if (el) el.scrollIntoView({ behavior: 'smooth' });
-        }}
-        onNavigate={handleNavigate}
-      />
+      <div data-tour="hero-title">
+        <Hero
+          onSeeWork={() => handleNavigate('/work')}
+          onMeetPrime={() => setChatOpen(true)}
+          onOpenAuth={() => {
+            window.dispatchEvent(new CustomEvent('jadai_open_auth'));
+          }}
+          onExploreGuest={() => {
+            const el = document.getElementById('studio-tools-section') || document.getElementById('playground-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }}
+          onNavigate={handleNavigate}
+        />
+      </div>
 
       {/* Subtle animated gold gradient line as a section separator between Hero and Playground */}
       <div className="w-full px-6 max-w-7xl mx-auto -my-4 relative">
@@ -131,7 +133,7 @@ export default function HomePage({ onNavigate }: HomePageProps = {}) {
 
       {/* 2. CATEGORIZED CASCADING DISPLAY (Playground Section) */}
       <Reveal>
-        <section id="studio-tools-section" className="relative w-full pt-4">
+        <section id="studio-tools-section" className="relative w-full pt-4" data-tour="tools-grid">
           <CascadingCategorizedDisplay onNavigate={handleNavigate} />
         </section>
       </Reveal>

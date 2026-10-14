@@ -177,6 +177,7 @@ export const Nav: React.FC<NavProps> = ({
             <button
               type="button"
               onClick={handleOpenVault}
+              data-tour="nav-vault"
               className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-[rgba(201,168,76,0.4)] bg-[rgba(15,14,12,0.85)] text-[#e8c96a] hover:bg-[rgba(201,168,76,0.2)] hover:border-[#C9A84C] transition-all flex items-center justify-center cursor-pointer shadow-[0_0_12px_rgba(201,168,76,0.2)] active:scale-95"
               title="Vault Knob"
               aria-label="Vault Knob"

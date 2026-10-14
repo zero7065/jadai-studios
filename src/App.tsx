@@ -16,6 +16,9 @@ import SacredGeometry from '../components/ui/SacredGeometry';
 import DefensiveFallback from '../components/ui/DefensiveFallback';
 import LivingAtmosphere from '../components/ui/LivingAtmosphere';
 import GuideBee from '../components/prime/GuideBee';
+import { TourProvider, useTour } from '../components/tour/TourProvider';
+import PageAiDock from '../components/ai/PageAiDock';
+import { getPageContext, HOME_TOUR } from '../lib/ai/pageContexts';
 
 // Public Site Views
 import HomePage from '../app/(site)/page';
@@ -95,6 +98,19 @@ function AppContent() {
   const [adminPasscodeOpen, setAdminPasscodeOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const { showToast } = useToast();
+  const { startTour, isActive } = useTour();
+
+  // Auto-run the home walkthrough once for first-time visitors.
+  useEffect(() => {
+    if (currentPath !== '/' || isActive) return;
+    let seen = false;
+    try {
+      seen = localStorage.getItem('jadai_tour_seen_home') === '1';
+    } catch {}
+    if (seen) return;
+    const t = window.setTimeout(() => startTour(HOME_TOUR), 1100);
+    return () => window.clearTimeout(t);
+  }, [currentPath, isActive, startTour]);
 
   const hasAdminSession = () => {
     try {
@@ -487,6 +503,9 @@ function AppContent() {
         <GuideBee onNavigate={navigateTo} />
       )}
 
+      {/* Page-aware AI dock (contextual assistant on every public page) */}
+      {!isAdminRoute && <PageAiDock context={getPageContext(currentPath)} />}
+
       {/* Main Viewport */}
       <main className="flex-1 w-full relative z-[1]">
         {renderActiveView()}
@@ -527,14 +546,16 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <CurrencyProvider>
-          <ToastProvider>
-            <AppContent />
-          </ToastProvider>
-        </CurrencyProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <TourProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <CurrencyProvider>
+            <ToastProvider>
+              <AppContent />
+            </ToastProvider>
+          </CurrencyProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </TourProvider>
   );
 }
