@@ -34,12 +34,39 @@ export default function PremiumProfilePage({ onNavigate }: { onNavigate?: (path:
     (async () => {
       if (typeof window !== 'undefined') {
         const savedSession = localStorage.getItem('jadai_user_session');
+        let sessionEmail = '';
         if (savedSession) {
           try {
             const parsed = JSON.parse(savedSession);
-            if (parsed.email) setUserEmail(parsed.email);
+            if (parsed.email) { setUserEmail(parsed.email); sessionEmail = parsed.email; }
             if (parsed.name) setUserName(parsed.name);
           } catch {}
+        }
+
+        // Paystack redirect back: verify the reference and grant the tier.
+        const params = new URLSearchParams(window.location.search);
+        const reference = params.get('reference') || params.get('trxref');
+        if (reference) {
+          try {
+            const verifyRes = await fetch('/api/paystack/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                reference,
+                email: sessionEmail || undefined,
+                plan: params.get('plan') || undefined,
+              }),
+            });
+            const v = await verifyRes.json();
+            if (!cancelled && v?.success && v?.tier) {
+              setTier(v.tier);
+              showToast('Payment verified — tier unlocked', 'success');
+            } else if (!cancelled && v?.error) {
+              showToast(v.error, 'error');
+            }
+          } catch {}
+          // Clean the reference off the URL so a refresh doesn't re-verify.
+          window.history.replaceState({}, '', window.location.pathname);
         }
 
         // Fetch the real verified tier from the server — never default to a paid tier.

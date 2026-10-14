@@ -166,12 +166,16 @@ export function chargeCoversPlan(plan: string, paidMinor: number, currency?: str
  * Resolves the Paystack secret key dynamically from admin_settings or env
  */
 export async function getPaystackSecretKey(): Promise<string | undefined> {
+  const allowTest = process.env.PAYSTACK_ALLOW_TEST === 'true';
   const sanitize = (key?: string | null): string | undefined => {
     if (!key || typeof key !== 'string') return undefined;
     const trimmed = key.trim();
     const lower = trimmed.toLowerCase();
     if (!trimmed.startsWith('sk_')) return undefined;
     if (lower.includes('mock') || lower.includes('placeholder') || lower.includes('your_')) return undefined;
+    // Reject any sk_test_ key unless PAYSTACK_ALLOW_TEST=true explicitly opts in.
+    // Prevents short test keys from reaching the live API and failing auth.
+    if (trimmed.startsWith('sk_test_') && !allowTest) return undefined;
     return trimmed;
   };
 
@@ -197,16 +201,14 @@ export async function getPaystackSecretKey(): Promise<string | undefined> {
  * Check if Paystack credentials are fully configured and ready
  */
 export function arePaystackKeysConfigured(): boolean {
-  const secret = process.env.PAYSTACK_SECRET_KEY;
-  const pub = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
-  return Boolean(
-    secret &&
-    !secret.startsWith('sk_test_placeholder') &&
-    !secret.includes('your_') &&
-    secret.startsWith('sk_') &&
-    pub &&
-    !pub.includes('your_')
-  );
+  const allowTest = process.env.PAYSTACK_ALLOW_TEST === 'true';
+  const secret = process.env.PAYSTACK_SECRET_KEY || '';
+  const pub = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
+  if (!secret.startsWith('sk_') || !pub) return false;
+  const lower = secret.toLowerCase();
+  if (lower.includes('mock') || lower.includes('placeholder') || lower.includes('your_')) return false;
+  if (secret.startsWith('sk_test_') && !allowTest) return false;
+  return true;
 }
 
 /**
@@ -235,8 +237,8 @@ export async function initializePaystackTransaction(
   const callbackUrl = options.callbackUrl ||
     `${process.env.NEXT_PUBLIC_APP_URL || ''}/account/premium?reference=${reference}&plan=${planKey}&status=success`;
 
-  // If secret key is not configured or in sandbox/demo, return graceful simulated checkout url
-  if (!secretKey || secretKey.startsWith('sk_test_placeholder') || secretKey.includes('your_')) {
+  // If secret key is not configured (placeholder/mock/test-without-optin), return graceful simulated checkout url
+  if (!secretKey) {
     return {
       success: true,
       reference,

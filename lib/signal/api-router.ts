@@ -472,7 +472,30 @@ signalRouter.get('/settings', (req, res) => {
 });
 
 signalRouter.post('/settings', (req, res) => {
-  const updated = signalStore.updateSettings(req.body);
+  const body = req.body || {};
+  // Plan changes require a verified Signal entitlement — no more unauthenticated plan:business.
+  if (typeof body.plan === 'string' && body.plan !== 'free') {
+    const email = String(req.query.email || req.headers['x-user-email'] || '').trim();
+    const builderId = String(req.query.builderId || req.headers['x-builder-id'] || '').trim();
+    let entitled = false;
+    try {
+      const { getEntitlement } = require('../entitlements/store');
+      const ent = getEntitlement({
+        userId: builderId.length >= 8 ? builderId : null,
+        email: email.includes('@') ? email : null,
+      });
+      entitled = Boolean(ent && ['signal_pro', 'signal_business', 'signal'].includes(ent.tier));
+    } catch {
+      entitled = false;
+    }
+    if (!entitled) {
+      return res.status(403).json({
+        success: false,
+        error: 'Signal plan upgrade requires an active Signal subscription. Purchase via /signal/pricing.',
+      });
+    }
+  }
+  const updated = signalStore.updateSettings(body);
   res.json({ success: true, settings: updated });
 });
 
@@ -531,7 +554,7 @@ signalRouter.get('/paystack-callback', async (req, res) => {
 
   try {
     const secret = await getPaystackSecretKey();
-    if (!secret || secret.startsWith('sk_test_placeholder') || secret.includes('your_')) {
+    if (!secret) {
       return res.redirect(`${back}?status=unconfigured`);
     }
 

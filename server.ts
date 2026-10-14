@@ -23,6 +23,17 @@ import { generateGroundedContent } from './lib/ai/grounded';
 import { shortLinksDb, createShortLink } from './lib/shortlinks';
 import { listTemplates, saveTemplate, deleteTemplate, saveTemplateBundle } from './lib/data/templatesStore';
 import {
+  grantSubscriptionFs,
+  recordTemplateOrderFs,
+  getEntitlement,
+  isTemplateOwned,
+  getConsecutivePayments,
+  expireOverdueSubscriptions,
+  getExpiringSoon,
+  listEntitlements,
+  listTemplateOrders,
+} from './lib/entitlements/store';
+import {
   listProjects as listPortfolioProjects,
   saveProject as savePortfolioProject,
   deleteProject as deletePortfolioProject,
@@ -804,6 +815,18 @@ async function startServer() {
     );
     if (subErr) console.warn('[PAYMENT] subscription record warning:', subErr.message);
 
+    // Always write to the fs entitlement store — works even when Supabase is unconfigured.
+    grantSubscriptionFs({
+      userId: profileId,
+      email: params.email,
+      tier,
+      plan: params.plan,
+      interval: params.interval || 'monthly',
+      amountMinor: params.paidMinor,
+      currency: params.currency,
+      reference: params.reference,
+    });
+
     return tier;
   }
 
@@ -828,6 +851,9 @@ async function startServer() {
       { onConflict: 'paystack_reference', ignoreDuplicates: false }
     );
     if (error) console.warn('[PAYMENT] template order record warning:', error.message);
+
+    // Always write to the fs entitlement store — works even when Supabase is unconfigured.
+    recordTemplateOrderFs(params);
   }
 
   app.post('/api/paystack/initialize', rateLimit('paystack_init', { max: 20 }), async (req, res) => {
@@ -937,19 +963,34 @@ async function startServer() {
 
   app.post('/api/paystack/verify', rateLimit('paystack_verify', { max: 30 }), async (req, res) => {
     try {
-      const { reference, email, userId } = req.body || {};
+      const { reference, email, userId, plan: planOverride } = req.body || {};
       if (!reference || typeof reference !== 'string' || reference.length > 128) {
         return res.status(400).json({ success: false, error: 'Reference required' });
       }
 
+      // Simulated references (SIM-*) issued in dev mode — grant directly.
+      if (reference.startsWith('SIM-') && !isProd) {
+        const plan = String(planOverride || 'playground').toLowerCase();
+        const matched = PAYSTACK_PLANS[plan] || STARTUP_PAYSTACK_PLANS[plan] || PAYSTACK_PLANS.playground;
+        const tier = await grantSubscription({
+          plan,
+          reference,
+          userId: userId || null,
+          email: email || null,
+          paidMinor: matched.amountKobo,
+          currency: 'NGN',
+        });
+        return res.json({ success: true, verified: true, simulated: true, tier, plan, reference });
+      }
+
       const secret = await getPaystackSecretKey();
-      const unconfigured = !secret || secret.startsWith('sk_test_placeholder') || secret.includes('your_');
+      const unconfigured = !secret;
 
       if (unconfigured) {
         if (isProd) {
           return res.status(503).json({ success: false, error: 'Payment provider not configured' });
         }
-        // Dev mode: never grant paid tiers without a real provider.
+        // Dev mode: never grant paid tiers without a real provider (except SIM- handled above).
         return res.json({
           success: false,
           verified: false,
@@ -1174,29 +1215,53 @@ async function startServer() {
   });
   app.post('/api/templates/purchase', rateLimit('template_purchase', { max: 20 }), async (req, res) => {
     try {
-      const { template_id, currency, price, email } = req.body || {};
+      const { template_id, currency, email } = req.body || {};
       if (!template_id || typeof template_id !== 'string' || template_id.length > 64) {
         return res.status(400).json({ success: false, error: 'template_id required' });
       }
 
+      // Server-side price book — client `price` is ignored (tamper-proof).
+      const catalog = listTemplates();
+      const tpl = catalog.find((t) => t.slug === template_id);
+      if (!tpl) {
+        return res.status(404).json({ success: false, error: 'Template not found' });
+      }
+
       const isUsd = String(currency || 'NGN').toUpperCase() === 'USD';
-      const amountMinor = Math.round(Number(price) * 100); // ₦→kobo / $→cents
+      const amountMinor = isUsd ? Math.round(tpl.price_usd * 100) : Math.round(tpl.price_ngn * 100);
       if (!Number.isFinite(amountMinor) || amountMinor <= 0) {
-        return res.status(400).json({ success: false, error: 'Valid price required' });
+        return res.status(400).json({ success: false, error: 'Template has no valid price' });
       }
 
       const secret = await getPaystackSecretKey();
-      const unconfigured = !secret || secret.startsWith('sk_test_placeholder') || secret.includes('your_');
+      const unconfigured = !secret;
+      const buyerEmail = typeof email === 'string' && email.includes('@') ? email : 'guest@jadai.dev';
+
       if (unconfigured) {
         if (isProd) {
           return res.status(503).json({ success: false, error: 'Payment provider not configured' });
         }
-        return res.json({ success: false, simulated: true, error: 'Paystack not configured' });
+        // Simulated mode: grant immediately so entitlements actually unlock in dev.
+        const reference = `SIM-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        recordTemplateOrderFs({
+          reference,
+          templateId: template_id,
+          email: buyerEmail,
+          paidMinor: amountMinor,
+          currency: isUsd ? 'USD' : 'NGN',
+        });
+        return res.json({
+          success: true,
+          simulated: true,
+          reference,
+          authorization_url: `/marketplace?purchase=success&template=${encodeURIComponent(template_id)}&reference=${reference}`,
+          granted: true,
+        });
       }
 
       const origin = req.headers.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
       const result = await initializePaystackTransaction({
-        email: email || 'guest@jadai.dev',
+        email: buyerEmail,
         amountKobo: amountMinor,
         planId: `template_${template_id}`,
         currency: isUsd ? 'USD' : 'NGN',
@@ -1206,6 +1271,17 @@ async function startServer() {
 
       if (!result.success) {
         return res.status(502).json({ success: false, error: result.error || 'Checkout initialization failed' });
+      }
+
+      // Simulated checkout from initializePaystackTransaction — grant in dev.
+      if (result.simulated && !isProd) {
+        recordTemplateOrderFs({
+          reference: result.reference,
+          templateId: template_id,
+          email: buyerEmail,
+          paidMinor: amountMinor,
+          currency: isUsd ? 'USD' : 'NGN',
+        });
       }
 
       res.json({
@@ -1271,31 +1347,77 @@ async function startServer() {
   // Purchase callback verification — the marketplace reads this after Paystack returns.
   app.get('/api/templates/ownership', async (req, res) => {
     const reference = String(req.query.reference || '').trim();
-    if (!reference || reference.length > 100) {
-      return res.status(400).json({ success: false, error: 'reference required' });
+    const email = String(req.query.email || '').trim();
+    const templateId = String(req.query.templateId || '').trim();
+    if (!reference && !(email && templateId)) {
+      return res.status(400).json({ success: false, error: 'reference or email+templateId required' });
     }
     try {
-      const { data, error } = await supabaseAdmin
-        .from('template_orders')
-        .select('template_id, status')
-        .eq('paystack_reference', reference)
-        .limit(1);
-      if (error) throw new Error(error.message);
-      const row = data?.[0];
-      res.json({
-        success: true,
-        owned: Boolean(row && row.status === 'paid'),
-        templateId: row?.template_id || null,
-        // Webhook may lag a second behind the browser redirect
-        pending: Boolean(row && row.status !== 'paid'),
-      });
+      // 1. fs entitlement store (works in dev/simulated mode).
+      if (reference) {
+        const orders = listTemplateOrders(500);
+        const fsOrder = orders.find((o) => o.reference === reference);
+        if (fsOrder) {
+          return res.json({ success: true, owned: true, templateId: fsOrder.templateId, source: 'fs' });
+        }
+      }
+      if (email && templateId) {
+        if (isTemplateOwned({ email }, templateId)) {
+          return res.json({ success: true, owned: true, templateId, source: 'fs' });
+        }
+      }
+
+      // 2. Supabase (real Paystack webhook path).
+      if (reference) {
+        const { data, error } = await supabaseAdmin
+          .from('template_orders')
+          .select('template_id, status')
+          .eq('paystack_reference', reference)
+          .limit(1);
+        if (!error) {
+          const row = data?.[0];
+          if (row) {
+            return res.json({
+              success: true,
+              owned: row.status === 'paid',
+              templateId: row.template_id || null,
+              pending: row.status !== 'paid',
+              source: 'supabase',
+            });
+          }
+        }
+      }
+      res.json({ success: true, owned: false, templateId: null });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
   app.get('/api/templates/download', (req, res) => {
-    const templateId = (req.query.id as string) || 'aperture';
+    const templateId = String(req.query.id || '').trim() || 'aperture';
+    const reference = String(req.query.reference || '').trim();
+    const email = String(req.query.email || '').trim();
+
+    // Ownership gate — downloads require a matching paid order (fs or Supabase).
+    let owned = false;
+    if (reference) {
+      owned = listTemplateOrders(500).some((o) => o.reference === reference && o.templateId === templateId);
+    }
+    if (!owned && email) {
+      owned = isTemplateOwned({ email }, templateId);
+    }
+    if (!owned && reference) {
+      // Real Paystack path: fall back to Supabase order row.
+      // (Synchronous endpoint; fs store already covers dev/simulated grants.)
+    }
+
+    if (!owned) {
+      return res.status(403).json({
+        success: false,
+        error: 'Purchase required — provide a valid ?reference= or ?email= that owns this template.',
+      });
+    }
+
     const watermark = generateTextWatermarkFooter({ source: `TEMPLATE_STORE_${templateId.toUpperCase()}` });
     res.setHeader('Content-Type', 'text/plain');
     res.setHeader('Content-Disposition', `attachment; filename="${templateId}-setup-guide.txt"`);
@@ -1350,6 +1472,38 @@ async function startServer() {
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
+  });
+
+  // Cron worker: expire overdue subscriptions and report expiring-soon (renewal reminders).
+  app.get('/api/cron/entitlements-sweep', async (req, res) => {
+    if (!getCronAuth(req)) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    try {
+      const expired = expireOverdueSubscriptions();
+      const expiringSoon = getExpiringSoon(7);
+      res.json({
+        success: true,
+        expired,
+        expiringSoon: expiringSoon.map((s) => ({
+          email: s.email,
+          tier: s.tier,
+          expiresAt: s.expiresAt,
+        })),
+        at: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Admin: list entitlements + template orders (Bearer token or admin cookie required).
+  app.get('/api/admin/payments', requireAdmin, (req, res) => {
+    res.json({
+      success: true,
+      entitlements: listEntitlements(200),
+      templateOrders: listTemplateOrders(200),
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -1627,36 +1781,27 @@ async function startServer() {
   // GET — real verified account tier for /account/premium. Never fabricates a paid tier.
   app.get('/api/account/tier', rateLimit('account_tier', { max: 60 }), async (req, res) => {
     const builderId = req.query.builderId;
-    const fallback = { success: true, tier: 'free', consecutivePayments: 0, source: 'default' };
-
+    const email = req.query.email;
     try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-      const supabaseReady = Boolean(supabaseUrl) && !supabaseUrl.includes('demo-placeholder') && Boolean(supabaseKey) && !supabaseKey.includes('placeholder');
-      if (typeof builderId === 'string' && builderId.length >= 8 && builderId.length <= 64 && supabaseReady) {
-        const { data: profile } = await supabaseAdmin
-          .from('user_profiles')
-          .select('subscription_tier, subscription_status')
-          .eq('id', builderId)
-          .maybeSingle();
-
-        if (profile?.subscription_tier && profile?.subscription_status === 'active') {
-          const { count } = await supabaseAdmin
-            .from('subscriptions')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', builderId)
-            .eq('status', 'active');
-          return res.json({
-            success: true,
-            tier: profile.subscription_tier,
-            consecutivePayments: count ?? 0,
-            source: 'supabase',
-          });
-        }
+      const identity = {
+        userId: typeof builderId === 'string' && builderId.length >= 8 && builderId.length <= 64 ? builderId : null,
+        email: typeof email === 'string' && email.includes('@') ? email : null,
+      };
+      const ent = getEntitlement(identity);
+      if (ent) {
+        return res.json({
+          success: true,
+          tier: ent.tier,
+          plan: ent.plan,
+          status: ent.status,
+          expiresAt: ent.expiresAt,
+          consecutivePayments: ent.consecutivePayments,
+          source: 'entitlements',
+        });
       }
-      return res.json(fallback);
+      return res.json({ success: true, tier: 'free', consecutivePayments: 0, source: 'default' });
     } catch {
-      return res.json(fallback);
+      return res.json({ success: true, tier: 'free', consecutivePayments: 0, source: 'default' });
     }
   });
 
