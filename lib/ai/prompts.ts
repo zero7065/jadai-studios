@@ -258,15 +258,37 @@ export function formatHistoryBlock(history?: ChatHistoryEntry[] | null): string 
     .join('\n');
 }
 
+const MAX_CONTEXT_CHUNKS = 6;
+const MAX_CONTEXT_CHARS = 1400;
+
+export function formatContextBlock(
+  context?: Array<{ text: string; score?: number }> | null
+): string {
+  if (!context || context.length === 0) return '';
+  let used = 0;
+  const lines: string[] = [];
+  for (const c of context.slice(0, MAX_CONTEXT_CHUNKS)) {
+    const text = String(c.text || '').trim();
+    if (!text) continue;
+    if (used + text.length > MAX_CONTEXT_CHARS) break;
+    used += text.length;
+    lines.push(`- ${text}`);
+  }
+  return lines.join('\n');
+}
+
 export function assembleChatRequest(input: {
   prompt: string;
   systemPrompt?: string;
   persona?: string;
   history?: ChatHistoryEntry[] | null;
   memory?: ChatMemoryFact[] | Record<string, unknown> | null;
+  /** Retrieved document snippets (RAG) — injected as grounding context. */
+  context?: Array<{ text: string; score?: number }> | null;
 }): { systemPrompt: string; prompt: string } {
   const memoryBlock = formatMemoryBlock(input.memory);
   const historyBlock = formatHistoryBlock(input.history);
+  const contextBlock = formatContextBlock(input.context);
 
   const personaGuide =
     input.persona && PRIME_PERSONA_GUIDES[input.persona as PrimePersona]
@@ -283,7 +305,10 @@ CONTINUITY PROTOCOL:
 - Keep replies tight: no preamble, no summaries of your own answer, no hedging.
 
 BUILDER MEMORY:
-${memoryBlock || '(none yet — this is a fresh builder)'}`;
+${memoryBlock || '(none yet — this is a fresh builder)'}${contextBlock ? `
+
+RETRIEVED CONTEXT (from the builder's indexed documents — ground your answer in this when relevant):
+${contextBlock}` : ''}`;
 
   const prompt = `${historyBlock ? `CONVERSATION RECORD:\n${historyBlock}\n\n` : ''}BUILDER: ${input.prompt}
 PRIME:`;

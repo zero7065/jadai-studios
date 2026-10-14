@@ -47,6 +47,19 @@ import {
   toggleDeployment,
   deleteDeployment,
 } from './lib/data/deploymentsStore';
+import {
+  ingestDocument as ingestRagDocument,
+  searchCollection as searchRagCollection,
+  listDocuments as listRagDocuments,
+  deleteDocument as deleteRagDocument,
+  wipeBuilder as wipeRagBuilder,
+} from './lib/rag/store';
+import {
+  upsertMemoryFact,
+  getMemoryFacts,
+  deleteMemoryFact,
+  wipeMemory,
+} from './lib/rag/memory-store';
 import { isRealGroqKey, isRealGeminiKey, isRealSupabaseUrl, isRealSupabaseKey, isOpenAIKey } from './lib/config/envTrust';
 import { generateTextWatermarkFooter } from './lib/watermark';
 import { isTransmissionCadenceTime } from './lib/content/delivery';
@@ -1573,6 +1586,17 @@ async function startServer() {
     for (const fact of facts.slice(0, 8)) {
       if (!fact.key || !fact.value || typeof fact.value !== 'string') continue;
       if (fact.value.length > 500) continue;
+      // Persist to the fs store (works with no Supabase configured).
+      try {
+        upsertMemoryFact({
+          builderId,
+          type: inferMemoryType(String(fact.key)) as any,
+          key: String(fact.key).slice(0, 64),
+          value: fact.value,
+          confidence: Math.min(1, Math.max(0, Number(fact.confidence) || 0.8)),
+          sourceModule: moduleSlug,
+        });
+      } catch {}
       await supabaseAdmin.from('ai_memories').upsert(
         {
           builder_id: builderId,
@@ -1594,12 +1618,33 @@ async function startServer() {
       return res.status(400).json({ success: false, error: 'Missing prompt' });
     }
 
+    // Server-side memory: merge client-provided facts with the persistent store.
+    let effectiveMemory = Array.isArray(memory) ? memory : memory && typeof memory === 'object' ? memory : undefined;
+    if (isValidBuilderId(builderId)) {
+      try {
+        const facts = getMemoryFacts(builderId, 14).map((f) => ({ key: f.key, value: f.value, confidence: f.confidence }));
+        if (facts.length) {
+          effectiveMemory = Array.isArray(effectiveMemory) ? [...facts, ...effectiveMemory] : facts;
+        }
+      } catch {}
+    }
+
+    // RAG: retrieve relevant snippets from the builder's indexed documents.
+    let context: Array<{ text: string; score: number }> | undefined;
+    if (isValidBuilderId(builderId)) {
+      try {
+        const hits = searchRagCollection({ builderId, query: prompt.slice(0, 2000), k: 4 });
+        if (hits.length) context = hits.map((h) => ({ text: h.text, score: h.score }));
+      } catch {}
+    }
+
     const assembled = assembleChatRequest({
       prompt: prompt.slice(0, 8000),
       systemPrompt: typeof systemPrompt === 'string' ? systemPrompt.slice(0, 4000) : undefined,
       persona: typeof persona === 'string' ? persona : undefined,
       history: Array.isArray(history) ? history : undefined,
-      memory: Array.isArray(memory) || (memory && typeof memory === 'object') ? memory : undefined,
+      memory: effectiveMemory,
+      context,
     });
 
     try {
@@ -1637,9 +1682,25 @@ async function startServer() {
   // renders responses token-by-token instead of waiting for the full buffer.
   // ---------------------------------------------------------------------------
   app.post('/api/ai/chat/stream', rateLimit('ai_chat_stream', { max: 20 }), async (req, res) => {
-    const { prompt, systemPrompt, moduleSlug, persona, history, memory, temperature } = req.body;
+    const { prompt, systemPrompt, moduleSlug, persona, history, memory, temperature, builderId } = req.body;
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ success: false, error: 'Missing prompt' });
+    }
+
+    // Server-side memory + RAG retrieval (same continuity protocol as /api/ai/chat).
+    let effectiveMemory = Array.isArray(memory) ? memory : memory && typeof memory === 'object' ? memory : undefined;
+    let context: Array<{ text: string; score: number }> | undefined;
+    if (isValidBuilderId(builderId)) {
+      try {
+        const facts = getMemoryFacts(builderId, 14).map((f) => ({ key: f.key, value: f.value, confidence: f.confidence }));
+        if (facts.length) {
+          effectiveMemory = Array.isArray(effectiveMemory) ? [...facts, ...effectiveMemory] : facts;
+        }
+      } catch {}
+      try {
+        const hits = searchRagCollection({ builderId, query: prompt.slice(0, 2000), k: 4 });
+        if (hits.length) context = hits.map((h) => ({ text: h.text, score: h.score }));
+      } catch {}
     }
 
     const assembled = assembleChatRequest({
@@ -1647,7 +1708,8 @@ async function startServer() {
       systemPrompt: typeof systemPrompt === 'string' ? systemPrompt.slice(0, 4000) : undefined,
       persona: typeof persona === 'string' ? persona : undefined,
       history: Array.isArray(history) ? history : undefined,
-      memory: Array.isArray(memory) || (memory && typeof memory === 'object') ? memory : undefined,
+      memory: effectiveMemory,
+      context,
     });
 
     // SSE headers
@@ -1805,6 +1867,103 @@ async function startServer() {
     }
   });
 
+  // POST — save a memory fact (client "teach PRIME" action / manual save).
+  app.post('/api/ai/memory', rateLimit('ai_memory_write', { max: 60 }), async (req, res) => {
+    const { builderId, facts } = req.body || {};
+    if (!isValidBuilderId(builderId)) {
+      return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    }
+    const list: Array<{ key?: unknown; value?: unknown; confidence?: unknown; type?: unknown }> = Array.isArray(facts)
+      ? facts
+      : req.body?.key
+        ? [{ key: req.body.key, value: req.body.value, confidence: req.body.confidence, type: req.body.type }]
+        : [];
+    if (!list.length) {
+      return res.status(400).json({ success: false, error: 'facts[] (or key/value) required' });
+    }
+
+    const saved: Array<{ key: string; value: string }> = [];
+    for (const f of list.slice(0, 20)) {
+      const rec = upsertMemoryFact({
+        builderId,
+        key: String(f.key || ''),
+        value: String(f.value || ''),
+        confidence: Number(f.confidence) || 0.8,
+        type: f.type as any,
+        sourceModule: 'client',
+      });
+      if (rec) saved.push({ key: rec.key, value: rec.value });
+    }
+    res.json({ success: true, saved, total: getMemoryFacts(builderId, 200).length });
+  });
+
+  // ---------------------------------------------------------------------------
+  // RAG — document ingest + retrieval for the builder's knowledge base.
+  // ---------------------------------------------------------------------------
+  app.post('/api/rag/ingest', rateLimit('rag_ingest', { max: 20 }), async (req, res) => {
+    const { builderId, docId, title, text, scope, chunkSize } = req.body || {};
+    if (!isValidBuilderId(builderId)) {
+      return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    }
+    if (!docId || typeof docId !== 'string' || docId.length > 128) {
+      return res.status(400).json({ success: false, error: 'docId required (≤128 chars)' });
+    }
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ success: false, error: 'text required' });
+    }
+
+    const result = ingestRagDocument({
+      builderId,
+      docId,
+      title: typeof title === 'string' ? title.slice(0, 200) : undefined,
+      text: text.slice(0, 200_000),
+      scope: typeof scope === 'string' ? scope : 'oracle',
+      chunkSize: Number(chunkSize) || undefined,
+    });
+    res.json({ success: true, ...result });
+  });
+
+  app.post('/api/rag/search', rateLimit('rag_search', { max: 60 }), (req, res) => {
+    const { builderId, query, k, minScore, scope } = req.body || {};
+    if (!isValidBuilderId(builderId)) {
+      return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    }
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ success: false, error: 'query required' });
+    }
+    const hits = searchRagCollection({
+      builderId,
+      query: query.slice(0, 2000),
+      k: Math.min(20, Number(k) || 4),
+      minScore: typeof minScore === 'number' ? minScore : undefined,
+      scope: typeof scope === 'string' ? scope : undefined,
+    });
+    res.json({ success: true, hits });
+  });
+
+  app.get('/api/rag/documents', rateLimit('rag_search', { max: 60 }), (req, res) => {
+    const builderId = req.query.builderId;
+    if (!isValidBuilderId(builderId)) {
+      return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    }
+    res.json({ success: true, documents: listRagDocuments(builderId) });
+  });
+
+  app.delete('/api/rag/documents', rateLimit('rag_ingest', { max: 20 }), (req, res) => {
+    const builderId = req.body?.builderId || req.query.builderId;
+    if (!isValidBuilderId(builderId)) {
+      return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    }
+    const docId = String(req.body?.docId || req.query.docId || '');
+    if (docId) {
+      const removed = deleteRagDocument(builderId, docId);
+      return res.json({ success: true, removed, scope: 'document' });
+    }
+    const ragWiped = wipeRagBuilder(builderId);
+    const memWiped = wipeMemory(builderId);
+    res.json({ success: true, removed: ragWiped + memWiped, rag: ragWiped, memory: memWiped, scope: 'all' });
+  });
+
   // GET — restore server-synced memory (facts + transcript) for a builder.
   app.get('/api/ai/memory', rateLimit('ai_memory', { max: 30 }), async (req, res) => {
     const builderId = req.query.builderId;
@@ -1828,16 +1987,38 @@ async function startServer() {
           .limit(40),
       ]);
 
-      res.json({
-        success: true,
-        facts: (factsRes.data || []).map((f) => ({
+      // Merge fs-store facts (works with no Supabase configured).
+      let fsFacts: Array<{ type: string; key: string; value: string; confidence: number; source: string; createdAt: string }> = [];
+      try {
+        fsFacts = getMemoryFacts(builderId, 40).map((f) => ({
           type: f.type,
           key: f.key,
           value: f.value,
           confidence: f.confidence,
-          source: f.source_module,
-          createdAt: f.updated_at,
-        })),
+          source: f.sourceModule,
+          createdAt: f.updatedAt,
+        }));
+      } catch {}
+
+      const supaFacts = (factsRes.data || []).map((f) => ({
+        type: f.type,
+        key: f.key,
+        value: f.value,
+        confidence: f.confidence,
+        source: f.source_module,
+        createdAt: f.updated_at,
+      }));
+
+      // Dedupe by key, keeping the highest confidence.
+      const byKey = new Map<string, any>();
+      for (const f of [...fsFacts, ...supaFacts]) {
+        const cur = byKey.get(f.key);
+        if (!cur || (f.confidence || 0) > (cur.confidence || 0)) byKey.set(f.key, f);
+      }
+
+      res.json({
+        success: true,
+        facts: [...byKey.values()].sort((a, b) => (b.confidence || 0) - (a.confidence || 0)),
         transcript: (messagesRes.data || []).reverse().map((m) => ({
           role: m.role,
           content: m.content,
@@ -1858,6 +2039,14 @@ async function startServer() {
     }
 
     try {
+      // Wipe fs store too (works with no Supabase configured).
+      let fsWiped = 0;
+      let ragWiped = 0;
+      try {
+        fsWiped = wipeMemory(builderId);
+        ragWiped = wipeRagBuilder(builderId);
+      } catch {}
+
       const [memories, messages] = await Promise.all([
         supabaseAdmin.from('ai_memories').delete().eq('builder_id', builderId),
         supabaseAdmin.from('ai_messages').delete().eq('builder_id', builderId),
@@ -1865,8 +2054,10 @@ async function startServer() {
       res.json({
         success: true,
         deleted: {
-          memories: memories.error ? 0 : 'all',
+          memories: memories.error && !fsWiped ? 0 : 'all',
           messages: messages.error ? 0 : 'all',
+          fsFacts: fsWiped,
+          ragChunks: ragWiped,
         },
       });
     } catch (err: any) {
