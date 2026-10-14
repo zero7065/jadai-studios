@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { EditableField, exportAs } from '@/modules/forge/lib/convert';
+import { EditableField, DocPage, exportAs } from '@/modules/forge/lib/convert';
 import {
   Download,
   Layers,
@@ -24,6 +24,14 @@ import {
   Sliders,
   FileCode,
   Wand2,
+  Plus,
+  Image as ImageIcon,
+  Square as ShapeIcon,
+  Trash2,
+  Bold,
+  Italic,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { StudioAudio } from '@/lib/watermark';
 import { useToast } from '@/components/providers/ToastProvider';
@@ -88,6 +96,12 @@ export interface EditorProps {
   initialFields: EditableField[];
   width: number;
   height: number;
+  /** Multi-page payload (PDFs). Single-page docs have 1 page. */
+  pages?: DocPage[];
+  /** Honest provenance label. */
+  source?: string;
+  /** Real text elements extracted (0 = nothing readable). */
+  extractedCount?: number;
   onReset?: () => void;
 }
 
@@ -96,6 +110,9 @@ export function Editor({
   initialFields,
   width,
   height,
+  pages,
+  source,
+  extractedCount,
   onReset,
 }: EditorProps) {
   // Ensure we have some default checkboxes if none detected in OCR
@@ -128,6 +145,18 @@ export function Editor({
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiAuditing, setAiAuditing] = useState(false);
   const [showAiHighlights, setShowAiHighlights] = useState(true);
+
+  // Multi-page navigation + per-page field stores.
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageFieldMap, setPageFieldMap] = useState<Record<number, EditableField[]>>(() => {
+    const map: Record<number, EditableField[]> = { 0: normalizedInitial };
+    (pages || []).forEach((p) => {
+      if (p.index !== 0) map[p.index] = p.fields;
+    });
+    return map;
+  });
+  const totalPages = Math.max(1, pages?.length || 1);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // 30-Step Bi-Directional Snapshot History (Up to 15 undo, up to 15 redo)
   const [undoStack, setUndoStack] = useState<EditableField[][]>([]);
@@ -252,6 +281,109 @@ export function Editor({
         'success'
       );
     }
+  };
+
+  // Keep the per-page field store in sync with the live `fields` array.
+  useEffect(() => {
+    setPageFieldMap((map) => ({ ...map, [currentPage]: fields }));
+  }, [fields, currentPage]);
+
+  // When the page changes, load that page's fields and clear selection.
+  const goToPage = useCallback(
+    (idx: number) => {
+      const clamped = Math.max(0, Math.min(totalPages - 1, idx));
+      if (clamped === currentPage) return;
+      setCurrentPage(clamped);
+      setFields(pageFieldMap[clamped] || []);
+      setSelectedId((pageFieldMap[clamped] || [])[0]?.id || null);
+      setEditingId(null);
+    },
+    [currentPage, totalPages, pageFieldMap]
+  );
+
+  const currentBackground = pages?.[currentPage]?.backgroundUrl || originalUrl;
+
+  // --- WPS-grade insert tools ---
+  const insertText = () => {
+    recordSnapshot(fields);
+    const id = crypto.randomUUID();
+    const newField: EditableField = {
+      id,
+      type: 'text',
+      value: 'New text',
+      x: Math.round(width / 2 - 80),
+      y: Math.round(height / 2 - 12),
+      width: 180,
+      height: 24,
+      fontSize: 16,
+      color: '#0a0908',
+      bold: false,
+      italic: false,
+      page: currentPage,
+    };
+    setFields((fs) => [...fs, newField]);
+    setSelectedId(id);
+    setEditingId(id);
+    showToast('Text layer added', 'success');
+  };
+
+  const insertShape = (shape: 'rect' | 'ellipse' | 'line') => {
+    recordSnapshot(fields);
+    const id = crypto.randomUUID();
+    const newField: EditableField = {
+      id,
+      type: 'shape',
+      value: shape,
+      shape,
+      x: Math.round(width / 2 - 60),
+      y: Math.round(height / 2 - 40),
+      width: 120,
+      height: 80,
+      color: '#C9A84C',
+      page: currentPage,
+    };
+    setFields((fs) => [...fs, newField]);
+    setSelectedId(id);
+    showToast(`${shape} shape added`, 'success');
+  };
+
+  const handleInsertImageClick = () => imageInputRef.current?.click();
+
+  const handleImageSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = String(reader.result || '');
+      if (!src) return;
+      recordSnapshot(fields);
+      const id = crypto.randomUUID();
+      const newField: EditableField = {
+        id,
+        type: 'image',
+        value: file.name,
+        src,
+        x: Math.round(width / 2 - 100),
+        y: Math.round(height / 2 - 75),
+        width: 200,
+        height: 150,
+        page: currentPage,
+      };
+      setFields((fs) => [...fs, newField]);
+      setSelectedId(id);
+      showToast('Image layer placed', 'success');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const deleteSelected = () => {
+    if (!selectedId) return;
+    recordSnapshot(fields);
+    setFields((fs) => fs.filter((f) => f.id !== selectedId));
+    setSelectedId(null);
+    setEditingId(null);
+    showToast('Layer deleted', 'info');
   };
 
   // AI Layout & Copy Audit — deterministic lint always runs; live AI adds copy
@@ -481,10 +613,10 @@ export function Editor({
       canvas.height = height * scale;
       ctx.scale(scale, scale);
 
-      // Draw background document
+      // Draw background document (current page).
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      img.src = originalUrl;
+      img.src = currentBackground;
       await new Promise((r) => {
         img.onload = () => r(true);
         img.onerror = () => r(false);
@@ -508,14 +640,49 @@ export function Editor({
             ctx.fillRect(field.x + 3, field.y + 3, 10, 10);
           }
           const fontSize = field.fontSize || 14;
-          ctx.font = `${fontSize}px sans-serif`;
+          ctx.font = `${field.bold ? 'bold ' : ''}${field.italic ? 'italic ' : ''}${fontSize}px sans-serif`;
           ctx.fillStyle = field.color || '#f5f3f0';
           ctx.fillText(field.value, field.x + 24, field.y + 13);
         } else if (field.type === 'text') {
           const fontSize = field.fontSize || 16;
-          ctx.font = `${fontSize}px sans-serif`;
+          ctx.font = `${field.bold ? 'bold ' : ''}${field.italic ? 'italic ' : ''}${fontSize}px sans-serif`;
           ctx.fillStyle = field.color || '#f5f3f0';
           ctx.fillText(field.value, field.x, field.y + fontSize);
+        } else if (field.type === 'shape' && field.shape) {
+          ctx.strokeStyle = field.color || '#C9A84C';
+          ctx.lineWidth = 2;
+          if (field.shape === 'rect') {
+            ctx.strokeRect(field.x, field.y, field.width, field.height);
+          } else if (field.shape === 'ellipse') {
+            ctx.beginPath();
+            ctx.ellipse(
+              field.x + field.width / 2,
+              field.y + field.height / 2,
+              field.width / 2,
+              field.height / 2,
+              0,
+              0,
+              Math.PI * 2
+            );
+            ctx.stroke();
+          } else if (field.shape === 'line') {
+            ctx.beginPath();
+            ctx.moveTo(field.x, field.y);
+            ctx.lineTo(field.x + field.width, field.y + field.height);
+            ctx.stroke();
+          }
+        } else if (field.type === 'image' && field.src) {
+          try {
+            const layerImg = new Image();
+            layerImg.src = field.src;
+            await new Promise((r) => {
+              layerImg.onload = () => r(true);
+              layerImg.onerror = () => r(false);
+            });
+            if (layerImg.complete && layerImg.naturalWidth > 0) {
+              ctx.drawImage(layerImg, field.x, field.y, field.width, field.height);
+            }
+          } catch {}
         }
       }
 
@@ -600,10 +767,89 @@ export function Editor({
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {/* Insert Tools (WPS-grade) */}
+          <div className="flex items-center gap-1 border-l border-[rgba(201,168,76,0.2)] pl-2">
+            <button
+              onClick={insertText}
+              className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/5"
+              title="Insert text layer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => insertShape('rect')}
+              className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/5"
+              title="Insert rectangle"
+            >
+              <ShapeIcon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={handleInsertImageClick}
+              className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/5"
+              title="Insert image"
+            >
+              <ImageIcon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={deleteSelected}
+              disabled={!selectedId}
+              className="p-1.5 rounded text-zinc-400 hover:text-red-400 hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Delete selected layer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelected}
+              className="hidden"
+            />
+          </div>
+
+          {/* Page Navigation (multi-page PDFs) */}
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1 border-l border-[rgba(201,168,76,0.2)] pl-2">
+              <button
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 0}
+                className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/5 disabled:opacity-30"
+                title="Previous page"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <span className="text-[10px] font-mono text-[#D4AF37] px-1">
+                {currentPage + 1}/{totalPages}
+              </span>
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage >= totalPages - 1}
+                className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/5 disabled:opacity-30"
+                title="Next page"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* AI Action Trigger & Export Dropdowns */}
         <div className="flex items-center gap-2">
+          {/* Honest provenance badge */}
+          {source && (
+            <span
+              className="px-2 py-1 rounded-full border border-[rgba(201,168,76,0.3)] bg-[#050404] text-[10px] font-mono text-[#8a6e2a]"
+              title={
+                (extractedCount ?? 0) > 0
+                  ? `${extractedCount} real text layers extracted from ${source.toUpperCase()}`
+                  : `No readable text found in ${source.toUpperCase()}`
+              }
+            >
+              {source.toUpperCase()} · {extractedCount ?? 0} layers
+              {totalPages > 1 ? ` · ${totalPages}pp` : ''}
+            </span>
+          )}
           <button
             onClick={handleAiAudit}
             disabled={aiAuditing}
@@ -736,12 +982,12 @@ export function Editor({
         >
           {/* Enhanced original document backing (Full visibility) */}
           <img
-            src={originalUrl}
+            src={currentBackground}
             alt="Document Base"
             className="absolute inset-0 w-full h-full object-contain opacity-75 pointer-events-none select-none filter contrast-125"
           />
 
-          {/* Canvas Vector Layer with Interactive Text & Checkboxes */}
+          {/* Canvas Vector Layer with Interactive Text, Checkboxes, Shapes & Images */}
           {fields.map((f) => (
             <div
               key={f.id}
@@ -761,10 +1007,25 @@ export function Editor({
                 top: `${Math.min(f.y, 500)}px`,
                 fontSize: `${Math.min(f.fontSize || 16, 32)}px`,
                 color: f.color || '#f5f3f0',
+                fontWeight: f.bold ? 700 : 400,
+                fontStyle: f.italic ? 'italic' : 'normal',
+                width: f.type === 'image' || f.type === 'shape' ? `${f.width}px` : undefined,
+                height: f.type === 'image' || f.type === 'shape' ? `${f.height}px` : undefined,
+                padding: f.type === 'image' || f.type === 'shape' ? 0 : undefined,
               }}
               title="Click and drag to move · Double-click to edit text"
             >
-              {f.type === 'checkbox' ? (
+              {f.type === 'image' && f.src ? (
+                <img src={f.src} alt={f.value} className="w-full h-full object-contain pointer-events-none" draggable={false} />
+              ) : f.type === 'shape' ? (
+                <div
+                  className="w-full h-full pointer-events-none"
+                  style={{
+                    border: `2px solid ${f.color || '#C9A84C'}`,
+                    borderRadius: f.shape === 'ellipse' ? '50%' : 0,
+                  }}
+                />
+              ) : f.type === 'checkbox' ? (
                 <div className="flex items-center gap-2">
                   <button
                     onClick={(e) => handleToggleCheckbox(f.id, e)}
@@ -903,6 +1164,63 @@ export function Editor({
               />
             </div>
 
+            {/* Bold / Italic toggles */}
+            {(selected.type === 'text' || selected.type === 'checkbox') && (
+              <div>
+                <label className="text-[#D4AF37] block mb-1">Style</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updateField(selected.id, { bold: !selected.bold })}
+                    className={`px-3 py-1 rounded-lg border text-[11px] flex items-center gap-1 ${
+                      selected.bold
+                        ? 'bg-[#C9A84C] text-black font-bold border-[#C9A84C]'
+                        : 'border-zinc-800 text-zinc-400'
+                    }`}
+                  >
+                    <Bold className="w-3 h-3" />
+                    <span>Bold</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateField(selected.id, { italic: !selected.italic })}
+                    className={`px-3 py-1 rounded-lg border text-[11px] flex items-center gap-1 ${
+                      selected.italic
+                        ? 'bg-[#C9A84C] text-black font-bold border-[#C9A84C]'
+                        : 'border-zinc-800 text-zinc-400'
+                    }`}
+                  >
+                    <Italic className="w-3 h-3" />
+                    <span>Italic</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Width / Height for shapes + images */}
+            {(selected.type === 'shape' || selected.type === 'image') && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[#D4AF37] block mb-1">Width</label>
+                  <input
+                    type="number"
+                    value={Math.round(selected.width)}
+                    onChange={(e) => updateField(selected.id, { width: Math.max(10, parseInt(e.target.value, 10) || 10) })}
+                    className="w-full bg-[#050404] border border-[rgba(201,168,76,0.25)] rounded-xl p-2 text-[#f5f3f0]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[#D4AF37] block mb-1">Height</label>
+                  <input
+                    type="number"
+                    value={Math.round(selected.height)}
+                    onChange={(e) => updateField(selected.id, { height: Math.max(10, parseInt(e.target.value, 10) || 10) })}
+                    className="w-full bg-[#050404] border border-[rgba(201,168,76,0.25)] rounded-xl p-2 text-[#f5f3f0]"
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="text-[#D4AF37] block mb-1">Color</label>
               <div className="flex items-center gap-2">
@@ -921,9 +1239,15 @@ export function Editor({
               </div>
             </div>
 
-            <div className="pt-2 border-t border-[rgba(201,168,76,0.15)] flex justify-between text-[11px] text-[#D4AF37]">
-              <span>X: {Math.round(selected.x)}px</span>
-              <span>Y: {Math.round(selected.y)}px</span>
+            <div className="pt-2 border-t border-[rgba(201,168,76,0.15)] flex items-center justify-between text-[11px] text-[#D4AF37]">
+              <span>X: {Math.round(selected.x)}px · Y: {Math.round(selected.y)}px</span>
+              <button
+                onClick={deleteSelected}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Delete</span>
+              </button>
             </div>
           </div>
         ) : (

@@ -47,7 +47,12 @@ export default function ForgePage({ onNavigate }: { onNavigate?: (path: string) 
       if (results.length > 0) {
         setDoc(results[0]);
         await recordModuleExecution('forge', access.userEmail, access.userId);
-        showToast('Document layers synthesized into editor', 'success');
+        const r = results[0];
+        const pageCount = r.pages?.length || 1;
+        showToast(
+          `Extracted ${r.extractedCount} text layers across ${pageCount} page${pageCount > 1 ? 's' : ''} (${r.source.toUpperCase()})`,
+          'success'
+        );
       } else {
         showToast('Could not extract layers from provided file(s).', 'error');
       }
@@ -84,6 +89,9 @@ export default function ForgePage({ onNavigate }: { onNavigate?: (path: string) 
         initialFields={doc.fields}
         width={doc.width}
         height={doc.height}
+        pages={doc.pages}
+        source={doc.source}
+        extractedCount={doc.extractedCount}
         onReset={() => setDoc(null)}
       />
     );
