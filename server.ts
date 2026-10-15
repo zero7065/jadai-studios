@@ -24,6 +24,7 @@ import { shortLinksDb, createShortLink } from './lib/shortlinks';
 import { listTemplates, saveTemplate, deleteTemplate, saveTemplateBundle } from './lib/data/templatesStore';
 import { listActiveHubListings, insertHubListing } from './lib/data/hubStore';
 import { insertDreamIntake } from './lib/data/dreamForgeStore';
+import { getAdminEmail, getAdminPasswordHash, setAdminCredentials } from './lib/data/adminCredentialsStore';
 import {
   grantSubscriptionFs,
   recordTemplateOrderFs,
@@ -73,6 +74,7 @@ import {
   signAdminToken,
   verifyAdminToken,
   verifyPassword,
+  hashPassword,
   parseCookies,
   buildAdminCookie,
   buildClearAdminCookie,
@@ -822,12 +824,13 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Password required' });
       }
 
-      const submittedEmail = (typeof email === 'string' && email.trim()) || ADMIN_EMAIL;
-      if (submittedEmail.toLowerCase() !== ADMIN_EMAIL) {
+      const adminEmail = getAdminEmail(ADMIN_EMAIL);
+      const submittedEmail = (typeof email === 'string' && email.trim()) || adminEmail;
+      if (submittedEmail.toLowerCase() !== adminEmail) {
         return res.status(401).json({ success: false, error: 'Invalid admin credentials' });
       }
 
-      const storedHash = process.env.ADMIN_PASSWORD_HASH;
+      const storedHash = getAdminPasswordHash(process.env.ADMIN_PASSWORD_HASH);
       if (!storedHash) {
         if (isProd) {
           return res.status(503).json({ success: false, error: 'Admin auth not configured on server' });
@@ -840,9 +843,9 @@ async function startServer() {
         return res.status(401).json({ success: false, error: 'Invalid admin credentials' });
       }
 
-      const { token, expiresAt } = signAdminToken(ADMIN_EMAIL);
+      const { token, expiresAt } = signAdminToken(adminEmail);
       res.setHeader('Set-Cookie', buildAdminCookie(token, expiresAt));
-      return res.json({ success: true, role: 'admin', email: ADMIN_EMAIL, token, expiresAt: expiresAt.toISOString() });
+      return res.json({ success: true, role: 'admin', email: adminEmail, token, expiresAt: expiresAt.toISOString() });
     } catch (err: any) {
       console.error('[ADMIN LOGIN] error:', err?.message);
       res.status(500).json({ success: false, error: 'Login failed' });
@@ -867,6 +870,46 @@ async function startServer() {
       delete req.headers.cookie;
     } catch {}
     res.json({ success: true, message: 'Logged out' });
+  });
+
+  // Change admin email + password at runtime (no redeploy required).
+  // Guarded by requireAdmin via the /api/admin middleware above.
+  app.get('/api/admin/credentials', (req, res) => {
+    const email = getAdminEmail(ADMIN_EMAIL);
+    res.json({ success: true, email, hasPassword: !!getAdminPasswordHash(process.env.ADMIN_PASSWORD_HASH) });
+  });
+
+  app.post('/api/admin/credentials', rateLimit('admin_credentials', { max: 5 }), (req, res) => {
+    try {
+      const { email, currentPassword, newPassword } = req.body || {};
+      const currentSecret = typeof currentPassword === 'string' ? currentPassword : '';
+      if (!currentSecret) {
+        return res.status(400).json({ success: false, error: 'Current password required' });
+      }
+
+      const currentHash = getAdminPasswordHash(process.env.ADMIN_PASSWORD_HASH);
+      if (!currentHash || !verifyPassword(currentSecret, currentHash)) {
+        return res.status(401).json({ success: false, error: 'Current password is incorrect' });
+      }
+
+      const newEmail = typeof email === 'string' && email.trim() ? email.trim().toLowerCase() : getAdminEmail(ADMIN_EMAIL);
+      const newSecret = typeof newPassword === 'string' ? newPassword : '';
+
+      if (!newSecret && newEmail === getAdminEmail(ADMIN_EMAIL)) {
+        return res.status(400).json({ success: false, error: 'Nothing to update' });
+      }
+
+      const nextHash = newSecret ? hashPassword(newSecret) : currentHash;
+      setAdminCredentials(newEmail, nextHash);
+
+      // Re-issue the session under the new email so the change takes effect immediately.
+      const { token, expiresAt } = signAdminToken(newEmail);
+      res.setHeader('Set-Cookie', buildAdminCookie(token, expiresAt));
+      return res.json({ success: true, email: newEmail, token, expiresAt: expiresAt.toISOString() });
+    } catch (err: any) {
+      console.error('[ADMIN CREDENTIALS] error:', err?.message);
+      res.status(500).json({ success: false, error: 'Failed to update credentials' });
+    }
   });
 
   // ---------------------------------------------------------------------------

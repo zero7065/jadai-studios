@@ -3,7 +3,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import { useToast } from '@/components/providers/ToastProvider';
 import { StudioAudio } from '@/lib/watermark';
-import { Settings, Eye, EyeOff, CheckCircle, RefreshCw, Key, ShieldCheck, Save, Globe } from 'lucide-react';
+import { Settings, Eye, EyeOff, CheckCircle, RefreshCw, Key, ShieldCheck, Save, Globe, UserCog } from 'lucide-react';
 
 interface KeyConfig {
   id: string;
@@ -92,6 +92,20 @@ export default function AdminSettingsPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // Admin credentials state
+  const [credEmail, setCredEmail] = useState('');
+  const [credCurrentPw, setCredCurrentPw] = useState('');
+  const [credNewPw, setCredNewPw] = useState('');
+  const [credSaving, setCredSaving] = useState(false);
+
+  // Load current admin email
+  useEffect(() => {
+    fetch('/api/admin/credentials')
+      .then((r) => r.json())
+      .then((res) => { if (res?.email) setCredEmail(res.email); })
+      .catch(() => {});
   }, []);
 
   // General Settings State
@@ -206,6 +220,33 @@ export default function AdminSettingsPage() {
     } catch {
       setSaving(false);
       showToast('Server unreachable — settings were not saved.', 'error', 'Save Failed');
+    }
+  };
+
+  const handleSaveCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!credCurrentPw) { showToast('Enter your current password to confirm.', 'error', 'Confirmation Required'); return; }
+    setCredSaving(true);
+    StudioAudio.playClick();
+    try {
+      const res = await fetch('/api/admin/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: credCurrentPw, email: credEmail, newPassword: credNewPw || undefined }),
+      });
+      const data = await res.json();
+      setCredSaving(false);
+      if (data.success) {
+        setCredCurrentPw(''); setCredNewPw('');
+        StudioAudio.playSuccessArpeggio();
+        showToast(`Admin credentials updated for ${data.email}.`, 'success', 'Credentials Saved');
+      } else {
+        showToast(data.error || 'Failed to update credentials', 'error', 'Update Failed');
+      }
+    } catch {
+      setCredSaving(false);
+      showToast('Server unreachable — credentials not saved.', 'error', 'Save Failed');
     }
   };
 
@@ -407,6 +448,59 @@ export default function AdminSettingsPage() {
           </Button>
         </div>
       </form>
+
+      {/* Section 3: Admin Credentials (self-contained form) */}
+      <GlassCard className="p-6 space-y-4">
+        <div className="flex items-center gap-2 border-b border-[rgba(201,168,76,0.15)] pb-3">
+          <UserCog className="w-4 h-4 text-[#C9A84C]" />
+          <h2 className="text-base font-display font-bold text-[#f5f3f0]">Admin Login Credentials</h2>
+        </div>
+        <p className="text-xs text-[#c4c0bb]">
+          Change the admin email and password used to sign into this dashboard. A new session is issued immediately on save.
+        </p>
+
+        <form onSubmit={handleSaveCredentials} className="space-y-4 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs">
+            <div>
+              <label className="block text-[#8a6e2a] uppercase text-[10px] mb-1">Admin Email</label>
+              <input
+                type="email"
+                value={credEmail}
+                onChange={(e) => setCredEmail(e.target.value)}
+                className="w-full px-3 py-2 rounded bg-[#050404] border border-[rgba(201,168,76,0.25)] text-[#f5f3f0]"
+              />
+            </div>
+            <div>
+              <label className="block text-[#8a6e2a] uppercase text-[10px] mb-1">Current Password (required)</label>
+              <input
+                type="password"
+                value={credCurrentPw}
+                onChange={(e) => setCredCurrentPw(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-3 py-2 rounded bg-[#050404] border border-[rgba(201,168,76,0.25)] text-[#f5f3f0]"
+              />
+            </div>
+          </div>
+
+          <div className="font-mono text-xs">
+            <label className="block text-[#8a6e2a] uppercase text-[10px] mb-1">New Password (leave blank to keep current)</label>
+            <input
+              type="password"
+              value={credNewPw}
+              onChange={(e) => setCredNewPw(e.target.value)}
+              placeholder="••••••••"
+              className="w-full px-3 py-2 rounded bg-[#050404] border border-[rgba(201,168,76,0.25)] text-[#f5f3f0]"
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <Button variant="primary" size="md" type="submit" disabled={credSaving}>
+              <ShieldCheck className="w-4 h-4 mr-2" />
+              {credSaving ? 'Updating Credentials...' : 'Update Credentials'}
+            </Button>
+          </div>
+        </form>
+      </GlassCard>
     </div>
   );
 }
