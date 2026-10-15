@@ -13,6 +13,7 @@ const STORE_FILE = path.join(DATA_DIR, 'admin-credentials.json');
 export interface AdminCredentials {
   email: string;
   passwordHash: string;
+  recoveryCode: string;
   updatedAt: string;
 }
 
@@ -60,11 +61,37 @@ export function getAdminPasswordHash(envFallback: string | undefined): string {
   return envFallback || '';
 }
 
+/**
+ * Returns the stored 4-digit recovery passcode (terminal gate), or null when
+ * none has been minted yet. The server mints one lazily via setAdminRecoveryCode.
+ */
+export function getAdminRecoveryCode(): string | null {
+  const store = ensureStore();
+  return store.credentials?.recoveryCode || null;
+}
+
+/** Persists the 4-digit recovery passcode used by the recovery terminal. */
+export async function setAdminRecoveryCode(code: string): Promise<void> {
+  await withStoreLock('admin-credentials', () => {
+    const s = ensureStore();
+    const current = s.credentials;
+    s.credentials = {
+      email: current?.email || '',
+      passwordHash: current?.passwordHash || '',
+      recoveryCode: code,
+      updatedAt: new Date().toISOString(),
+    };
+    persist(s);
+  });
+}
+
 /** Overwrites the stored admin email + hash. Used by the credentials endpoint. */
 export async function setAdminCredentials(email: string, passwordHash: string): Promise<AdminCredentials> {
+  const existing = ensureStore().credentials;
   const record: AdminCredentials = {
     email: email.toLowerCase(),
     passwordHash,
+    recoveryCode: existing?.recoveryCode || '',
     updatedAt: new Date().toISOString(),
   };
   await withStoreLock('admin-credentials', () => {

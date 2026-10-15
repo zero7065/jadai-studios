@@ -25,7 +25,7 @@ import { shortLinksDb, createShortLink } from './lib/shortlinks';
 import { listTemplates, saveTemplate, deleteTemplate, saveTemplateBundle } from './lib/data/templatesStore';
 import { listActiveHubListings, insertHubListing } from './lib/data/hubStore';
 import { insertDreamIntake } from './lib/data/dreamForgeStore';
-import { getAdminEmail, getAdminPasswordHash, setAdminCredentials } from './lib/data/adminCredentialsStore';
+import { getAdminEmail, getAdminPasswordHash, setAdminCredentials, getAdminRecoveryCode, setAdminRecoveryCode } from './lib/data/adminCredentialsStore';
 import {
   grantSubscriptionFs,
   recordTemplateOrderFs,
@@ -76,6 +76,7 @@ import {
   verifyAdminToken,
   verifyPassword,
   hashPassword,
+  constantTimeEquals,
   parseCookies,
   buildAdminCookie,
   buildClearAdminCookie,
@@ -853,16 +854,101 @@ async function startServer() {
     }
   });
 
-  // Recovery terminal commands require a full admin session — no magic passcode.
-  app.post('/api/admin/recovery', rateLimit('admin_recovery', { max: 10 }), (req, res) => {
-    const { command, payload } = req.body || {};
-    res.json({
-      success: true,
-      message: 'Recovery command executed',
-      command,
-      payload,
-      executedBy: (req as any).adminEmail,
-    });
+  // Recovery terminal — real server-side actions. Guarded by requireAdmin
+  // (session cookie/bearer via the /api/admin middleware) AND a per-request
+  // passcode: the stored 4-digit recovery code (Admin Settings → 20-Tap
+  // Recovery Passcode, or minted/rotated here) or the admin password itself.
+  // Resolution order: admin_settings.recovery_code → fs store → mint fresh.
+  async function resolveRecoveryCode(): Promise<string> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data } = await supabaseAdmin
+          .from('admin_settings')
+          .select('value')
+          .eq('key', 'recovery_code')
+          .maybeSingle();
+        const v = data?.value ? String(data.value).trim() : '';
+        if (v) return v.slice(0, 8);
+      } catch {}
+    }
+    const stored = getAdminRecoveryCode();
+    if (stored) return stored;
+    const code = String(Math.floor(1000 + Math.random() * 9000));
+    await setAdminRecoveryCode(code);
+    return code;
+  }
+
+  app.post('/api/admin/recovery', rateLimit('admin_recovery', { max: 10 }), async (req, res) => {
+    try {
+      const { action, passcode, email, newPassword } = req.body || {};
+      const secret = typeof passcode === 'string' ? passcode.trim() : '';
+      if (!secret) {
+        return res.status(400).json({ success: false, error: 'Passcode required' });
+      }
+
+      const recoveryCode = await resolveRecoveryCode();
+      const storedHash = getAdminPasswordHash(process.env.ADMIN_PASSWORD_HASH);
+      const passOk =
+        constantTimeEquals(secret, recoveryCode) ||
+        (!!storedHash && verifyPassword(secret, storedHash));
+      if (!passOk) {
+        return res.status(401).json({ success: false, error: 'Invalid passcode. Security counter incremented.' });
+      }
+
+      const adminEmail = getAdminEmail(ADMIN_EMAIL);
+
+      switch (action) {
+        case 'auth':
+        case 'view':
+          return res.json({
+            success: true,
+            email: adminEmail,
+            hasPassword: !!storedHash,
+            recoveryCode,
+            role: 'admin',
+          });
+
+        case 'set_email': {
+          const newEmail = typeof email === 'string' && email.includes('@') ? email.trim().toLowerCase() : '';
+          if (!newEmail) return res.status(400).json({ success: false, error: 'Valid email required' });
+          if (!storedHash) return res.status(400).json({ success: false, error: 'No password configured yet' });
+          await setAdminCredentials(newEmail, storedHash);
+          const { token, expiresAt } = signAdminToken(newEmail);
+          res.setHeader('Set-Cookie', buildAdminCookie(token, expiresAt));
+          return res.json({ success: true, email: newEmail });
+        }
+
+        case 'set_password': {
+          const pw = typeof newPassword === 'string' ? newPassword : '';
+          if (pw.length < 4) return res.status(400).json({ success: false, error: 'Password must be at least 4 characters' });
+          await setAdminCredentials(adminEmail, hashPassword(pw));
+          return res.json({ success: true, email: adminEmail });
+        }
+
+        case 'rotate_passcode': {
+          const code = String(Math.floor(1000 + Math.random() * 9000));
+          await setAdminRecoveryCode(code);
+          if (isSupabaseConfigured) {
+            try {
+              await supabaseAdmin.from('admin_settings').upsert({
+                key: 'recovery_code',
+                value: code,
+                updated_at: new Date().toISOString(),
+                updated_by: 'admin',
+              });
+              invalidateSettingsCache();
+            } catch {}
+          }
+          return res.json({ success: true, recoveryCode: code });
+        }
+
+        default:
+          return res.status(400).json({ success: false, error: 'Unknown recovery action' });
+      }
+    } catch (err: any) {
+      console.error('[ADMIN RECOVERY] error:', err?.message);
+      res.status(500).json({ success: false, error: 'Recovery command failed' });
+    }
   });
 
   app.post('/api/admin/logout', (req, res) => {
