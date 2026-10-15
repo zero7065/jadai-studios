@@ -8,7 +8,7 @@ import { runSelfCheck } from './lib/diagnostics/self-check';
 import { runDiagnosticScan } from './lib/diagnostics/scanner';
 import { generateText, assembleChatRequest, formatMemoryBlock, extractMemoriesPrompt, GROQ_PRIMARY_MODEL, OPENAI_PRIMARY_MODEL, isOpenAIQuotaExhausted } from './lib/ai';
 import { getModuleBySlug } from './lib/modules/modules.config';
-import { supabaseAdmin } from './lib/supabase/admin';
+import { supabaseAdmin, isSupabaseConfigured } from './lib/supabase/admin';
 import { invalidateAiCache } from './lib/ai/cache';
 import { invalidateSettingsCache } from './lib/settings';
 import {
@@ -22,6 +22,8 @@ import {
 import { generateGroundedContent } from './lib/ai/grounded';
 import { shortLinksDb, createShortLink } from './lib/shortlinks';
 import { listTemplates, saveTemplate, deleteTemplate, saveTemplateBundle } from './lib/data/templatesStore';
+import { listActiveHubListings, insertHubListing } from './lib/data/hubStore';
+import { insertDreamIntake } from './lib/data/dreamForgeStore';
 import {
   grantSubscriptionFs,
   recordTemplateOrderFs,
@@ -240,12 +242,16 @@ async function startServer() {
   // ---------------------------------------------------------------------------
   app.get('/api/health', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    let db: 'up' | 'down' = 'down';
-    try {
-      await supabaseAdmin.from('modules').select('slug', { head: true, count: 'exact' });
-      db = 'up';
-    } catch {
-      db = 'down';
+    let db: 'up' | 'down' | 'unconfigured' = 'down';
+    if (!isSupabaseConfigured) {
+      db = 'unconfigured';
+    } else {
+      try {
+        await supabaseAdmin.from('modules').select('slug', { head: true, count: 'exact' });
+        db = 'up';
+      } catch {
+        db = 'down';
+      }
     }
     res.json({ ...getPublicHealth(), db });
   });
@@ -2640,14 +2646,8 @@ Draft a continuation of 40-70 words that deepens the architectural or moral stak
 
   app.get('/api/hub/listings', async (req, res) => {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('hub_listings')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(100);
-      if (error) throw new Error(error.message);
-      res.json({ success: true, listings: data || [] });
+      const listings = await listActiveHubListings();
+      res.json({ success: true, listings });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -2663,23 +2663,18 @@ Draft a continuation of 40-70 words that deepens the architectural or moral stak
     }
     const stack = Array.isArray(b.stack) ? b.stack.filter((s: unknown) => typeof s === 'string').slice(0, 20) : [];
     try {
-      const { data, error } = await supabaseAdmin
-        .from('hub_listings')
-        .insert({
-          type: allowedTypes.includes(b.type) ? b.type : 'service',
-          title,
-          description,
-          stack,
-          price_type: ['fixed', 'hourly', 'equity', 'free'].includes(b.price_type) ? b.price_type : 'fixed',
-          price: Math.max(0, Math.round(Number(b.price) || 0)),
-          currency: String(b.currency || 'NGN').toUpperCase() === 'USD' ? 'USD' : 'NGN',
-          contact_method: typeof b.contact_method === 'string' ? b.contact_method.slice(0, 300) : null,
-          status: 'pending',
-        })
-        .select()
-        .single();
-      if (error) throw new Error(error.message);
-      res.json({ success: true, listing: data });
+      const listing = await insertHubListing({
+        type: allowedTypes.includes(b.type) ? b.type : 'service',
+        title,
+        description,
+        stack,
+        price_type: ['fixed', 'hourly', 'equity', 'free'].includes(b.price_type) ? b.price_type : 'fixed',
+        price: Math.max(0, Math.round(Number(b.price) || 0)),
+        currency: String(b.currency || 'NGN').toUpperCase() === 'USD' ? 'USD' : 'NGN',
+        contact_method: typeof b.contact_method === 'string' ? b.contact_method.slice(0, 300) : null,
+        status: 'pending',
+      });
+      res.json({ success: true, listing });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message || 'Listing not queued' });
     }
@@ -2696,7 +2691,7 @@ Draft a continuation of 40-70 words that deepens the architectural or moral stak
       return res.status(400).json({ success: false, error: 'Valid email required when provided' });
     }
     try {
-      const { error } = await supabaseAdmin.from('dream_forge_intakes').insert({
+      await insertDreamIntake({
         building,
         obstacles: String(b.obstacles || '').trim().slice(0, 2000) || null,
         tried: String(b.tried || '').trim().slice(0, 2000) || null,
@@ -2704,7 +2699,6 @@ Draft a continuation of 40-70 words that deepens the architectural or moral stak
         email: email || null,
         whatsapp: String(b.whatsapp || '').trim().slice(0, 40) || null,
       });
-      if (error) throw new Error(error.message);
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message || 'Intake not recorded' });
     }
