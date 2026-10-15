@@ -5,6 +5,8 @@ import EdgeGlow from '../ui/EdgeGlow';
 import { Send, CheckCircle2, Sparkles, ExternalLink, ShieldCheck } from 'lucide-react';
 import { StudioAudio } from '../../lib/watermark';
 import { getCustomization } from '../../lib/data/customization';
+import FollowButtons from '../social/FollowButtons';
+import AncientRelicRing from '../home/AncientRelicRing';
 
 export interface FounderBubble {
   id: string;
@@ -106,7 +108,8 @@ export const Footer: React.FC = () => {
         {/* -------------------------------------------------------------
             STUDIO CREED & ORIGIN
            ------------------------------------------------------------- */}
-        <div className="flex flex-col items-center text-center space-y-2 max-w-2xl mx-auto">
+        <div className="flex flex-col items-center text-center space-y-4 max-w-2xl mx-auto">
+          <AncientRelicRing size={160} />
           <div className="flex items-center gap-2">
             <span className="font-display font-bold tracking-[0.3em] text-[#C9A84C] text-sm">
               JADAI STUDIOS
@@ -118,6 +121,7 @@ export const Footer: React.FC = () => {
           <p className="text-xs font-mono text-[#8a857e]">
             Jos, Nigeria · Est. 2024
           </p>
+          <FollowButtons />
         </div>
 
         {/* -------------------------------------------------------------
