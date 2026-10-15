@@ -5,6 +5,7 @@ import GlassCard from '../../../../components/ui/GlassCard';
 import Button from '../../../../components/ui/Button';
 import StatusBadge from '../../../../components/ui/StatusBadge';
 import CodeBlock from '../../../../components/ui/CodeBlock';
+import IntegrationStatusPanel from '../../../../components/admin/IntegrationStatusPanel';
 import { useToast } from '../../../../components/providers/ToastProvider';
 import { Activity, RefreshCw, Clock, CheckCircle, Terminal, Database, Server, Cpu } from 'lucide-react';
 import type { SelfCheckReport } from '../../../../lib/diagnostics/self-check';
@@ -65,6 +66,7 @@ export default function AdminDiagnosticPage() {
 
   return (
     <div className="space-y-6 py-6">
+      <IntegrationStatusPanel />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[rgba(201,168,76,0.2)] pb-6">
         <div>
           <span className="text-xs font-mono uppercase tracking-widest text-[#C9A84C]">Diagnostic Telemetry</span>

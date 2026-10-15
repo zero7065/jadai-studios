@@ -62,7 +62,7 @@ import {
   deleteMemoryFact,
   wipeMemory,
 } from './lib/rag/memory-store';
-import { isRealGroqKey, isRealGeminiKey, isRealSupabaseUrl, isRealSupabaseKey, isOpenAIKey } from './lib/config/envTrust';
+import { isRealGroqKey, isRealGeminiKey, isRealSupabaseUrl, isRealSupabaseKey, isOpenAIKey, isPlaceholderValue } from './lib/config/envTrust';
 import { generateTextWatermarkFooter } from './lib/watermark';
 import { isTransmissionCadenceTime } from './lib/content/delivery';
 import { signalRouter } from './lib/signal/api-router';
@@ -278,6 +278,102 @@ async function startServer() {
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Integration status — reads server env and reports, per integration, whether
+  // the credential is a real live value or an obvious placeholder. Never echoes
+  // the secret itself, only a masked hint and the exact env var to set.
+  // ---------------------------------------------------------------------------
+  app.get('/api/admin/integrations', requireAdmin, (req, res) => {
+    const mask = (v: string | undefined) => {
+      if (isPlaceholderValue(v)) return null;
+      const s = String(v);
+      return `${s.slice(0, 4)}…${s.slice(-3)} (len ${s.length})`;
+    };
+    const supabaseLive = isRealSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL) && isRealSupabaseKey(process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const integrations = [
+      {
+        id: 'groq',
+        label: 'Groq (primary AI)',
+        envVars: ['GROQ_API_KEY'],
+        live: isRealGroqKey(process.env.GROQ_API_KEY),
+        hint: mask(process.env.GROQ_API_KEY),
+        impact: 'PRIME chat, streaming, and all AI generation fail without this.',
+        getFrom: 'https://console.groq.com/keys',
+      },
+      {
+        id: 'openai',
+        label: 'OpenAI (AI fallback)',
+        envVars: ['OPENAI_API_KEY'],
+        live: isOpenAIKey(process.env.OPENAI_API_KEY),
+        hint: mask(process.env.OPENAI_API_KEY),
+        impact: 'Optional — Groq covers AI when this is absent. Add for redundancy.',
+        getFrom: 'https://platform.openai.com/api-keys',
+      },
+      {
+        id: 'gemini',
+        label: 'Gemini (secondary AI)',
+        envVars: ['GEMINI_API_KEY'],
+        live: isRealGeminiKey(process.env.GEMINI_API_KEY),
+        hint: mask(process.env.GEMINI_API_KEY),
+        impact: 'Optional third AI fallback.',
+        getFrom: 'https://aistudio.google.com/apikey',
+      },
+      {
+        id: 'supabase',
+        label: 'Supabase (cloud database)',
+        envVars: ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'],
+        live: supabaseLive,
+        hint: supabaseLive ? mask(process.env.NEXT_PUBLIC_SUPABASE_URL) : null,
+        impact: 'Runs in local fs mode without this — works, but no cloud sync, RLS, or multi-instance scaling.',
+        getFrom: 'https://supabase.com/dashboard → Project Settings → API',
+      },
+      {
+        id: 'paystack',
+        label: 'Paystack (payments)',
+        envVars: ['PAYSTACK_SECRET_KEY', 'NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY'],
+        live: !isPlaceholderValue(process.env.PAYSTACK_SECRET_KEY) && !isPlaceholderValue(process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY),
+        hint: mask(process.env.PAYSTACK_SECRET_KEY),
+        impact: 'Checkout runs in simulated mode without this — no real charges, no entitlement grants on payment.',
+        getFrom: 'https://dashboard.paystack.com/#/settings/developers',
+      },
+      {
+        id: 'session',
+        label: 'Session secret',
+        envVars: ['SESSION_SECRET'],
+        live: !isPlaceholderValue(process.env.SESSION_SECRET) && String(process.env.SESSION_SECRET).length >= 32,
+        hint: mask(process.env.SESSION_SECRET),
+        impact: 'Admin login sessions are insecure/unstable without a real 32+ char random string.',
+        getFrom: 'Generate: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
+      },
+      {
+        id: 'admin',
+        label: 'Admin credentials',
+        envVars: ['ADMIN_EMAIL', 'ADMIN_PASSWORD_HASH'],
+        live: !isPlaceholderValue(process.env.ADMIN_EMAIL) && !isPlaceholderValue(process.env.ADMIN_PASSWORD_HASH),
+        hint: mask(process.env.ADMIN_EMAIL),
+        impact: 'Cannot log into /admin without a real email + bcrypt password hash.',
+        getFrom: 'Set ADMIN_EMAIL, then run: npm run gen:admin-hash',
+      },
+      {
+        id: 'cron',
+        label: 'Cron guard secret',
+        envVars: ['CRON_SECRET'],
+        live: !isPlaceholderValue(process.env.CRON_SECRET),
+        hint: mask(process.env.CRON_SECRET),
+        impact: 'Background sweeps (entitlement expiry, content delivery) reject unauthorized calls without this.',
+        getFrom: 'Generate any long random string',
+      },
+    ];
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      success: true,
+      appUrl: process.env.NEXT_PUBLIC_APP_URL || null,
+      integrations,
+      liveCount: integrations.filter((i) => i.live).length,
+      totalCount: integrations.length,
+    });
   });
 
   // ---------------------------------------------------------------------------
