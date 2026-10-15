@@ -1,6 +1,12 @@
-import { createServerClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '../../supabase/admin';
 import { callSignalLLM } from '../llm';
 import { signalStore } from '../store';
+
+function toDbUserId(userId: string): string | null {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)
+    ? userId
+    : null;
+}
 
 const CLOSER_SYSTEM = `You are an outreach specialist for Jadai Signal.
 
@@ -18,7 +24,8 @@ Output JSON only:
 {"message": "text", "approach": "conversational"|"helpful"|"curious"}`;
 
 export async function runCloser(userId: string = 'usr-default', signalId: string) {
-  const sb = createServerClient();
+  const sb = supabaseAdmin;
+  const dbUserId = toDbUserId(userId);
 
   let signal: any = null;
   try {
@@ -62,7 +69,7 @@ export async function runCloser(userId: string = 'usr-default', signalId: string
 
   try {
     await sb.from('outreach_drafts').insert({
-      user_id: userId,
+      user_id: dbUserId,
       signal_id: signalId,
       platform: signal.platform,
       message: parsed.message,
@@ -73,7 +80,7 @@ export async function runCloser(userId: string = 'usr-default', signalId: string
 
   try {
     await sb.from('signal_analytics').insert({
-      user_id: userId,
+      user_id: dbUserId,
       signal_id: signalId,
       event_type: 'message_drafted',
     });

@@ -6,8 +6,9 @@ import { runWriterAgent } from './agents/writer';
 import { initializePaystackTransaction, getPaystackSecretKey } from '../paystack';
 import { SIGNAL_PLANS, SignalPlanTier } from './types';
 import { generateText } from '../ai';
-import { getEntitlement } from '../entitlements/store';
+import { getEntitlement, grantSubscriptionFs } from '../entitlements/store';
 import { TIER_LEVELS, isMasterAdmin } from '../auth/tier';
+import { supabaseAdmin, isSupabaseConfigured } from '../supabase/admin';
 import {
   listCampaigns,
   getCampaign,
@@ -87,11 +88,47 @@ signalRouter.use((req, res, next) => {
 // ---------------------------------------------------------------------------
 // 1. SIGNALS
 // ---------------------------------------------------------------------------
-signalRouter.get('/signals', (req, res) => {
+// Map a Supabase signals row to the camelCase Signal shape the frontend expects.
+function mapDbSignal(row: any) {
+  return {
+    id: row.id,
+    userId: row.user_id || 'usr-default',
+    platform: row.platform,
+    sourceUrl: row.source_url,
+    author: row.author,
+    authorHandle: row.author_handle || undefined,
+    content: row.content,
+    intentScore: row.intent_score ?? 0,
+    reason: row.reason || '',
+    suggestedAngle: row.suggested_angle || '',
+    status: row.status || 'new',
+    detectedAt: row.created_at || new Date().toISOString(),
+  };
+}
+
+signalRouter.get('/signals', async (req, res) => {
   const platform = req.query.platform as string;
   const status = req.query.status as string;
 
-  let signals = signalStore.getSignals();
+  // Supabase first — the in-memory store resets on every restart, but scout
+  // persists signals to the DB. Reading DB-first makes scouted signals survive.
+  let signals: any[] = [];
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('signals')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (!error && data) signals = data.map(mapDbSignal);
+    } catch {
+      // fall through to in-memory store
+    }
+  }
+  if (signals.length === 0) {
+    signals = signalStore.getSignals();
+  }
+
   if (platform && platform !== 'all') {
     signals = signals.filter((s) => s.platform === platform);
   }
@@ -130,8 +167,31 @@ signalRouter.delete('/signals/:id', (req, res) => {
 // ---------------------------------------------------------------------------
 // 2. DRAFTS
 // ---------------------------------------------------------------------------
-signalRouter.get('/drafts', (req, res) => {
-  res.json({ success: true, drafts: signalStore.getDrafts() });
+signalRouter.get('/drafts', async (_req, res) => {
+  let drafts: any[] = [];
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('outreach_drafts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (!error && data) {
+        drafts = data.map((row: any) => ({
+          id: row.id,
+          userId: row.user_id || 'usr-default',
+          signalId: row.signal_id,
+          platform: row.platform,
+          message: row.message,
+          approach: row.approach || 'conversational',
+          status: row.status || 'draft',
+          createdAt: row.created_at,
+        }));
+      }
+    } catch {}
+  }
+  if (drafts.length === 0) drafts = signalStore.getDrafts();
+  res.json({ success: true, drafts });
 });
 
 signalRouter.post('/drafts/:id', (req, res) => {
@@ -152,8 +212,31 @@ signalRouter.post('/drafts/generate', async (req, res) => {
 // ---------------------------------------------------------------------------
 // 3. GENERATED CONTENT (BUILD IN PUBLIC)
 // ---------------------------------------------------------------------------
-signalRouter.get('/content', (req, res) => {
-  res.json({ success: true, content: signalStore.getContent() });
+signalRouter.get('/content', async (_req, res) => {
+  let content: any[] = [];
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('generated_content')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (!error && data) {
+        content = data.map((row: any) => ({
+          id: row.id,
+          userId: row.user_id || 'usr-default',
+          platform: row.platform,
+          content: row.content,
+          sourceType: row.source_type || 'manual',
+          sourceRef: row.source_ref || undefined,
+          status: row.status || 'draft',
+          createdAt: row.created_at,
+        }));
+      }
+    } catch {}
+  }
+  if (content.length === 0) content = signalStore.getContent();
+  res.json({ success: true, content });
 });
 
 signalRouter.post('/content', (req, res) => {
@@ -187,8 +270,29 @@ signalRouter.delete('/content/:id', (req, res) => {
 // ---------------------------------------------------------------------------
 // 3.5. TRACKERS (github | reddit | x)
 // ---------------------------------------------------------------------------
-signalRouter.get('/trackers', (req, res) => {
-  res.json({ success: true, trackers: signalStore.getTrackers() });
+signalRouter.get('/trackers', async (_req, res) => {
+  let trackers: any[] = [];
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('signal_trackers')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (!error && data) {
+        trackers = data.map((row: any) => ({
+          id: row.id,
+          userId: row.user_id || 'usr-default',
+          source: row.source,
+          query: row.query,
+          active: row.active,
+          createdAt: row.created_at,
+        }));
+      }
+    } catch {}
+  }
+  if (trackers.length === 0) trackers = signalStore.getTrackers();
+  res.json({ success: true, trackers });
 });
 
 signalRouter.post('/trackers', (req, res) => {
@@ -639,6 +743,26 @@ signalRouter.get('/paystack-callback', async (req, res) => {
     }
 
     signalStore.setPlan(tier);
+
+    // Bridge to the entitlement store — the write-gate middleware above reads
+    // getEntitlement(), not signalStore.setPlan(). Without this, a paying user
+    // still gets 402 on every write action.
+    const customerEmail = String(json.data?.customer?.email || '').trim() || null;
+    const canonicalTier = tier === 'business' ? 'signal_business' : 'signal_pro';
+    try {
+      await grantSubscriptionFs({
+        email: customerEmail,
+        tier: canonicalTier,
+        plan: `signal_${tier}`,
+        interval: 'monthly',
+        amountMinor: paid,
+        currency: paidCurrency,
+        reference,
+      });
+    } catch (entErr) {
+      console.error('[SIGNAL CALLBACK] entitlement grant failed:', entErr);
+    }
+
     return res.redirect(`${back}?status=success&tier=${tier}`);
   } catch {
     return res.redirect(`${back}?status=error`);

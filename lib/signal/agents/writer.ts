@@ -1,6 +1,12 @@
-import { createServerClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '../../supabase/admin';
 import { callSignalLLM } from '../llm';
 import { signalStore } from '../store';
+
+function toDbUserId(userId: string): string | null {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)
+    ? userId
+    : null;
+}
 
 const WRITER_SYSTEM = `Turn developer work into build-in-public content.
 
@@ -21,7 +27,8 @@ export async function runWriter(
     details: string;
   }
 ) {
-  const sb = createServerClient();
+  const sb = supabaseAdmin;
+  const dbUserId = toDbUserId(userId);
 
   let parsed: any;
   try {
@@ -44,7 +51,7 @@ export async function runWriter(
     if (typeof content !== 'string') continue;
     try {
       await sb.from('generated_content').insert({
-        user_id: userId,
+        user_id: dbUserId,
         platform,
         content,
         source_type: activity.type,
