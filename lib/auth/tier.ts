@@ -1,4 +1,9 @@
-export const ADMIN_EMAIL = 'jadaistudiosoffcl@gmail.com';
+// Prefer the runtime ADMIN_EMAIL from the environment (set in .env / host
+// dashboard) so admin-gated checks match the credentials the admin actually
+// logs in with. Fall back to the legacy constant only when env is absent
+// (e.g. client bundles where process.env.ADMIN_EMAIL isn't inlined).
+export const ADMIN_EMAIL =
+  (typeof process !== 'undefined' && process.env?.ADMIN_EMAIL) || 'jadaistudiosoffcl@gmail.com';
 export const FREE_TOOL_USAGE_LIMIT = 3;
 
 export type AppFeature = 'playground' | 'studio_premium' | 'signal' | 'marketplace_download';

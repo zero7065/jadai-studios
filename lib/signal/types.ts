@@ -185,5 +185,7 @@ export interface SignalTracker {
   active: boolean;
   createdAt: string;
   updatedAt?: string;
+  hits?: number;
+  lastHitAt?: string | null;
 }
 

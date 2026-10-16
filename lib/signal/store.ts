@@ -19,11 +19,10 @@ const INITIAL_DRAFTS: OutreachDraft[] = [];
 // Real generated content starts empty until generated
 const INITIAL_CONTENT: GeneratedContent[] = [];
 
-const INITIAL_TRACKERS: SignalTracker[] = [
-  { id: 'trk-1', userId: 'usr-default', source: 'github', query: 'jadai-studios/core', active: true, createdAt: new Date().toISOString() },
-  { id: 'trk-2', userId: 'usr-default', source: 'reddit', query: 'r/SaaS', active: true, createdAt: new Date().toISOString() },
-  { id: 'trk-3', userId: 'usr-default', source: 'x', query: '#buildinpublic', active: true, createdAt: new Date().toISOString() },
-];
+// Real trackers start empty — they're created by paying Signal Pro users via
+// the API (DB-backed). The in-memory list is only a fallback when Supabase
+// is unreachable, so it must never ship fake seed rows.
+const INITIAL_TRACKERS: SignalTracker[] = [];
 
 const INITIAL_SETTINGS: SignalSettings = {
   id: 'set-default',

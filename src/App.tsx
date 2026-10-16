@@ -44,7 +44,6 @@ import CommunityPage from '../app/(site)/community/page';
 import SignalApp from '../components/signal/SignalApp';
 import AuthCallback from '../components/auth/AuthCallback';
 import SignalLanding from '../app/(site)/signal/page';
-import SignalRadarPage from '../app/(site)/signal/radar/page';
 import SignalDetailPage from '../app/(site)/signal/radar/[id]/page';
 import SignalPricingPage from '../app/(site)/signal/pricing/page';
 
@@ -361,9 +360,9 @@ function AppContent() {
         const id = currentPath.replace('/signal/radar/', '').trim();
         return <SignalDetailPage params={{ id }} onNavigate={navigateTo} />;
       }
-      if (currentPath === '/signal/radar') {
-        return <SignalRadarPage onNavigate={navigateTo} />;
-      }
+      // /signal/radar intentionally falls through to SignalApp so the full
+      // RadarView (trackers + drafts + settings) renders — the standalone
+      // SignalRadarPage lacked the trackers feature entirely.
       if (currentPath === '/signal/pricing') {
         return <SignalPricingPage onNavigate={navigateTo} />;
       }

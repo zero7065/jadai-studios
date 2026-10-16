@@ -107,6 +107,26 @@ export const RadarView: React.FC<RadarViewProps> = ({ onNavigate }) => {
   const [newSource, setNewSource] = useState<SignalTrackerSource>('github');
   const [newQuery, setNewQuery] = useState('');
   const [addingTracker, setAddingTracker] = useState(false);
+  const [trackerLocked, setTrackerLocked] = useState(false);
+
+  // Identity headers for Signal APIs — the server resolves the paying user
+  // (and gates writes) from x-user-email / x-builder-id. Without these,
+  // every tracker write correctly 402s.
+  const getUserIdentity = (): Record<string, string> => {
+    try {
+      const raw = localStorage.getItem('jadai_user_session');
+      if (!raw) return {};
+      const s = JSON.parse(raw);
+      const h: Record<string, string> = {};
+      if (s?.email) h['x-user-email'] = s.email;
+      if (s?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s.id)) {
+        h['x-builder-id'] = s.id;
+      }
+      return h;
+    } catch {
+      return {};
+    }
+  };
 
   // Outreach Modal State
   const [activeSignal, setActiveSignal] = useState<Signal | null>(null);
@@ -118,11 +138,12 @@ export const RadarView: React.FC<RadarViewProps> = ({ onNavigate }) => {
   // Load signals & settings & trackers
   const loadData = async () => {
     try {
+      const headers = getUserIdentity();
       const [resSig, resDrafts, resSet, resTrk] = await Promise.all([
-        fetch('/api/signal/signals').then((r) => r.json()),
-        fetch('/api/signal/drafts').then((r) => r.json()),
-        fetch('/api/signal/settings').then((r) => r.json()),
-        fetch('/api/signal/trackers').then((r) => r.json()),
+        fetch('/api/signal/signals', { headers }).then((r) => r.json()),
+        fetch('/api/signal/drafts', { headers }).then((r) => r.json()),
+        fetch('/api/signal/settings', { headers }).then((r) => r.json()),
+        fetch('/api/signal/trackers', { headers }).then((r) => r.json()),
       ]);
 
       if (resSig.success) setSignals(resSig.signals || []);
@@ -144,14 +165,22 @@ export const RadarView: React.FC<RadarViewProps> = ({ onNavigate }) => {
     try {
       const res = await fetch('/api/signal/trackers', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getUserIdentity() },
         body: JSON.stringify({ source: newSource, query: newQuery.trim() }),
       });
-      const data = await res.json();
-      if (data.success && data.tracker) {
+      const data = await res.json().catch(() => null);
+      if (res.status === 402) {
+        setTrackerLocked(true);
+        showToast('Tracker armed requires a Signal Pro subscription. Upgrade to start continuous monitoring.', 'error', 'Upgrade Required');
+        return;
+      }
+      if (res.ok && data?.success && data.tracker) {
+        setTrackerLocked(false);
         setTrackers((prev) => [data.tracker, ...prev]);
         setNewQuery('');
         showToast(`Tracking ${newSource.toUpperCase()} query: ${data.tracker.query}`, 'success', 'Tracker Active');
+      } else {
+        showToast(data?.error || "The tracker wasn't armed — nothing is being watched yet.", 'error');
       }
     } catch {
       showToast("The tracker wasn't armed — nothing is being watched yet. Check the query and try again.", 'error');
@@ -163,11 +192,21 @@ export const RadarView: React.FC<RadarViewProps> = ({ onNavigate }) => {
   const handleToggleTracker = async (id: string) => {
     StudioAudio.playClick();
     try {
-      const res = await fetch(`/api/signal/trackers/${id}/toggle`, { method: 'POST' });
-      const data = await res.json();
-      if (data.success && data.tracker) {
+      const res = await fetch(`/api/signal/trackers/${id}/toggle`, {
+        method: 'POST',
+        headers: getUserIdentity(),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.status === 402) {
+        setTrackerLocked(true);
+        showToast('Signal Pro subscription required to manage trackers.', 'error', 'Upgrade Required');
+        return;
+      }
+      if (res.ok && data?.success && data.tracker) {
         setTrackers((prev) => prev.map((t) => (t.id === id ? data.tracker : t)));
         showToast(`Tracker ${data.tracker.active ? 'resumed' : 'paused'}`, 'info');
+      } else {
+        showToast(data?.error || 'Error toggling tracker', 'error');
       }
     } catch {
       showToast('Error toggling tracker', 'error');
@@ -177,9 +216,22 @@ export const RadarView: React.FC<RadarViewProps> = ({ onNavigate }) => {
   const handleDeleteTracker = async (id: string) => {
     StudioAudio.playClick();
     try {
-      await fetch(`/api/signal/trackers/${id}`, { method: 'DELETE' });
-      setTrackers((prev) => prev.filter((t) => t.id !== id));
-      showToast('Tracker removed', 'info');
+      const res = await fetch(`/api/signal/trackers/${id}`, {
+        method: 'DELETE',
+        headers: getUserIdentity(),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.status === 402) {
+        setTrackerLocked(true);
+        showToast('Signal Pro subscription required to manage trackers.', 'error', 'Upgrade Required');
+        return;
+      }
+      if (res.ok && (data?.removed || res.status === 404)) {
+        setTrackers((prev) => prev.filter((t) => t.id !== id));
+        showToast('Tracker removed', 'info');
+      } else {
+        showToast(data?.error || 'Error deleting tracker', 'error');
+      }
     } catch {
       showToast('Error deleting tracker', 'error');
     }
@@ -196,11 +248,18 @@ export const RadarView: React.FC<RadarViewProps> = ({ onNavigate }) => {
     showToast('Scout Agent launched across Hacker News, GitHub & Reddit...', 'info', 'Scanning Radar');
 
     try {
-      const res = await fetch('/api/signal/worker/scout', { method: 'POST' });
+      const res = await fetch('/api/signal/worker/scout', {
+        method: 'POST',
+        headers: getUserIdentity(),
+      });
       const data = await res.json().catch(() => null);
       await loadData();
       if (res.ok && data?.success) {
-        showToast('Radar sweep complete. New developer signals indexed.', 'success', 'Scout Report');
+        const watched = data?.result?.trackersWatched;
+        const detail = typeof watched === 'number' && watched > 0 ? ` ${watched} tracker${watched === 1 ? '' : 's'} watched.` : '';
+        showToast(`Radar sweep complete. New developer signals indexed.${detail}`, 'success', 'Scout Report');
+      } else if (res.status === 402) {
+        showToast('Scout runs require a Signal Pro subscription. Upgrade via pricing to launch sweeps.', 'error', 'Upgrade Required');
       } else {
         const reason = data?.error || `worker responded ${res.status}`;
         showToast(`Scout run did not complete (${reason}). Existing signals reloaded.`, 'error', 'Scout Report');
@@ -472,6 +531,8 @@ export const RadarView: React.FC<RadarViewProps> = ({ onNavigate }) => {
 
       {/* -----------------------------------------------------------------
           SIGNAL TRACKERS (github | reddit | x continuous monitoring)
+          DB-backed, per-user, gated behind Signal Pro — Scout crawls each
+          active tracker's query on every sweep and attributes hits back.
          ----------------------------------------------------------------- */}
       <div className="p-4 rounded-2xl bg-[#0a0908]/90 border border-[rgba(201,168,76,0.22)] backdrop-blur-xl space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -481,46 +542,59 @@ export const RadarView: React.FC<RadarViewProps> = ({ onNavigate }) => {
               Continuous Trackers ({trackers.length})
             </span>
             <span className="text-[10px] font-mono text-[#8a6e2a]">
-              Automated repo, subreddit & handle crawlers
+              GitHub &amp; Reddit crawlers + X keyword watch
             </span>
           </div>
 
-          {/* Quick Add Form */}
-          <form onSubmit={handleAddTracker} className="flex items-center gap-2">
-            <select
-              value={newSource}
-              onChange={(e) => setNewSource(e.target.value as SignalTrackerSource)}
-              className="text-xs font-mono bg-black/80 border border-zinc-800 rounded-lg px-2 py-1 text-[#D4AF37] focus:outline-none focus:border-[#C9A84C]"
+          {/* Quick Add Form — only for entitled users; upgrade CTA otherwise */}
+          {trackerLocked ? (
+            <button
+              type="button"
+              onClick={() => onNavigate?.('/signal/pricing')}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-600 to-yellow-500 text-black text-xs font-mono font-bold hover:from-amber-500 hover:to-yellow-400 transition-all"
             >
-              <option value="github">GitHub</option>
-              <option value="reddit">Reddit</option>
-              <option value="x">X / Twitter</option>
-            </select>
-            <input
-              type="text"
-              value={newQuery}
-              onChange={(e) => setNewQuery(e.target.value)}
-              placeholder={
-                newSource === 'github'
-                  ? 'org/repo or topic'
-                  : newSource === 'reddit'
-                  ? 'r/subreddit or term'
-                  : '#hashtag or @handle'
-              }
-              className="text-xs font-mono bg-black/80 border border-zinc-800 rounded-lg px-2.5 py-1 text-white placeholder-zinc-600 focus:outline-none focus:border-[#C9A84C] w-40 sm:w-52"
-            />
-            <Button variant="outline" size="sm" type="submit" disabled={addingTracker || !newQuery.trim()}>
-              <Plus className="w-3 h-3 mr-1" />
-              <span>Track</span>
-            </Button>
-          </form>
+              <Sparkles className="w-3.5 h-3.5" />
+              Upgrade to Signal Pro
+            </button>
+          ) : (
+            <form onSubmit={handleAddTracker} className="flex items-center gap-2">
+              <select
+                value={newSource}
+                onChange={(e) => setNewSource(e.target.value as SignalTrackerSource)}
+                className="text-xs font-mono bg-black/80 border border-zinc-800 rounded-lg px-2 py-1 text-[#D4AF37] focus:outline-none focus:border-[#C9A84C]"
+              >
+                <option value="github">GitHub</option>
+                <option value="reddit">Reddit</option>
+                <option value="x">X / Twitter (keyword watch)</option>
+              </select>
+              <input
+                type="text"
+                value={newQuery}
+                onChange={(e) => setNewQuery(e.target.value)}
+                placeholder={
+                  newSource === 'github'
+                    ? 'org/repo or topic'
+                    : newSource === 'reddit'
+                    ? 'r/subreddit or term'
+                    : '#hashtag or @handle'
+                }
+                className="text-xs font-mono bg-black/80 border border-zinc-800 rounded-lg px-2.5 py-1 text-white placeholder-zinc-600 focus:outline-none focus:border-[#C9A84C] w-40 sm:w-52"
+              />
+              <Button variant="outline" size="sm" type="submit" disabled={addingTracker || !newQuery.trim()}>
+                <Plus className="w-3 h-3 mr-1" />
+                <span>Track</span>
+              </Button>
+            </form>
+          )}
         </div>
 
         {/* Tracker Chips */}
         <div className="flex flex-wrap gap-2 pt-1">
           {trackers.length === 0 ? (
             <p className="text-[11px] font-mono text-zinc-500 py-1">
-              No custom trackers set. Add repos or subreddits above to continuously harvest high-intent signals.
+              {trackerLocked
+                ? 'Trackers are a Signal Pro feature — upgrade to arm continuous repo & subreddit crawlers.'
+                : 'No custom trackers set. Add repos or subreddits above to continuously harvest high-intent signals.'}
             </p>
           ) : (
             trackers.map((trk) => {
@@ -541,6 +615,14 @@ export const RadarView: React.FC<RadarViewProps> = ({ onNavigate }) => {
                     {trk.source}
                   </span>
                   <span className="text-[#f5f3f0]">{trk.query}</span>
+                  {typeof trk.hits === 'number' && trk.hits > 0 && (
+                    <span
+                      className="text-[9px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                      title={trk.lastHitAt ? `Last signal ${new Date(trk.lastHitAt).toLocaleString()}` : undefined}
+                    >
+                      {trk.hits} hit{trk.hits === 1 ? '' : 's'}
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleToggleTracker(trk.id)}

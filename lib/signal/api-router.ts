@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'crypto';
 import { signalStore } from './store';
 import { runScoutForUser } from './agents/scout';
 import { runCloserAgent } from './agents/closer';
@@ -8,6 +9,7 @@ import { SIGNAL_PLANS, SignalPlanTier } from './types';
 import { generateText } from '../ai';
 import { getEntitlement, grantSubscriptionFs } from '../entitlements/store';
 import { TIER_LEVELS, isMasterAdmin } from '../auth/tier';
+import { getAdminEmail } from '../data/adminCredentialsStore';
 import { supabaseAdmin, isSupabaseConfigured } from '../supabase/admin';
 import {
   listCampaigns,
@@ -48,6 +50,20 @@ const SIGNAL_WRITE_EXEMPT = new Set([
   '/settings', // POST /settings has its own granular plan-change gate below.
 ]);
 
+// Master-admin bypass: match the env ADMIN_EMAIL (lib/auth/tier) OR the
+// runtime-editable admin email from the credentials store, so the gate keeps
+// working after an admin changes their login email in the settings UI.
+function isSignalAdmin(email: string): boolean {
+  if (!email) return false;
+  if (isMasterAdmin(email)) return true;
+  try {
+    const runtime = (getAdminEmail(process.env.ADMIN_EMAIL || '') || '').toLowerCase();
+    return runtime.length > 0 && email === runtime;
+  } catch {
+    return false;
+  }
+}
+
 signalRouter.use((req, res, next) => {
   const isWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
   const path = (req.path || '').replace(/\/+$/, '');
@@ -57,7 +73,7 @@ signalRouter.use((req, res, next) => {
   const builderId = String(req.query.builderId || req.headers['x-builder-id'] || '').trim();
 
   // Master admin always passes.
-  if (isMasterAdmin(email)) return next();
+  if (isSignalAdmin(email)) return next();
 
   try {
     const ent = getEntitlement({
@@ -84,6 +100,91 @@ signalRouter.use((req, res, next) => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// IDENTITY RESOLUTION (per-user trackers & agent runs)
+// Email and/or builderId come from ?query or x-user-* headers — the same
+// contract the write-gate and /api/account/tier use. dbUserId is the
+// user_profiles.id UUID (FK target for signal_trackers); it's resolved from
+// builderId directly, or by email lookup, or created on first tracker write.
+// ---------------------------------------------------------------------------
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+interface SignalIdentity {
+  email: string | null;
+  builderId: string | null;
+  dbUserId: string | null;
+  isAdmin: boolean;
+}
+
+async function resolveSignalIdentity(req: any): Promise<SignalIdentity> {
+  const email = String(req.query?.email || req.headers?.['x-user-email'] || '').trim().toLowerCase();
+  const rawBuilder = String(req.query?.builderId || req.headers?.['x-builder-id'] || '').trim();
+  const builderId = UUID_RE.test(rawBuilder) ? rawBuilder : null;
+  const isAdmin = isSignalAdmin(email);
+  let dbUserId = builderId;
+  if (!dbUserId && email.includes('@') && isSupabaseConfigured) {
+    try {
+      const { data } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+      dbUserId = data?.id || null;
+    } catch {}
+  }
+  return {
+    email: email.includes('@') ? email : null,
+    builderId,
+    dbUserId,
+    isAdmin,
+  };
+}
+
+/** Returns the user_profiles.id (FK target) for tracker writes, creating the
+ *  profile row on first use so the signal_trackers FK never rejects. */
+async function ensureTrackerProfile(ident: SignalIdentity): Promise<string | null> {
+  if (!isSupabaseConfigured) return null;
+  try {
+    if (ident.dbUserId) {
+      await supabaseAdmin.from('user_profiles').upsert(
+        { id: ident.dbUserId, email: ident.email, updated_at: new Date().toISOString() },
+        { onConflict: 'id' }
+      );
+      return ident.dbUserId;
+    }
+    if (ident.email) {
+      const { data: existing } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id')
+        .eq('email', ident.email)
+        .maybeSingle();
+      if (existing?.id) return existing.id;
+      const id = randomUUID();
+      await supabaseAdmin.from('user_profiles').insert({
+        id,
+        email: ident.email,
+        display_name: ident.email.split('@')[0],
+      });
+      return id;
+    }
+  } catch (e) {
+    console.warn('[TRACKERS] ensureProfile failed:', e);
+  }
+  return null;
+}
+
+function mapDbTracker(row: any) {
+  return {
+    id: row.id,
+    userId: row.user_id || 'usr-default',
+    source: row.source,
+    query: row.query,
+    active: row.active,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || undefined,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // 1. SIGNALS
@@ -268,60 +369,172 @@ signalRouter.delete('/content/:id', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// 3.5. TRACKERS (github | reddit | x)
+// 3.5. TRACKERS (github | reddit | x) — DB-first, per-user, paid (Signal Pro)
+// Trackers are the sellable continuous-monitoring product: each active row
+// feeds Scout's crawl loop with its query, and every signal it produces is
+// attributed back via signal_analytics.metadata.tracker_id (hit counts).
 // ---------------------------------------------------------------------------
-signalRouter.get('/trackers', async (_req, res) => {
+signalRouter.get('/trackers', async (req, res) => {
+  const ident = await resolveSignalIdentity(req);
   let trackers: any[] = [];
+
   if (isSupabaseConfigured) {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('signal_trackers')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-      if (!error && data) {
-        trackers = data.map((row: any) => ({
-          id: row.id,
-          userId: row.user_id || 'usr-default',
-          source: row.source,
-          query: row.query,
-          active: row.active,
-          createdAt: row.created_at,
-        }));
+      let q = supabaseAdmin.from('signal_trackers').select('*');
+      if (!ident.isAdmin) {
+        // No identity resolved → nothing private to show (never leak other users' rows).
+        if (!ident.dbUserId) return res.json({ success: true, trackers: [] });
+        q = q.eq('user_id', ident.dbUserId);
       }
+      const { data, error } = await q.order('created_at', { ascending: false }).limit(100);
+      if (!error && data) trackers = data.map(mapDbTracker);
+    } catch (e) {
+      console.warn('[TRACKERS] DB read failed:', e);
+    }
+  } else {
+    const all = signalStore.getTrackers();
+    trackers = ident.isAdmin
+      ? all
+      : all.filter((t) => t.userId === (ident.dbUserId || 'usr-default'));
+  }
+
+  // Per-tracker hit stats from scout attribution events.
+  if (trackers.length && isSupabaseConfigured) {
+    try {
+      const ids = trackers.map((t) => t.id);
+      const { data: events } = await supabaseAdmin
+        .from('signal_analytics')
+        .select('metadata, created_at')
+        .eq('event_type', 'signal_found')
+        .in('metadata->>tracker_id', ids)
+        .limit(1000);
+      const hits: Record<string, { count: number; last: string }> = {};
+      for (const ev of events || []) {
+        const tid = ev.metadata?.tracker_id;
+        if (!tid) continue;
+        if (!hits[tid]) hits[tid] = { count: 0, last: '' };
+        hits[tid].count++;
+        if (ev.created_at > hits[tid].last) hits[tid].last = ev.created_at;
+      }
+      trackers = trackers.map((t) => ({
+        ...t,
+        hits: hits[t.id]?.count || 0,
+        lastHitAt: hits[t.id]?.last || null,
+      }));
     } catch {}
   }
-  if (trackers.length === 0) trackers = signalStore.getTrackers();
+
   res.json({ success: true, trackers });
 });
 
-signalRouter.post('/trackers', (req, res) => {
-  const { source, query } = req.body;
-  if (!source || !['github', 'reddit', 'x'].includes(source) || !query) {
-    return res.status(400).json({ success: false, error: 'Valid source (github | reddit | x) and query required' });
+signalRouter.post('/trackers', async (req, res) => {
+  const { source, query } = req.body || {};
+  if (!source || !['github', 'reddit', 'x'].includes(source)) {
+    return res.status(400).json({ success: false, error: 'Valid source (github | reddit | x) required' });
+  }
+  const q = String(query || '').trim();
+  if (q.length < 2 || q.length > 120) {
+    return res.status(400).json({ success: false, error: 'Query must be 2-120 characters' });
   }
 
+  const ident = await resolveSignalIdentity(req);
+  if (!ident.isAdmin && !ident.dbUserId && !ident.email) {
+    return res.status(401).json({ success: false, error: 'Sign in to create trackers' });
+  }
+
+  if (isSupabaseConfigured) {
+    const ownerId = await ensureTrackerProfile(ident);
+    if (ownerId) {
+      try {
+        const { count } = await supabaseAdmin
+          .from('signal_trackers')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', ownerId);
+        if ((count || 0) >= 25) {
+          return res.status(429).json({ success: false, error: 'Tracker limit reached (25). Remove one to add another.' });
+        }
+        const { data, error } = await supabaseAdmin
+          .from('signal_trackers')
+          .insert({ user_id: ownerId, source, query: q, active: true })
+          .select()
+          .single();
+        if (!error && data) return res.json({ success: true, tracker: mapDbTracker(data) });
+        console.warn('[TRACKERS] insert failed:', error?.message);
+      } catch (e) {
+        console.warn('[TRACKERS] insert error:', e);
+      }
+    }
+  }
+
+  // Memory fallback (DB down / unconfigured) — degraded but honest.
   const tracker = signalStore.addTracker({
-    userId: 'usr-default',
+    userId: ident.dbUserId || 'usr-default',
     source,
-    query: query.trim(),
+    query: q,
     active: true,
   });
-
-  res.json({ success: true, tracker });
+  res.json({ success: true, tracker, degraded: true });
 });
 
-signalRouter.post('/trackers/:id/toggle', (req, res) => {
-  const updated = signalStore.toggleTracker(req.params.id);
-  if (!updated) {
+signalRouter.post('/trackers/:id/toggle', async (req, res) => {
+  const ident = await resolveSignalIdentity(req);
+  if (isSupabaseConfigured) {
+    try {
+      const { data: row } = await supabaseAdmin
+        .from('signal_trackers')
+        .select('*')
+        .eq('id', req.params.id)
+        .maybeSingle();
+      if (!row) return res.status(404).json({ success: false, error: 'Tracker not found' });
+      if (!ident.isAdmin && row.user_id !== ident.dbUserId) {
+        return res.status(404).json({ success: false, error: 'Tracker not found' });
+      }
+      const { data: updated, error } = await supabaseAdmin
+        .from('signal_trackers')
+        .update({ active: !row.active, updated_at: new Date().toISOString() })
+        .eq('id', row.id)
+        .select()
+        .single();
+      if (!error && updated) return res.json({ success: true, tracker: mapDbTracker(updated) });
+    } catch (e) {
+      console.warn('[TRACKERS] toggle error:', e);
+    }
+  }
+  const existing = signalStore.getTrackers().find((t) => t.id === req.params.id);
+  if (existing && !ident.isAdmin && existing.userId !== (ident.dbUserId || 'usr-default')) {
     return res.status(404).json({ success: false, error: 'Tracker not found' });
   }
+  const updated = signalStore.toggleTracker(req.params.id);
+  if (!updated) return res.status(404).json({ success: false, error: 'Tracker not found' });
   res.json({ success: true, tracker: updated });
 });
 
-signalRouter.delete('/trackers/:id', (req, res) => {
+signalRouter.delete('/trackers/:id', async (req, res) => {
+  const ident = await resolveSignalIdentity(req);
+  if (isSupabaseConfigured) {
+    try {
+      const { data: row } = await supabaseAdmin
+        .from('signal_trackers')
+        .select('user_id')
+        .eq('id', req.params.id)
+        .maybeSingle();
+      if (!row) return res.status(404).json({ success: false, error: 'Tracker not found' });
+      if (!ident.isAdmin && row.user_id !== ident.dbUserId) {
+        return res.status(404).json({ success: false, error: 'Tracker not found' });
+      }
+      const { error } = await supabaseAdmin.from('signal_trackers').delete().eq('id', req.params.id);
+      if (!error) return res.json({ success: true, removed: true });
+    } catch (e) {
+      console.warn('[TRACKERS] delete error:', e);
+    }
+  }
+  const existing = signalStore.getTrackers().find((t) => t.id === req.params.id);
+  if (existing && !ident.isAdmin && existing.userId !== (ident.dbUserId || 'usr-default')) {
+    return res.status(404).json({ success: false, error: 'Tracker not found' });
+  }
   const removed = signalStore.deleteTracker(req.params.id);
-  res.json({ success: true, removed });
+  if (!removed) return res.status(404).json({ success: false, error: 'Tracker not found' });
+  res.json({ success: true, removed: true });
 });
 
 // ---------------------------------------------------------------------------
@@ -775,17 +988,51 @@ signalRouter.get('/paystack-callback', async (req, res) => {
 const handleScoutWorker = async (req: any, res: any) => {
   const auth = req.headers?.authorization;
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    // Fail closed: header must be present AND match.
-    if (auth !== `Bearer ${cronSecret}`) {
-      return res.status(401).json({ error: 'Unauthorized' });
+  const isCron = Boolean(cronSecret && auth === `Bearer ${cronSecret}`);
+
+  // System cron sweep: default workspace + every owner of an active tracker.
+  if (isCron) {
+    try {
+      const results: any[] = [];
+      results.push(await runScoutForUser('usr-default'));
+      if (isSupabaseConfigured) {
+        try {
+          const { data: owners } = await supabaseAdmin
+            .from('signal_trackers')
+            .select('user_id')
+            .eq('active', true)
+            .not('user_id', 'is', null)
+            .limit(50);
+          const seen = new Set<string>();
+          for (const o of owners || []) {
+            if (o.user_id && !seen.has(o.user_id)) {
+              seen.add(o.user_id);
+              results.push(await runScoutForUser(o.user_id));
+            }
+          }
+        } catch {}
+      }
+      return res.json({ success: true, message: 'Cron scout sweep completed', results });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
     }
-  } else if (process.env.NODE_ENV === 'production') {
+  }
+
+  // With CRON_SECRET configured, GET stays cron-only (schedulers poll it).
+  // User-triggered runs come via POST, already entitlement-gated by the
+  // write-gate middleware above (x-user-* headers must identify a Signal Pro+).
+  if (cronSecret) {
+    if (req.method === 'GET') return res.status(401).json({ error: 'Unauthorized' });
+    if (auth) return res.status(401).json({ error: 'Unauthorized' });
+  } else if (process.env.NODE_ENV === 'production' && req.method === 'GET') {
     return res.status(503).json({ error: 'CRON_SECRET not configured' });
   }
 
+  // User-triggered run — scout crawls for THAT user's settings + trackers.
   try {
-    const result = await runScoutForUser();
+    const ident = await resolveSignalIdentity(req);
+    const userId = ident.dbUserId || ident.builderId || 'usr-default';
+    const result = await runScoutForUser(userId);
     res.json({ success: true, message: 'Scout agent run completed', result });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
