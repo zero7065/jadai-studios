@@ -40,6 +40,28 @@ export function getBookOfLiesBySlug(slug: string): BookOfLiesEpisode | undefined
   );
 }
 
+/**
+ * Pulls the server's shared custom-episode list into the localStorage mirror
+ * that the sync readers above consult. Call once on mount from the Book pages.
+ * Server wins when non-empty; an empty server list keeps device-local
+ * (possibly unsynced) episodes instead of wiping them.
+ */
+export async function hydrateCustomEpisodes(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    const res = await fetch('/api/book-of-lies/episodes');
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (!data?.success || !Array.isArray(data.episodes)) return false;
+    if (data.episodes.length > 0) {
+      localStorage.setItem('jadai_custom_episodes', JSON.stringify(data.episodes));
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function getAllBookOfLies(filters?: { sin?: string; act?: number }): BookOfLiesEpisode[] {
   let list = [...ALL_CANONICAL_EPISODES.filter(Boolean)];
   if (typeof window !== 'undefined') {

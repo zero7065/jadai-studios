@@ -7,7 +7,7 @@ import EpisodeReader from '@/components/content/EpisodeReader';
 import { EmptyBookOfLies } from '@/components/ui/EmptyStates';
 import EdgeGlow from '@/components/ui/EdgeGlow';
 import LikeButton from '@/components/ui/LikeButton';
-import { getAllBookOfLies, BookOfLiesEpisode, synthesizePersonalBook, PersonalBookSynthesis } from '@/lib/data/book-of-lies';
+import { getAllBookOfLies, hydrateCustomEpisodes, BookOfLiesEpisode, synthesizePersonalBook, PersonalBookSynthesis } from '@/lib/data/book-of-lies';
 import { StudioAudio } from '@/lib/watermark';
 import Button from '@/components/ui/Button';
 import {
@@ -69,6 +69,13 @@ export default function BookOfLiesPage() {
   useEffect(() => {
     setCurrentIndex(0);
   }, [selectedSin, selectedAct]);
+
+  // Pull shared custom episodes from the server into the localStorage mirror,
+  // then re-render so the sync list above includes them (survives cache clears).
+  const [, setEpisodesHydrated] = useState(false);
+  useEffect(() => {
+    hydrateCustomEpisodes().finally(() => setEpisodesHydrated(true));
+  }, []);
 
   const [personalModalOpen, setPersonalModalOpen] = useState(false);
   const [personalName, setPersonalName] = useState('Architect Jehu');
@@ -199,6 +206,13 @@ You cannot outsmart arithmetic with charisma. Build the floor.`,
       const customList = stored ? JSON.parse(stored) : [];
       customList.unshift(newEpisode);
       localStorage.setItem('jadai_custom_episodes', JSON.stringify(customList));
+      // Persist server-side too — the parable survives cache clears and reaches
+      // other devices; if the network is down the local mirror still holds it.
+      void fetch('/api/book-of-lies/episodes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ episode: newEpisode }),
+      }).catch(() => {});
       StudioAudio.playSuccessArpeggio();
       setAuthorModalOpen(false);
       // Immediately open in reader so user experiences their own story!

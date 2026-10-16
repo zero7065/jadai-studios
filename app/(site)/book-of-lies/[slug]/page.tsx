@@ -1,19 +1,33 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import EpisodeReader from '@/components/content/EpisodeReader';
-import { getBookOfLiesBySlug, getAllBookOfLies, BookOfLiesEpisode } from '@/lib/data/book-of-lies';
+import { getBookOfLiesBySlug, getAllBookOfLies, hydrateCustomEpisodes, BookOfLiesEpisode } from '@/lib/data/book-of-lies';
 
 import BrandedErrorFallback from '@/components/ui/BrandedErrorFallback';
 
+function lookupEpisode(slug: string): BookOfLiesEpisode | undefined {
+  try {
+    return slug ? getBookOfLiesBySlug(slug) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function BookOfLiesEpisodePage({ params }: { params?: { slug?: string } }) {
   const slug = params?.slug || '';
-  let episode;
-  try {
-    episode = slug ? getBookOfLiesBySlug(slug) : undefined;
-  } catch {
-    return <BrandedErrorFallback message="This chapter could not load." />;
-  }
+  const [episode, setEpisode] = useState<BookOfLiesEpisode | undefined>(() => lookupEpisode(slug));
+  const [hydrated, setHydrated] = useState(false);
+
+  // Cold deep-links to custom episodes: pull the server list into the local
+  // mirror, then re-lookup so the chapter resolves instead of 404-ing.
+  useEffect(() => {
+    hydrateCustomEpisodes().finally(() => {
+      setEpisode(lookupEpisode(slug));
+      setHydrated(true);
+    });
+  }, [slug]);
 
   if (!episode) {
+    if (!hydrated) return null;
     return <BrandedErrorFallback message="This episode could not be found." />;
   }
 

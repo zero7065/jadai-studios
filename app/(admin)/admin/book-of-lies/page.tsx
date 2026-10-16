@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
-import { getAllBookOfLies, BookOfLiesEpisode, MASTER_40_EPISODES } from '@/lib/data/book-of-lies';
+import { getAllBookOfLies, hydrateCustomEpisodes, BookOfLiesEpisode, ALL_CANONICAL_EPISODES } from '@/lib/data/book-of-lies';
 import { useToast } from '@/components/providers/ToastProvider';
 import { BookOpen, Plus, Flame, Clock, Eye, Heart, Edit2, Trash2 } from 'lucide-react';
 
@@ -15,6 +15,27 @@ export default function AdminBookOfLiesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEpisode, setEditingEpisode] = useState<BookOfLiesEpisode | null>(null);
   const { showToast } = useToast();
+
+  // Hydrate shared custom episodes from the server on mount (survives cache clears).
+  useEffect(() => {
+    hydrateCustomEpisodes().then((ok) => {
+      if (ok) setEpisodes(getAllBookOfLies());
+    });
+  }, []);
+
+  // Mirror the custom-episode list to the server; the admin cookie carries auth.
+  const persistCustomList = async (list: BookOfLiesEpisode[]): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/book-of-lies/episodes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ episodes: list }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  };
 
   // Form State
   const [title, setTitle] = useState('');
@@ -47,7 +68,7 @@ export default function AdminBookOfLiesPage() {
     setModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !fullText) {
       showToast('Title and full text are required', 'error');
@@ -69,11 +90,20 @@ export default function AdminBookOfLiesPage() {
           : ep
       );
       setEpisodes(updated);
+      let synced = false;
       try {
-        const custom = updated.filter((e) => e.id.startsWith('bol-custom-') || e.id.startsWith('bol-') && !MASTER_40_EPISODES.find(m => m.id === e.id));
+        // Custom episodes persist to the server; canonical edits stay in-memory
+        // (compile-time constants — reload restores the canon).
+        const custom = updated.filter((e) => !ALL_CANONICAL_EPISODES.some((m) => m.id === e.id));
         localStorage.setItem('jadai_custom_episodes', JSON.stringify(custom));
+        synced = await persistCustomList(custom);
       } catch {}
-      showToast(`Episode "${title}" updated.`, 'success');
+      showToast(
+        synced
+          ? `Episode "${title}" updated and synced to the server.`
+          : `Episode "${title}" updated on this device only — server sync failed (admin session may have expired).`,
+        synced ? 'success' : 'error'
+      );
     } else {
       const newEp: BookOfLiesEpisode = {
         id: `bol-${Date.now()}`,
@@ -93,13 +123,20 @@ export default function AdminBookOfLiesPage() {
       };
       const updated = [newEp, ...episodes];
       setEpisodes(updated);
+      let synced = false;
       try {
         const stored = localStorage.getItem('jadai_custom_episodes');
         const list = stored ? JSON.parse(stored) : [];
         list.unshift(newEp);
         localStorage.setItem('jadai_custom_episodes', JSON.stringify(list));
+        synced = await persistCustomList(list);
       } catch {}
-      showToast(`Episode "${title}" registered for 9:47 PM broadcast and published live.`, 'success');
+      showToast(
+        synced
+          ? `Episode "${title}" registered for 9:47 PM broadcast, published live, and synced to the server.`
+          : `Episode "${title}" published live on this device — server sync failed (admin session may have expired).`,
+        synced ? 'success' : 'error'
+      );
     }
 
     setModalOpen(false);
@@ -165,17 +202,27 @@ export default function AdminBookOfLiesPage() {
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const filtered = episodes.filter((e) => e.id !== ep.id);
                       setEpisodes(filtered);
-                      try {
-                        const stored = localStorage.getItem('jadai_custom_episodes');
-                        if (stored) {
-                          const list = JSON.parse(stored).filter((e: any) => e.id !== ep.id);
-                          localStorage.setItem('jadai_custom_episodes', JSON.stringify(list));
-                        }
-                      } catch {}
-                      showToast(`Episode "${ep.title}" removed`, 'info');
+                      const isCustom = !ALL_CANONICAL_EPISODES.some((m) => m.id === ep.id);
+                      let synced = true;
+                      if (isCustom) {
+                        synced = false;
+                        try {
+                          const stored = localStorage.getItem('jadai_custom_episodes');
+                          const list: BookOfLiesEpisode[] = stored ? JSON.parse(stored) : [];
+                          const next = list.filter((e) => e.id !== ep.id);
+                          localStorage.setItem('jadai_custom_episodes', JSON.stringify(next));
+                          synced = await persistCustomList(next);
+                        } catch {}
+                      }
+                      showToast(
+                        isCustom && !synced
+                          ? `Episode "${ep.title}" removed on this device only — server sync failed`
+                          : `Episode "${ep.title}" removed`,
+                        isCustom && !synced ? 'error' : 'info'
+                      );
                     }}
                     className="p-1 rounded text-[#8a6e2a] hover:text-[#C0392B]"
                   >

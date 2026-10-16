@@ -8,6 +8,7 @@ import { getPublicHealth } from './lib/diagnostics/health';
 import { runSelfCheck } from './lib/diagnostics/self-check';
 import { runDiagnosticScan } from './lib/diagnostics/scanner';
 import { generateText, assembleChatRequest, formatMemoryBlock, extractMemoriesPrompt, GROQ_PRIMARY_MODEL, OPENAI_PRIMARY_MODEL, isOpenAIQuotaExhausted } from './lib/ai';
+import { probeOpenAICredits } from './lib/ai/openai';
 import { getModuleBySlug } from './lib/modules/modules.config';
 import { supabaseAdmin, isSupabaseConfigured } from './lib/supabase/admin';
 import { invalidateAiCache } from './lib/ai/cache';
@@ -26,6 +27,7 @@ import { listTemplates, saveTemplate, deleteTemplate, saveTemplateBundle } from 
 import { listActiveHubListings, insertHubListing } from './lib/data/hubStore';
 import { insertDreamIntake } from './lib/data/dreamForgeStore';
 import { getAdminEmail, getAdminPasswordHash, setAdminCredentials, getAdminRecoveryCode, setAdminRecoveryCode } from './lib/data/adminCredentialsStore';
+import { getCustomEpisodes, saveCustomEpisodes, appendCustomEpisode } from './lib/data/bookOfLiesStore';
 import {
   grantSubscriptionFs,
   recordTemplateOrderFs,
@@ -851,6 +853,53 @@ async function startServer() {
     } catch (err: any) {
       console.error('[ADMIN LOGIN] error:', err?.message);
       res.status(500).json({ success: false, error: 'Login failed' });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Book of Lies — custom episodes (server-persisted; localStorage is the
+  // client's offline mirror). GET is public canon content; POST appends one
+  // reader-authored parable (rate-limited + validated); PUT replaces the whole
+  // list and is admin-only (create/edit/delete from the manager).
+  // ---------------------------------------------------------------------------
+  app.get('/api/book-of-lies/episodes', rateLimit('bol_read', { max: 60 }), (_req, res) => {
+    try {
+      res.json({ success: true, episodes: getCustomEpisodes() });
+    } catch (err) {
+      console.error('[BOOK OF LIES] read failed:', err);
+      res.status(500).json({ success: false, error: 'read_failed' });
+    }
+  });
+
+  app.post('/api/book-of-lies/episodes', rateLimit('bol_author', { max: 5 }), async (req, res) => {
+    try {
+      const body = req.body || {};
+      const result = await appendCustomEpisode(body.episode ?? body);
+      if (result.status === 'invalid') {
+        return res.status(422).json({ success: false, error: 'invalid_episode' });
+      }
+      if (result.status === 'full') {
+        return res.status(429).json({ success: false, error: 'canon_full' });
+      }
+      // 'added' and 'duplicate' are both idempotent successes for the client.
+      res.json({ success: true, episodes: result.episodes });
+    } catch (err) {
+      console.error('[BOOK OF LIES] append failed:', err);
+      res.status(500).json({ success: false, error: 'append_failed' });
+    }
+  });
+
+  app.put('/api/book-of-lies/episodes', requireAdmin, async (req, res) => {
+    try {
+      const body = req.body || {};
+      if (!Array.isArray(body.episodes)) {
+        return res.status(400).json({ success: false, error: 'episodes_array_required' });
+      }
+      const episodes = await saveCustomEpisodes(body.episodes);
+      res.json({ success: true, episodes });
+    } catch (err) {
+      console.error('[BOOK OF LIES] save failed:', err);
+      res.status(500).json({ success: false, error: 'save_failed' });
     }
   });
 
@@ -3004,6 +3053,15 @@ Draft a continuation of 40-70 words that deepens the architectural or moral stak
 
   app.listen(port, '0.0.0.0', () => {
     console.log(`[JADAI STUDIOS] Engine active on http://0.0.0.0:${port}`);
+    // OpenAI credits probe: park a dead key in the quota breaker up front so
+    // the first live request of the day falls through to Groq instantly.
+    if (process.env.OPENAI_API_KEY) {
+      probeOpenAICredits()
+        .then((live) =>
+          console.log(`[BOOT] OpenAI credits probe: ${live ? 'live' : 'paused (no credits — Groq fallback engaged)'}`)
+        )
+        .catch(() => {});
+    }
   });
 }
 
