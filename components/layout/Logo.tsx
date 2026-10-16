@@ -21,50 +21,79 @@ export const Logo: React.FC<LogoProps> = ({
   showWordmark = true,
   className = '',
 }) => {
-  // Tap tracking: 5 taps within 3 seconds opens Admin Lounge
+  // Tap tracking:
+  //  - 5 taps within 3s (fires 500ms after the user pauses) → Admin Lounge
+  //  - 20 taps within 10s (fires immediately) → Disaster Recovery Terminal
+  // The 5-tap decision is quiet-debounced so uninterrupted rapid tapping can
+  // escalate past it to the 20-tap recovery gesture instead of being cut off.
   const tapHistoryRef = useRef<number[]>([]);
+  const escalateRef = useRef<number[]>([]);
   const resetTimerRef = useRef<any>(null);
   const singleClickTimerRef = useRef<any>(null);
+  const adminDecideTimerRef = useRef<any>(null);
   const [pulsing, setPulsing] = useState(false);
+
+  const fireFeedback = () => {
+    try {
+      StudioAudio.playSuccessArpeggio();
+    } catch {}
+    setPulsing(true);
+    setTimeout(() => setPulsing(false), 800);
+  };
+
+  const clearGestureState = () => {
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    if (singleClickTimerRef.current) clearTimeout(singleClickTimerRef.current);
+    if (adminDecideTimerRef.current) clearTimeout(adminDecideTimerRef.current);
+    resetTimerRef.current = null;
+    singleClickTimerRef.current = null;
+    adminDecideTimerRef.current = null;
+    tapHistoryRef.current = [];
+    escalateRef.current = [];
+  };
 
   const handleTap = (e: React.MouseEvent) => {
     e.preventDefault();
     const now = Date.now();
 
-    // Clear reset timer on every tap
+    // Reset the 5-tap window after 3 seconds of no taps
     if (resetTimerRef.current) {
       clearTimeout(resetTimerRef.current);
     }
-    // Reset counter after 3 seconds of no taps
     resetTimerRef.current = setTimeout(() => {
       tapHistoryRef.current = [];
     }, 3000);
 
-    // Keep only taps within the last 3 seconds
     tapHistoryRef.current = [...tapHistoryRef.current, now].filter((t) => now - t <= 3000);
+    escalateRef.current = [...escalateRef.current, now].filter((t) => now - t <= 10000);
 
-    // If 5 taps within 3 seconds -> show admin passcode modal with chime and gold pulse
-    if (tapHistoryRef.current.length >= 5) {
-      tapHistoryRef.current = [];
-      if (resetTimerRef.current) {
-        clearTimeout(resetTimerRef.current);
-      }
-      if (singleClickTimerRef.current) {
-        clearTimeout(singleClickTimerRef.current);
-        singleClickTimerRef.current = null;
-      }
-      try {
-        StudioAudio.playSuccessArpeggio();
-      } catch {}
-      setPulsing(true);
-      setTimeout(() => setPulsing(false), 800);
-
-      if (onAdminTrigger) {
-        onAdminTrigger();
+    // 20 taps within 10 seconds → Disaster Recovery Terminal.
+    if (escalateRef.current.length >= 20) {
+      clearGestureState();
+      fireFeedback();
+      if (onRecovery) {
+        onRecovery();
       } else if (typeof window !== 'undefined') {
-        window.location.href = '/admin';
+        window.location.href = '/admin/recovery';
       }
       return;
+    }
+
+    // ≥5 taps within 3 seconds → Admin Lounge opens after 500ms of quiet.
+    // Every additional tap postpones it, so continuous mashing escalates to 20.
+    if (tapHistoryRef.current.length >= 5) {
+      if (adminDecideTimerRef.current) {
+        clearTimeout(adminDecideTimerRef.current);
+      }
+      adminDecideTimerRef.current = setTimeout(() => {
+        clearGestureState();
+        fireFeedback();
+        if (onAdminTrigger) {
+          onAdminTrigger();
+        } else if (typeof window !== 'undefined') {
+          window.location.href = '/admin';
+        }
+      }, 500);
     }
 
     // If single tap and onHomeClick provided, schedule home navigation
