@@ -55,7 +55,7 @@ export async function generateText(
   if (!isOpenAIConfigured(options.openaiKey)) {
     failureNotes.push('OpenAI: key not configured');
   } else if (isOpenAIQuotaExhausted()) {
-    failureNotes.push('OpenAI: quota exhausted (cooling down 10 min)');
+    failureNotes.push('OpenAI: quota breaker active (escalating backoff — using Groq)');
     fallbackTriggered = true;
   } else {
     try {

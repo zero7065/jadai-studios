@@ -15,9 +15,17 @@ export const OPENAI_PRIMARY_MODEL = OPENAI_MODEL_CANDIDATES[0];
 
 // Circuit breaker: when the org runs out of credits every call would burn a round-trip
 // just to receive 429 credit_balance_exhausted. After the first such error, pause
-// OpenAI attempts for the cooldown window so the chain falls through to Groq instantly.
-// It re-arms automatically — add credits and the provider comes back without a restart.
-const QUOTA_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+// OpenAI attempts so the chain falls through to Groq instantly.
+// Escalating backoff: a genuinely dead key gets probed less and less often
+// (10min → 30min → 2h → 6h cap), and ANY successful call resets the breaker
+// immediately — add credits and the provider comes back without a restart.
+const QUOTA_COOLDOWN_STEPS_MS = [
+  10 * 60 * 1000, // 1st failure: 10 min
+  30 * 60 * 1000, // 2nd: 30 min
+  2 * 60 * 60 * 1000, // 3rd: 2 hours
+  6 * 60 * 60 * 1000, // 4th+: 6 hours (cap)
+];
+let quotaFailureStreak = 0;
 let quotaExhaustedUntil = 0;
 
 export function isOpenAIQuotaExhausted(): boolean {
@@ -25,13 +33,48 @@ export function isOpenAIQuotaExhausted(): boolean {
 }
 
 function markQuotaExhausted(reason: string): void {
-  quotaExhaustedUntil = Date.now() + QUOTA_COOLDOWN_MS;
-  logger.warn('OpenAI quota exhausted — pausing OpenAI attempts for 10 minutes', { reason });
+  const step = Math.min(quotaFailureStreak, QUOTA_COOLDOWN_STEPS_MS.length - 1);
+  const waitMs = QUOTA_COOLDOWN_STEPS_MS[step];
+  quotaFailureStreak += 1;
+  quotaExhaustedUntil = Date.now() + waitMs;
+  logger.warn(
+    `OpenAI quota exhausted (streak ${quotaFailureStreak}) — pausing OpenAI attempts for ${Math.round(waitMs / 60000)} min`,
+    { reason }
+  );
 }
 
 /** Report a quota/credit failure from ANY OpenAI surface (text, images, search). */
 export function reportOpenAIQuotaError(reason: string): void {
   markQuotaExhausted(reason);
+}
+
+/** Called after any successful OpenAI response — re-arms the provider at once. */
+function reportOpenAIRecovered(): void {
+  if (quotaFailureStreak > 0) {
+    logger.info('OpenAI credits available again — quota breaker reset', {
+      previousStreak: quotaFailureStreak,
+    });
+  }
+  quotaFailureStreak = 0;
+  quotaExhaustedUntil = 0;
+}
+
+/**
+ * One-tiny-request credits probe, fired once at server boot. If the key has
+ * no credits the breaker parks OpenAI BEFORE the first live user request
+ * touches it; if it succeeds the breaker is confirmed clear.
+ */
+export async function probeOpenAICredits(): Promise<boolean> {
+  if (!isOpenAIConfigured()) return false;
+  if (isOpenAIQuotaExhausted()) return false;
+  try {
+    await callOpenAI('Reply with the single word: ok', { maxTokens: 5, temperature: 0 });
+    return true;
+  } catch {
+    // Quota errors already armed the breaker inside callOpenAI; other errors
+    // (network, model) are transient and must not park the provider.
+    return false;
+  }
 }
 
 export function isOpenAIConfigured(customKey?: string): boolean {
@@ -130,6 +173,7 @@ export async function callOpenAI(
     try {
       const result = await attemptOpenAI(model, apiKey as string, messages, options);
       const durationMs = Date.now() - startTime;
+      reportOpenAIRecovered();
       if (lastError) {
         logger.warn('OpenAI recovered on fallback model', { model, previous: lastError.message });
       }
