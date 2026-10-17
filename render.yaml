@@ -1,6 +1,12 @@
 # JADAI STUDIOS — Render free-tier API service
 # Frontend: Cloudflare Pages (static, dist/)  →  proxies /api/* and /s/* here.
 # Alternative: set SERVE_STATIC=1 to let this service serve the SPA too (no Pages needed).
+#
+# PERSISTENT DATA: the server writes fs stores under ./data/ (chat sessions,
+# artifacts, uploaded files + RAG index, memory, entitlements, signal stores).
+# Render Free's disk is EPHEMERAL — all ./data is wiped on every redeploy/restart.
+# To keep user data across deploys: Render dashboard → service → Disks →
+# add a disk mounted at the working directory (Starter plan+), or accept resets.
 services:
   - type: web
     name: jadai-api
@@ -26,7 +32,11 @@ services:
       #   SUPABASE_SERVICE_ROLE_KEY
       #   NEXT_PUBLIC_SUPABASE_URL
       #   NEXT_PUBLIC_SUPABASE_ANON_KEY
-      #   PAYSTACK_SECRET_KEY
-      #   NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
-      #   GROQ_API_KEY / GEMINI_API_KEY
+      #   PAYSTACK_SECRET_KEY             (live: sk_live_...)
+      #   NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY (live: pk_live_...)
+      #   GROQ_API_KEY        — REQUIRED for AI (console.groq.com/keys)
+      #   OPENAI_API_KEY      — optional; needs active credits or breaker parks it
+      #   GEMINI_API_KEY      — optional tertiary
+      #   NEXT_PUBLIC_GIPHY_API_KEY — optional GIF search (developers.giphy.com)
       #   NEXT_PUBLIC_APP_URL=https://jadai.dev
+      # Full list + required/optional status: .env.example and docs/02-DEPLOYMENT.md §5
