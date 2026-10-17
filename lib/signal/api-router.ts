@@ -1044,6 +1044,57 @@ signalRouter.post('/scout', handleScoutWorker);
 signalRouter.get('/worker/scout', handleScoutWorker);
 signalRouter.post('/worker/scout', handleScoutWorker);
 
+// ---------------------------------------------------------------------------
+// Social Diagnostic — honest AI structural audit of a handle's positioning.
+// Signal has no social-platform API access, so this NEVER invents live
+// metrics (followers, engagement, geo percentages). The model analyzes the
+// handle + platform and returns qualitative structure; the client labels it
+// as AI analysis. Entitlement-gated by the write-gate middleware above.
+// ---------------------------------------------------------------------------
+const SOCIAL_PLATFORMS = new Set(['x', 'instagram', 'tiktok', 'youtube', 'linkedin', 'threads']);
+
+signalRouter.post('/social-diagnostic', async (req, res) => {
+  const handle = String(req.body?.handle || '').trim().replace(/^@+/, '');
+  const platformRaw = String(req.body?.platform || 'x').trim().toLowerCase();
+  const platform = SOCIAL_PLATFORMS.has(platformRaw) ? platformRaw : 'x';
+  if (!handle || handle.length > 64 || !/^[A-Za-z0-9_.\-/:@]+$/.test(handle)) {
+    return res
+      .status(400)
+      .json({ success: false, error: 'Provide a valid handle (letters, numbers, underscore, dot, dash).' });
+  }
+
+  const systemPrompt =
+    'You are Signal Social Diagnostic, an honest positioning analyst for builders. ' +
+    'You do NOT have access to live platform analytics and you must never invent specific ' +
+    'metrics (follower counts, engagement rates, percentages, reach numbers, country splits). ' +
+    'Write a structural audit: what the handle currently signals, positioning gaps, content ' +
+    'architecture for this platform, cadence and format guidance, and exactly 3 concrete next ' +
+    'actions. Be direct and specific. Plain text: short titled sections separated by blank lines, ' +
+    'no markdown tables, no invented numbers.';
+
+  try {
+    const result = await generateText(
+      `Platform: ${platform}\nHandle: @${handle}\n\nWrite the structural audit now.`,
+      { systemPrompt, temperature: 0.5 }
+    );
+    res.json({
+      success: true,
+      handle: `@${handle}`,
+      platform,
+      analysis: result.text,
+      provider: result.provider,
+      generatedAt: new Date().toISOString(),
+      disclaimer:
+        'AI structural audit based on the handle and platform best practices. Not live platform analytics — Signal does not read private platform data.',
+    });
+  } catch {
+    res.status(502).json({
+      success: false,
+      error: 'Diagnostic engine unreachable — the AI provider chain is down. Try again shortly.',
+    });
+  }
+});
+
 const handleWriterWorker = async (req: any, res: any) => {
   const { summary, details, type } = req.body || {};
   try {
