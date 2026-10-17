@@ -6,7 +6,9 @@ import fs from 'fs';
 import path from 'path';
 import { withStoreLock } from '../utils/storeLock';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+import { getDataDir } from './dataDir';
+
+const DATA_DIR = getDataDir();
 const STORE_FILE = path.join(DATA_DIR, 'chat-sessions.json');
 
 const MAX_SESSIONS_PER_USER = 100;

@@ -116,25 +116,37 @@ Complete list — also mirrored in `.env.example` with placeholder values.
 
 ---
 
-## 5b. Persistent Data (`./data/` directory) — READ BEFORE LAUNCH
+## 5b. Persistent Data (`DATA_DIR`) — READ BEFORE LAUNCH
 
-The server keeps **filesystem stores** under `./data/` in the working directory:
+The server keeps **filesystem stores** under a single data directory, resolved by
+`lib/data/dataDir.ts`:
 
-| Path | Contents |
+| Path (under the data dir) | Contents |
 |---|---|
-| `data/chat-sessions.json` | PRIME chat history (sessions + messages) |
-| `data/artifacts.json` | generated artifacts (websites/docs/sheets) |
-| `data/uploads/<builderId>/` | uploaded files (up to 100MB each) |
-| `data/rag/` + related | RAG index built from uploads (auto-used in PRIME answers) |
+| `chat-sessions.json` | PRIME chat history (sessions + messages) |
+| `artifacts.json` | generated artifacts (websites/docs/sheets) |
+| `uploads/<builderId>/` | uploaded files (up to 100MB each) |
+| `rag/` + related | RAG index built from uploads (auto-used in PRIME answers) |
 | memory / entitlements / signal / hub / template stores | user state, Pro+ entitlements, radar data |
 
-**Render Free's disk is ephemeral**: every redeploy/restart/sleep-cycle wipes `./data/`. Your options:
+**Resolution rule:**
+- `DATA_DIR` env var set → that path (created on demand) is used.
+- Unset → `<cwd>/data` (local dev default, unchanged).
 
-1. **Accept resets (free):** everything rebuilt from Supabase where possible; chat history and uploads reset on each deploy.
-2. **Persistent disk (paid):** Render dashboard → service → **Disks** → create a disk and mount it at the service root working directory (Starter plan+). All `./data` then survives redeploys.
-3. **Hybrid:** keep Supabase as the durable source of truth (payments, admin, memory facts already sync there); treat fs stores as cache.
+**`render.yaml` already wires this up:** a 1GB disk mounted at `/var/data` plus
+`DATA_DIR=/var/data`, so chat history, artifacts, uploads, and the RAG index
+**survive redeploys and restarts**.
 
-Uploads also consume disk space (`100MB × users`) — size the disk accordingly if you enable persistence.
+> ⚠️ Render **disks require the Starter plan ($7/mo)**. If you stay on Free:
+> delete the `disk:` block **and** the `DATA_DIR` env var from `render.yaml` —
+> everything still works, but `./data` resets on every redeploy.
+
+Local override example (test persistence on any machine):
+```
+DATA_DIR=/var/data npm run dev
+```
+
+Uploads consume disk space (`100MB × users`) — grow `sizeGB` in `render.yaml` as needed.
 
 ---
 
@@ -183,7 +195,7 @@ First steady-state cost: domain (~$12/year) + transaction fees after your first 
 - [ ] Paystack **live** keys set (`sk_live_` / `pk_live_`) and webhook fires (dashboard → Webhooks log).
 - [ ] `GROQ_API_KEY` set and verified (`GET /api/ai/status` → `groq.configured: true`).
 - [ ] `OPENAI_API_KEY` set **only if** OpenAI credits are topped up (otherwise leave unset — Groq serves everything; the breaker auto-resumes when credits return).
-- [ ] Decision recorded: `./data/` persistence — persistent disk mounted, or accept resets on redeploy (§5b).
+- [ ] **Disk decision:** Starter plan+ → keep `disk:` + `DATA_DIR` in render.yaml (data persists). Free plan → delete both blocks (data resets each deploy). See §5b.
 - [ ] Optional: `NEXT_PUBLIC_GIPHY_API_KEY` set for GIF search.
 - [ ] Both cron jobs saved with the secret header.
 - [ ] Smoke test: register → subscribe (test key) → entitlement active; PRIME chat answers offline-labelled when keys are absent.

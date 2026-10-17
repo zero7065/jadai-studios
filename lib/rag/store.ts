@@ -14,7 +14,9 @@ import path from 'path';
 import { Chunk, chunkText } from './chunker';
 import { embedText, cosineSim, EMBED_DIM } from './embed';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+import { getDataDir } from '../data/dataDir';
+
+const DATA_DIR = getDataDir();
 const STORE_FILE = path.join(DATA_DIR, 'rag_store.json');
 
 export interface IndexedChunk {

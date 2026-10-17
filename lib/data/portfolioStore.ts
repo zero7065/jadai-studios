@@ -6,7 +6,9 @@ import fs from 'fs';
 import path from 'path';
 import { SEED_PORTFOLIO, PortfolioProject } from './portfolio';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+import { getDataDir } from './dataDir';
+
+const DATA_DIR = getDataDir();
 const STORE_FILE = path.join(DATA_DIR, 'admin-portfolio.json');
 
 interface PortfolioStore {

@@ -7,7 +7,9 @@ import path from 'path';
 import { supabaseAdmin } from '../supabase/admin';
 import { withStoreLock, withStoreLockSync } from '../utils/storeLock';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+import { getDataDir } from '../data/dataDir';
+
+const DATA_DIR = getDataDir();
 const STORE_FILE = path.join(DATA_DIR, 'entitlements.json');
 
 export interface EntitlementRecord {

@@ -22,7 +22,9 @@ export interface DeploymentRecord {
   archiveName?: string;
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+import { getDataDir } from './dataDir';
+
+const DATA_DIR = getDataDir();
 const REGISTRY_FILE = path.join(DATA_DIR, 'deployments.json');
 const DIST_ROOT = path.join(process.cwd(), 'dist');
 const PUBLIC_ROOT = path.join(process.cwd(), 'public');

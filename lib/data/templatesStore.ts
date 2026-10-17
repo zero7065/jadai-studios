@@ -7,7 +7,9 @@ import fs from 'fs';
 import path from 'path';
 import { SEED_TEMPLATES, TemplateItem } from './templates';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+import { getDataDir } from './dataDir';
+
+const DATA_DIR = getDataDir();
 const STORE_FILE = path.join(DATA_DIR, 'admin-templates.json');
 const BUNDLE_DIR = path.join(DATA_DIR, 'template-bundles');
 

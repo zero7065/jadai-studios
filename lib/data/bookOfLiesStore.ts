@@ -9,7 +9,9 @@ import path from 'path';
 import { withStoreLock } from '../utils/storeLock';
 import type { BookOfLiesEpisode } from './book-of-lies-anthology';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+import { getDataDir } from './dataDir';
+
+const DATA_DIR = getDataDir();
 const STORE_FILE = path.join(DATA_DIR, 'book-of-lies-custom.json');
 
 export const MAX_CUSTOM_EPISODES = 200;

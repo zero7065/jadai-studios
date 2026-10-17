@@ -6,7 +6,9 @@
 import fs from 'fs';
 import path from 'path';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+import { getDataDir } from '../data/dataDir';
+
+const DATA_DIR = getDataDir();
 const STORE_FILE = path.join(DATA_DIR, 'ai_memory.json');
 
 export type MemoryType = 'profile' | 'goal' | 'preference' | 'pattern' | 'insight' | 'context';

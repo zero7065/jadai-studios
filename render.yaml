@@ -1,26 +1,35 @@
-# JADAI STUDIOS — Render free-tier API service
+# JADAI STUDIOS — Render API service
 # Frontend: Cloudflare Pages (static, dist/)  →  proxies /api/* and /s/* here.
 # Alternative: set SERVE_STATIC=1 to let this service serve the SPA too (no Pages needed).
 #
-# PERSISTENT DATA: the server writes fs stores under ./data/ (chat sessions,
-# artifacts, uploaded files + RAG index, memory, entitlements, signal stores).
-# Render Free's disk is EPHEMERAL — all ./data is wiped on every redeploy/restart.
-# To keep user data across deploys: Render dashboard → service → Disks →
-# add a disk mounted at the working directory (Starter plan+), or accept resets.
+# PERSISTENT DATA: the server writes fs stores under DATA_DIR (default ./data):
+# chat sessions, artifacts, uploaded files + RAG index, memory, entitlements,
+# signal stores. The `disk` block below mounts a persistent disk at /var/data
+# and DATA_DIR points the server there, so all of it survives redeploys.
+#
+# NOTE: Render disks require the Starter plan ($7/mo). If you stay on Free,
+# DELETE the `disk:` block and the DATA_DIR env var — everything still works,
+# but ./data resets on every redeploy/restart (see docs/02-DEPLOYMENT.md §5b).
 services:
   - type: web
     name: jadai-api
     runtime: node
-    plan: free
+    plan: free            # upgrade to starter in the dashboard to use the disk
     region: oregon
     buildCommand: npm ci
     startCommand: npm run start
     healthCheckPath: /api/health
+    disk:
+      name: jadai-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
       - key: SERVE_STATIC
         value: "0"
+      - key: DATA_DIR
+        value: /var/data
       - key: SESSION_SECRET
         generateValue: true
       - key: CRON_SECRET

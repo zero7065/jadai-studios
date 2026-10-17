@@ -28,6 +28,7 @@ import { shortLinksDb, createShortLink } from './lib/shortlinks';
 import { listTemplates, saveTemplate, deleteTemplate, saveTemplateBundle } from './lib/data/templatesStore';
 import { listActiveHubListings, insertHubListing } from './lib/data/hubStore';
 import { insertDreamIntake } from './lib/data/dreamForgeStore';
+import { getDataDir } from './lib/data/dataDir';
 import { getAdminEmail, getAdminPasswordHash, setAdminCredentials, getAdminRecoveryCode, setAdminRecoveryCode } from './lib/data/adminCredentialsStore';
 import { getCustomEpisodes, saveCustomEpisodes, appendCustomEpisode } from './lib/data/bookOfLiesStore';
 import {
@@ -2289,7 +2290,7 @@ async function startServer() {
   // /api/ai/chat already retrieves from. Images/other binaries are STORED
   // (honest: not read - no vision provider configured).
   // ---------------------------------------------------------------------------
-  const uploadsDir = path.join(process.cwd(), 'data', 'uploads');
+  const uploadsDir = path.join(getDataDir(), 'uploads');
   const uploadTmpDir = path.join(uploadsDir, 'tmp');
   const uploadMulter = multer({
     storage: multer.diskStorage({
