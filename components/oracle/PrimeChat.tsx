@@ -1,17 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GlassCard from '../ui/GlassCard';
 import Button from '../ui/Button';
 import MemoryIndicator, { UserMemoryItem } from './MemoryIndicator';
 import StreamingResponse from './StreamingResponse';
 import OracleMessageContent from './OracleMessageContent';
 import StatusBadge from '../ui/StatusBadge';
-import { Send, Sparkles, Terminal, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Send, Terminal, RotateCcw, Paperclip, Smile, ImageIcon, FileCode, Plus, FolderOpen } from 'lucide-react';
 import type { PrimePersona } from '../../lib/ai/prompts';
 import { useToast } from '../providers/ToastProvider';
 import UpgradeModal from '../auth/UpgradeModal';
 import AuthModal from '../auth/AuthModal';
-import { checkToolAccess, recordModuleExecution } from '../../lib/supabase/gates';
-import { askPrime, fetchServerMemory } from '../../lib/ai/memory';
+import { checkToolAccess, recordModuleExecution, getActiveUser } from '../../lib/supabase/gates';
+import { askPrime, fetchServerMemory, getBuilderId } from '../../lib/ai/memory';
 
 export interface ChatMessage {
   id: string;
@@ -20,6 +20,10 @@ export interface ChatMessage {
   isStreaming?: boolean;
   provider?: string;
   timestamp: string;
+  artifact?: { id: string; title: string; type: string; previewUrl: string; downloadUrl: string };
+  attachment?: { name: string; parsed: boolean; note?: string };
+  image?: string;
+  gif?: string;
 }
 
 export interface PrimeChatProps {
@@ -34,6 +38,19 @@ const QUICK_PROMPTS = [
   "How do I structure my team when resources are scarce?",
   "Refactor this architectural dilemma down to first principles.",
 ];
+
+const EMOJIS = ['😀','😂','🥲','😍','🤩','😎','🤔','🤯','😱','🙌','👏','🔥','✨','⚡','💯','🚀','🛠','📈','📉','🧠','🤝','🙏','💪','🎯','🧩','💾','🔒','🗝','🌌','⭐'];
+
+function welcomeMsg(persona: string): ChatMessage {
+  return {
+    id: 'msg-welcome',
+    role: 'assistant',
+    content: `I am PRIME. I observe your architectures, remember your decisions, and speak truth over comfort.\n\nMode: ${persona.toUpperCase()}. State your current challenge or vector of inquiry.`,
+    isStreaming: false,
+    provider: 'prime-core',
+    timestamp: new Date().toISOString(),
+  };
+}
 
 export const PrimeChat: React.FC<PrimeChatProps> = ({
   initialPersona = 'The Architect',
@@ -89,8 +106,56 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [pendingText, setPendingText] = useState<string | null>(null);
 
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<Array<{ id: string; title: string; updatedAt: string; messageCount: number }>>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [gifQuery, setGifQuery] = useState('');
+  const [gifResults, setGifResults] = useState<Array<{ url: string; title: string }>>([]);
+  const [gifLoading, setGifLoading] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
+
+  // Tracks the user/assistant text of the exchange currently in flight so we can
+  // persist it to the server session once a reply (or fallback) is produced.
+  const pendingExchangeRef = useRef<{ user: string; assistant?: string; provider?: string } | null>(null);
+
+  const refreshSessions = useCallback(async () => {
+    try {
+      const bid = getBuilderId();
+      const res = await fetch(`/api/chat/sessions?builderId=${encodeURIComponent(bid)}`);
+      const data = await res.json();
+      if (data?.success && Array.isArray(data.sessions)) {
+        setSessions(
+          data.sessions.map((s: any) => ({
+            id: s.id,
+            title: s.title,
+            updatedAt: s.updatedAt,
+            messageCount: s.messages?.length ?? 0,
+          }))
+        );
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    void refreshSessions();
+  }, [refreshSessions]);
+
+  // Close the emoji/gif picker on outside click
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [pickerOpen]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -158,6 +223,7 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setLoading(true);
+    pendingExchangeRef.current = { user: textToSend.trim() };
 
     const today = new Date().toISOString().slice(0, 10);
     const newUsage = dailyQueriesUsed + 1;
@@ -197,6 +263,12 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
 
       setMessages((prev) => [...prev, assistantMsg]);
       await recordModuleExecution('oracle', access.userEmail, access.userId);
+      if (pendingExchangeRef.current) {
+        pendingExchangeRef.current.assistant = responseText;
+        pendingExchangeRef.current.provider = providerUsed;
+        void persistExchange(sessionId, pendingExchangeRef.current.user, responseText, providerUsed);
+        pendingExchangeRef.current = null;
+      }
 
       // Check if memory should be added — deterministic upsert, not coin-flip
       if (textToSend.length > 30) {
@@ -231,6 +303,11 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
           timestamp: new Date().toISOString(),
         },
       ]);
+      if (pendingExchangeRef.current) {
+        pendingExchangeRef.current.assistant = `[OFFLINE STUDY - not a live PRIME answer]\n\n${fallbackText}`;
+        void persistExchange(sessionId, pendingExchangeRef.current.user, pendingExchangeRef.current.assistant, 'offline-fallback');
+        pendingExchangeRef.current = null;
+      }
     } finally {
       setLoading(false);
     }
@@ -238,22 +315,228 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
 
   const handleClearHistory = () => {
     if (confirm('Clear conversational transcript? Memories will remain preserved.')) {
-      setMessages([
-        {
-          id: 'welcome',
-          role: 'assistant',
-          content: 'Memory ledger preserved. Conversation transcript cleared.',
-          timestamp: new Date().toISOString(),
-        },
-      ]);
+      setMessages([welcomeMsg(initialPersona)]);
+      setSessionId(null);
       if (typeof window !== 'undefined') {
         localStorage.removeItem('jadai-oracle-messages');
       }
+      void refreshSessions();
     }
   };
 
   const handleDeleteMemory = (id: string) => {
     setMemories((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  // Persist a finished exchange (user + assistant) to the server session.
+  const persistExchange = useCallback(
+    async (sid: string | null, userContent: string, assistantContent: string, provider?: string) => {
+      const bid = getBuilderId();
+      let currentSid = sid;
+      try {
+        if (!currentSid) {
+          const created = await fetch('/api/chat/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ builderId: bid, title: userContent.slice(0, 60) }),
+          });
+          const data = await created.json();
+          if (data?.success && data.session?.id) {
+            currentSid = data.session.id;
+            setSessionId(currentSid);
+          }
+        }
+        if (!currentSid) return;
+        await fetch(`/api/chat/sessions/${currentSid}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            builderId: bid,
+            messages: [
+              { role: 'user', content: userContent.slice(0, 32000), createdAt: new Date().toISOString() },
+              {
+                role: 'assistant',
+                content: assistantContent.slice(0, 32000),
+                provider,
+                createdAt: new Date().toISOString(),
+              },
+            ],
+          }),
+        });
+        void refreshSessions();
+      } catch {}
+    },
+    [refreshSessions]
+  );
+
+  const loadSession = useCallback(
+    async (sid: string) => {
+      try {
+        const bid = getBuilderId();
+        const res = await fetch(`/api/chat/sessions/${sid}?builderId=${encodeURIComponent(bid)}`);
+        const data = await res.json();
+        if (data?.success && data.session) {
+          const loaded: ChatMessage[] = (data.session.messages || []).map((m: any) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            provider: m.provider,
+            timestamp: m.createdAt,
+            isStreaming: false,
+          }));
+          setMessages(loaded.length ? loaded : [welcomeMsg(initialPersona)]);
+          setSessionId(sid);
+          setHistoryOpen(false);
+        }
+      } catch {
+        showToast('Could not load that session.', 'error', 'Session');
+      }
+    },
+    [initialPersona, showToast]
+  );
+
+  const startNewSession = useCallback(() => {
+    setMessages([welcomeMsg(initialPersona)]);
+    setSessionId(null);
+    setHistoryOpen(false);
+  }, [initialPersona]);
+
+  // File upload -> server parses + indexes into the builder's RAG knowledge base.
+  const handleFileUpload = async (file: File) => {
+    const bid = getBuilderId();
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('builderId', bid);
+      const res = await fetch('/api/uploads', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || `Upload failed (${res.status})`);
+      }
+      const attachMsg: ChatMessage = {
+        id: `att-${Date.now()}`,
+        role: 'user',
+        content: `📎 Uploaded "${data.title}" (${(data.bytes / 1024).toFixed(0)} KB)`,
+        timestamp: new Date().toISOString(),
+        attachment: { name: data.title, parsed: data.parsed, note: data.note },
+      };
+      setMessages((prev) => [...prev, attachMsg]);
+      showToast(data.note, data.parsed ? 'success' : 'info', 'Upload Indexed');
+      void persistExchange(sessionId, attachMsg.content, data.note, 'uploads');
+    } catch (err: any) {
+      showToast(err?.message || 'Upload failed.', 'error', 'Upload');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // Artifact generation via /api/artifacts/generate -> attach a live preview card.
+  const handleGenerateArtifact = async () => {
+    const prompt = input.trim();
+    if (prompt.length < 8) {
+      showToast('Describe the artifact in at least 8 characters first.', 'info', 'Artifacts');
+      return;
+    }
+    const access = await checkToolAccess('oracle');
+    if (!access.allowed) {
+      setPendingText(prompt);
+      access.reason === 'unauthenticated' ? setAuthModalOpen(true) : setUpgradeModalOpen(true);
+      return;
+    }
+    setGenerating(true);
+    const bid = getBuilderId();
+    try {
+      const res = await fetch('/api/artifacts/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ builderId: bid, prompt, type: 'website' }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) throw new Error(data?.error || `Artifact generation failed (${res.status})`);
+      const artMsg: ChatMessage = {
+        id: `art-${Date.now()}`,
+        role: 'assistant',
+        content: `Generated artifact "${data.artifact.title}" via ${data.provider || 'AI'}.`,
+        provider: data.provider || 'artifact',
+        timestamp: new Date().toISOString(),
+        artifact: {
+          id: data.artifact.id,
+          title: data.artifact.title,
+          type: data.artifact.type,
+          previewUrl: data.previewUrl,
+          downloadUrl: data.downloadUrl,
+        },
+      };
+      setMessages((prev) => [...prev, artMsg]);
+      setMessages((prev) => [
+        ...prev,
+        { id: `u-${Date.now()}`, role: 'user', content: `🛠 Generate artifact: ${prompt}`, timestamp: new Date().toISOString() },
+      ]);
+      setInput('');
+      showToast(`"${data.artifact.title}" ready — live preview attached.`, 'success', 'Artifact');
+      void persistExchange(sessionId, `🛠 Generate artifact: ${prompt}`, artMsg.content, data.provider);
+    } catch (err: any) {
+      showToast(err?.message || 'Artifact generation failed.', 'error', 'Artifacts');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const searchGifs = async () => {
+    const q = gifQuery.trim();
+    if (!q) return;
+    setGifLoading(true);
+    try {
+      const key = process.env.NEXT_PUBLIC_GIPHY_API_KEY || '';
+      if (!key) {
+        showToast(
+          'GIF search needs a GIPHY API key. Set NEXT_PUBLIC_GIPHY_API_KEY in .env (get one free at developers.giphy.com). Emojis still work.',
+          'error',
+          'GIFs unavailable'
+        );
+        return;
+      }
+      const res = await fetch(
+        `https://api.giphy.com/v1/gifs/search?api_key=${key}&q=${encodeURIComponent(q)}&limit=12&rating=g&lang=en`
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || (data?.meta && data.meta.status !== 200)) {
+        const msg = data?.meta?.msg || `HTTP ${res.status}`;
+        showToast(`GIF provider rejected the request (${msg}). Add or renew NEXT_PUBLIC_GIPHY_API_KEY.`, 'error', 'GIFs unavailable');
+        return;
+      }
+      const items: Array<{ url: string; title: string }> = (data?.data || [])
+        .map((g: any) => ({ url: g?.images?.fixed_width?.url, title: g?.title || q }))
+        .filter((g: any) => !!g.url);
+      setGifResults(items);
+      if (!items.length) showToast('No GIFs found for that query.', 'info', 'GIFs');
+    } catch {
+      showToast('GIF search unavailable right now.', 'error', 'GIFs');
+    } finally {
+      setGifLoading(false);
+    }
+  };
+
+  const insertGif = (url: string) => {
+    const gifMsg: ChatMessage = {
+      id: `gif-${Date.now()}`,
+      role: 'user',
+      content: '',
+      timestamp: new Date().toISOString(),
+      gif: url,
+    };
+    setMessages((prev) => [...prev, gifMsg]);
+    setPickerOpen(false);
+    setGifQuery('');
+    setGifResults([]);
+    void persistExchange(sessionId, '🎞 Sent a GIF', '📎 GIF shared', 'gif');
+  };
+
+  const insertEmoji = (emoji: string) => {
+    setInput((prev) => prev + emoji);
+    setPickerOpen(false);
   };
 
   return (
@@ -292,6 +575,22 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
           )}
 
           <button
+            onClick={() => setHistoryOpen((v) => !v)}
+            className={`p-1.5 rounded border transition-colors cursor-pointer ${historyOpen ? 'border-[#C9A84C] text-[#C9A84C]' : 'border-[rgba(201,168,76,0.2)] text-[#8a6e2a] hover:text-[#C9A84C]'}`}
+            title="Chat history"
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            onClick={startNewSession}
+            className="p-1.5 rounded border border-[rgba(201,168,76,0.2)] text-[#8a6e2a] hover:text-[#C9A84C] transition-colors cursor-pointer"
+            title="New session"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+
+          <button
             onClick={handleClearHistory}
             className="p-1.5 rounded border border-[rgba(201,168,76,0.2)] text-[#8a6e2a] hover:text-[#C0392B] transition-colors cursor-pointer"
             title="Clear Chat History"
@@ -300,6 +599,38 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
           </button>
         </div>
       </GlassCard>
+
+      {/* Session History Panel */}
+      {historyOpen && (
+        <GlassCard className="p-4 border-[rgba(201,168,76,0.25)]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-mono text-xs text-[#e8c96a]">SAVED SESSIONS ({sessions.length})</span>
+            <button onClick={() => setHistoryOpen(false)} className="text-[#8a6e2a] hover:text-[#C9A84C] text-xs font-mono cursor-pointer">close</button>
+          </div>
+          {sessions.length === 0 ? (
+            <p className="text-[11px] font-mono text-[#8a6e2a]">No saved sessions yet. Start a conversation and it will be persisted here.</p>
+          ) : (
+            <div className="max-h-56 overflow-y-auto space-y-1">
+              {sessions.map((s) => (
+                <div
+                  key={s.id}
+                  className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded border text-[11px] font-mono cursor-pointer transition-colors ${
+                    s.id === sessionId
+                      ? 'border-[#C9A84C] bg-[rgba(201,168,76,0.08)] text-[#f5f3f0]'
+                      : 'border-[rgba(201,168,76,0.12)] text-[#c4c0bb] hover:border-[#C9A84C]'
+                  }`}
+                  onClick={() => loadSession(s.id)}
+                >
+                  <span className="truncate flex-1">{s.title || 'Untitled session'}</span>
+                  <span className="text-[10px] text-[#8a6e2a] shrink-0">
+                    {s.messageCount} msg • {new Date(s.updatedAt).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      )}
 
       {/* Terminal Chat Box */}
       <GlassCard className="p-4 sm:p-6 h-[560px] flex flex-col justify-between border-[rgba(201,168,76,0.25)] bg-[#050404]/90 relative overflow-hidden">
@@ -335,6 +666,47 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
                   ) : (
                     <OracleMessageContent content={m.content} />
                   )}
+
+                  {m.attachment && (
+                    <div className="mt-2 text-[11px] font-mono text-[#8a6e2a] border border-[rgba(201,168,76,0.2)] rounded px-2 py-1.5">
+                      📎 {m.attachment.name}
+                      <span className="block text-[10px] text-[#6b5520]">{m.attachment.note}</span>
+                    </div>
+                  )}
+
+                  {m.image && (
+                    <img src={m.image} alt="Generated" className="mt-2 max-w-[280px] rounded border border-[rgba(201,168,76,0.25)]" />
+                  )}
+
+                  {m.gif && <img src={m.gif} alt="GIF" className="mt-2 max-w-[220px] rounded border border-[rgba(201,168,76,0.25)]" />}
+
+                  {m.artifact && (
+                    <div className="mt-2 w-[320px] max-w-full rounded border border-[rgba(201,168,76,0.3)] bg-[#0a0908] overflow-hidden">
+                      <iframe
+                        src={m.artifact.previewUrl}
+                        title={m.artifact.title}
+                        sandbox="allow-scripts allow-modals allow-forms allow-popups"
+                        className="w-full h-44 border-0 bg-white"
+                      />
+                      <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 border-t border-[rgba(201,168,76,0.2)]">
+                        <span className="truncate text-[11px] font-mono text-[#e8c96a]">{m.artifact.title}</span>
+                        <a
+                          href={m.artifact.previewUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] font-mono text-[#C9A84C] hover:underline shrink-0"
+                        >
+                          open ↗
+                        </a>
+                        <a
+                          href={m.artifact.downloadUrl}
+                          className="text-[10px] font-mono text-[#8a6e2a] hover:text-[#C9A84C] shrink-0"
+                        >
+                          ↓ save
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -363,6 +735,67 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
           ))}
         </div>
 
+        {/* Emoji / GIF Picker */}
+        {pickerOpen && (
+          <div ref={pickerRef} className="mb-3 rounded border border-[rgba(201,168,76,0.25)] bg-[#0a0908] p-2.5">
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                onClick={() => setPickerOpen(false)}
+                className="text-[10px] font-mono px-2 py-1 rounded border border-[rgba(201,168,76,0.2)] text-[#C9A84C] cursor-pointer"
+              >
+                EMOJI
+              </button>
+              <div className="flex items-center gap-1.5 flex-1">
+                <input
+                  value={gifQuery}
+                  onChange={(e) => setGifQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      searchGifs();
+                    }
+                  }}
+                  placeholder="Search GIFs..."
+                  className="flex-1 px-2 py-1 rounded bg-[#050404] border border-[rgba(201,168,76,0.2)] text-[#f5f3f0] font-mono text-[11px] focus:outline-none focus:border-[#C9A84C]"
+                />
+                <button
+                  onClick={searchGifs}
+                  disabled={gifLoading || !gifQuery.trim()}
+                  className="text-[10px] font-mono px-2 py-1 rounded border border-[rgba(201,168,76,0.2)] text-[#C9A84C] disabled:opacity-40 cursor-pointer"
+                >
+                  {gifLoading ? '...' : 'GIF'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-10 gap-1 max-h-20 overflow-y-auto">
+              {EMOJIS.map((em) => (
+                <button
+                  key={em}
+                  onClick={() => insertEmoji(em)}
+                  className="text-lg hover:bg-[rgba(201,168,76,0.15)] rounded cursor-pointer leading-none"
+                >
+                  {em}
+                </button>
+              ))}
+            </div>
+
+            {gifResults.length > 0 && (
+              <div className="grid grid-cols-4 gap-1.5 mt-2 max-h-40 overflow-y-auto">
+                {gifResults.map((g, i) => (
+                  <button
+                    key={i}
+                    onClick={() => insertGif(g.url)}
+                    className="rounded overflow-hidden border border-[rgba(201,168,76,0.2)] hover:border-[#C9A84C] cursor-pointer"
+                  >
+                    <img src={g.url} alt={g.title} className="w-full h-16 object-cover" loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Input Bar */}
         <form
           onSubmit={(e) => {
@@ -371,6 +804,41 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
           }}
           className="flex items-center gap-2"
         >
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept=".txt,.md,.pdf,.docx,.zip,.csv,.json,.log,.html,.png,.jpg,.jpeg,.gif,.webp"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleFileUpload(f);
+            }}
+          />
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || loading}
+            className="p-2 rounded border border-[rgba(201,168,76,0.2)] text-[#8a6e2a] hover:text-[#C9A84C] transition-colors cursor-pointer disabled:opacity-40"
+            title="Upload a file (indexed into your knowledge base)"
+          >
+            {uploading ? (
+              <span className="inline-block w-3.5 h-3.5 border-2 border-[#C9A84C] border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Paperclip className="w-4 h-4" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPickerOpen((v) => !v)}
+            disabled={loading}
+            className={`p-2 rounded border transition-colors cursor-pointer disabled:opacity-40 ${pickerOpen ? 'border-[#C9A84C] text-[#C9A84C]' : 'border-[rgba(201,168,76,0.2)] text-[#8a6e2a] hover:text-[#C9A84C]'}`}
+            title="Emoji & GIFs"
+          >
+            <Smile className="w-4 h-4" />
+          </button>
+
           <div className="relative flex-1">
             <Terminal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8a6e2a]" />
             <input
@@ -382,6 +850,20 @@ export const PrimeChat: React.FC<PrimeChatProps> = ({
               className="w-full pl-9 pr-4 py-2.5 rounded bg-[#050404] border border-[rgba(201,168,76,0.25)] text-[#f5f3f0] font-mono text-xs focus:outline-none focus:border-[#C9A84C]"
             />
           </div>
+
+          <button
+            type="button"
+            onClick={handleGenerateArtifact}
+            disabled={loading || generating || input.trim().length < 8}
+            className="p-2 rounded border border-[rgba(201,168,76,0.2)] text-[#8a6e2a] hover:text-[#C9A84C] transition-colors cursor-pointer disabled:opacity-40"
+            title="Generate a live-preview artifact from this prompt"
+          >
+            {generating ? (
+              <span className="inline-block w-3.5 h-3.5 border-2 border-[#C9A84C] border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <FileCode className="w-4 h-4" />
+            )}
+          </button>
 
           <Button type="submit" size="md" disabled={loading || !input.trim()}>
             <Send className="w-4 h-4" />

@@ -1,7 +1,9 @@
 import './lib/env';
 import express from 'express';
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
+import multer from 'multer';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { getPublicHealth } from './lib/diagnostics/health';
@@ -28,6 +30,20 @@ import { listActiveHubListings, insertHubListing } from './lib/data/hubStore';
 import { insertDreamIntake } from './lib/data/dreamForgeStore';
 import { getAdminEmail, getAdminPasswordHash, setAdminCredentials, getAdminRecoveryCode, setAdminRecoveryCode } from './lib/data/adminCredentialsStore';
 import { getCustomEpisodes, saveCustomEpisodes, appendCustomEpisode } from './lib/data/bookOfLiesStore';
+import {
+  listSessions as listChatSessions,
+  getSession as getChatSession,
+  createSession as createChatSession,
+  appendMessages as appendChatMessages,
+  deleteSession as deleteChatSession,
+} from './lib/data/chatSessionsStore';
+import {
+  saveArtifact,
+  getArtifact,
+  listArtifacts,
+  deleteArtifact,
+  sanitizeFiles,
+} from './lib/data/artifactsStore';
 import {
   grantSubscriptionFs,
   recordTemplateOrderFs,
@@ -2265,6 +2281,408 @@ async function startServer() {
     const memWiped = wipeMemory(builderId);
     res.json({ success: true, removed: ragWiped + memWiped, rag: ragWiped, memory: memWiped, scope: 'all' });
   });
+
+  // ---------------------------------------------------------------------------
+  // FILE UPLOADS -> RAG KNOWLEDGE BASE
+  // Multipart, 100MB cap. Text extraction (txt/md/csv/json/log/html, PDF,
+  // DOCX, ZIP of those) -> indexed into the builder's RAG collection, which
+  // /api/ai/chat already retrieves from. Images/other binaries are STORED
+  // (honest: not read - no vision provider configured).
+  // ---------------------------------------------------------------------------
+  const uploadsDir = path.join(process.cwd(), 'data', 'uploads');
+  const uploadTmpDir = path.join(uploadsDir, 'tmp');
+  const uploadMulter = multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => {
+        try {
+          fs.mkdirSync(uploadTmpDir, { recursive: true });
+        } catch {}
+        cb(null, uploadTmpDir);
+      },
+      filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname || '').slice(0, 12);
+        cb(null, `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}${ext}`);
+      },
+    }),
+    limits: { fileSize: 100 * 1024 * 1024, files: 1 },
+  });
+
+  const TEXT_EXTS = new Set(['.txt', '.md', '.markdown', '.csv', '.tsv', '.json', '.log', '.html', '.htm', '.xml', '.yml', '.yaml']);
+  const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp']);
+
+  let pdfjsModule: any = null;
+  async function loadPdfjs(): Promise<any> {
+    if (pdfjsModule) return pdfjsModule;
+    const mod: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    pdfjsModule = mod.getDocument ? mod : mod.default;
+    return pdfjsModule;
+  }
+
+  async function extractPdfText(buffer: Buffer): Promise<string> {
+    const lib = await loadPdfjs();
+    const doc = await lib.getDocument({
+      data: new Uint8Array(buffer),
+      isEvalSupported: false,
+      useSystemFonts: false,
+      disableFontFace: true,
+    }).promise;
+    const parts: string[] = [];
+    const maxPages = Math.min(doc.numPages, 200);
+    for (let i = 1; i <= maxPages; i++) {
+      const page = await doc.getPage(i);
+      const tc = await page.getTextContent();
+      parts.push(tc.items.map((it: any) => it.str).join(' '));
+    }
+    try {
+      await doc.destroy();
+    } catch {}
+    return parts.join('\n');
+  }
+
+  async function extractDocxText(buffer: Buffer): Promise<string> {
+    const mammothMod: any = await import('mammoth');
+    const mammoth = mammothMod.default || mammothMod;
+    const result = await mammoth.extractRawText({ buffer });
+    return result?.value || '';
+  }
+
+  async function extractZipTexts(buffer: Buffer): Promise<Array<{ name: string; text: string }>> {
+    const AdmZipMod: any = await import('adm-zip');
+    const AdmZip = AdmZipMod.default || AdmZipMod;
+    const zip = new AdmZip(buffer);
+    const out: Array<{ name: string; text: string }> = [];
+    const entries = zip.getEntries().filter((e: any) => !e.isDirectory).slice(0, 25);
+    for (const entry of entries) {
+      const name = String(entry.entryName || '').slice(0, 200);
+      const ext = path.extname(name).toLowerCase();
+      try {
+        if (TEXT_EXTS.has(ext)) {
+          out.push({ name, text: entry.getData().toString('utf8').slice(0, 200000) });
+        } else if (ext === '.pdf') {
+          out.push({ name, text: (await extractPdfText(entry.getData())).slice(0, 200000) });
+        } else if (ext === '.docx') {
+          out.push({ name, text: (await extractDocxText(entry.getData())).slice(0, 200000) });
+        }
+      } catch {}
+    }
+    return out;
+  }
+
+  app.post('/api/uploads', rateLimit('uploads', { max: 20 }), (req, res) => {
+    uploadMulter.single('file')(req, res, async (err) => {
+      if (err) {
+        const tooBig = (err as any).code === 'LIMIT_FILE_SIZE';
+        return res
+          .status(tooBig ? 413 : 400)
+          .json({ success: false, error: tooBig ? 'File exceeds the 100MB upload limit.' : err.message || 'Upload failed' });
+      }
+      const builderId = req.body?.builderId || req.query.builderId;
+      if (!isValidBuilderId(builderId)) {
+        return res.status(400).json({ success: false, error: 'Valid builderId required' });
+      }
+      const file = req.file;
+      if (!file) return res.status(400).json({ success: false, error: 'No file provided (field name: file)' });
+
+      try {
+        const originalName = path.basename(file.originalname || 'upload').slice(0, 200);
+        const ext = path.extname(originalName).toLowerCase();
+        const buffer = fs.readFileSync(file.path);
+
+        const userDir = path.join(uploadsDir, builderId);
+        fs.mkdirSync(userDir, { recursive: true });
+        const docId = `upl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        const storedName = `${docId}_${originalName.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80)}`;
+        fs.writeFileSync(path.join(userDir, storedName), buffer);
+
+        let extracted = '';
+        const zipParts: Array<{ name: string; text: string }> = [];
+        try {
+          if (ext === '.pdf') extracted = await extractPdfText(buffer);
+          else if (ext === '.docx') extracted = await extractDocxText(buffer);
+          else if (ext === '.zip') {
+            const parts = await extractZipTexts(buffer);
+            zipParts.push(...parts);
+            extracted = parts.map((p) => `--- ${p.name} ---\n${p.text}`).join('\n\n');
+          } else if (TEXT_EXTS.has(ext) || !ext) {
+            extracted = buffer.toString('utf8');
+          }
+        } catch (extractErr: any) {
+          console.warn('[uploads] extraction failed for', originalName, '->', extractErr?.message || extractErr);
+          extracted = '';
+        }
+
+        extracted = extracted.replace(/\u0000/g, '').trim();
+        let chunks = 0;
+        if (extracted.length >= 10) {
+          const ingested: any = ingestRagDocument({
+            builderId,
+            docId,
+            title: originalName,
+            text: extracted.slice(0, 300000),
+            scope: 'knowledge',
+          });
+          chunks = Number(ingested?.chunks) || 0;
+        }
+        if (ext === '.zip') {
+          for (const zp of zipParts) {
+            if (zp.text.trim().length < 10) continue;
+            try {
+              ingestRagDocument({
+                builderId,
+                docId: `${docId}_${zp.name.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 60)}`,
+                title: `${originalName} > ${zp.name}`,
+                text: zp.text.slice(0, 300000),
+                scope: 'knowledge',
+              });
+            } catch {}
+          }
+        }
+
+        try {
+          fs.unlinkSync(file.path);
+        } catch {}
+
+        const parsed = extracted.length >= 10;
+        res.json({
+          success: true,
+          docId,
+          title: originalName,
+          bytes: buffer.length,
+          parsed,
+          chars: extracted.length,
+          chunks,
+          note: parsed
+            ? 'Indexed into your knowledge base - PRIME will use it in answers.'
+            : IMAGE_EXTS.has(ext)
+              ? 'Stored successfully. Images are not read yet (no vision provider configured).'
+              : extracted.length > 0
+                ? `Extracted only ${extracted.length} characters - stored, but too short to index.`
+                : 'Stored successfully, but no extractable text (unsupported or scanned binary).',
+        });
+      } catch (e: any) {
+        try {
+          if (file?.path) fs.unlinkSync(file.path);
+        } catch {}
+        res.status(500).json({ success: false, error: e?.message || 'Upload processing failed' });
+      }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // CHAT SESSIONS - persistent PRIME history + exact continuation
+  // ---------------------------------------------------------------------------
+  app.get('/api/chat/sessions', rateLimit('chat_sessions', { max: 60 }), (req, res) => {
+    const builderId = req.query.builderId;
+    if (!isValidBuilderId(builderId)) return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    res.json({ success: true, sessions: listChatSessions(builderId) });
+  });
+
+  app.post('/api/chat/sessions', rateLimit('chat_sessions', { max: 30 }), async (req, res) => {
+    const builderId = req.body?.builderId;
+    if (!isValidBuilderId(builderId)) return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    const session = await createChatSession(builderId, typeof req.body?.title === 'string' ? req.body.title : undefined);
+    res.json({ success: true, session });
+  });
+
+  app.get('/api/chat/sessions/:id', rateLimit('chat_sessions', { max: 60 }), (req, res) => {
+    const builderId = req.query.builderId;
+    if (!isValidBuilderId(builderId)) return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    const session = getChatSession(builderId, req.params.id);
+    if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+    res.json({ success: true, session });
+  });
+
+  app.post('/api/chat/sessions/:id/messages', rateLimit('chat_sessions', { max: 120 }), async (req, res) => {
+    const builderId = req.body?.builderId;
+    if (!isValidBuilderId(builderId)) return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    const messages = Array.isArray(req.body?.messages) ? req.body.messages.slice(-20) : [];
+    if (!messages.length) return res.status(400).json({ success: false, error: 'messages array required' });
+    const session = await appendChatMessages(builderId, req.params.id, messages);
+    if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+    res.json({
+      success: true,
+      session: { id: session.id, title: session.title, messageCount: session.messages.length, updatedAt: session.updatedAt },
+    });
+  });
+
+  app.delete('/api/chat/sessions/:id', rateLimit('chat_sessions', { max: 30 }), async (req, res) => {
+    const builderId = req.query.builderId;
+    if (!isValidBuilderId(builderId)) return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    const removed = await deleteChatSession(builderId, req.params.id);
+    res.json({ success: true, removed });
+  });
+
+  // ---------------------------------------------------------------------------
+  // ARTIFACTS - AI-generated websites / documents / spreadsheets with a live
+  // preview URL and downloadable file. IDs are unguessable capability tokens.
+  // ---------------------------------------------------------------------------
+  function escapeArtifactHtml(s: string): string {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  app.get('/api/artifacts', rateLimit('artifacts', { max: 60 }), (req, res) => {
+    const builderId = req.query.builderId;
+    if (!isValidBuilderId(builderId)) return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    res.json({ success: true, artifacts: listArtifacts(builderId) });
+  });
+
+  app.post('/api/artifacts', rateLimit('artifacts', { max: 30 }), (req, res) => {
+    const { builderId, type, title, content, files } = req.body || {};
+    if (!isValidBuilderId(builderId)) return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    let artifactFiles = sanitizeFiles(files);
+    if (!artifactFiles && typeof content === 'string' && content.trim()) {
+      const ext = type === 'website' ? 'html' : type === 'spreadsheet' ? 'csv' : 'md';
+      artifactFiles = sanitizeFiles([{ name: `artifact.${ext}`, content }]);
+    }
+    if (!artifactFiles) {
+      return res.status(400).json({ success: false, error: 'Provide content or files[] (max 30 files, 1.5MB each)' });
+    }
+    const artifact = saveArtifact({ builderId, type, title, files: artifactFiles })!;
+    res.json({
+      success: true,
+      artifact,
+      previewUrl: `/artifacts/${artifact.id}/preview`,
+      downloadUrl: `/artifacts/${artifact.id}/download`,
+    });
+  });
+
+  app.post('/api/artifacts/generate', rateLimit('artifacts_gen', { max: 12 }), async (req, res) => {
+    const { builderId, prompt, type } = req.body || {};
+    if (!isValidBuilderId(builderId)) return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 8) {
+      return res.status(400).json({ success: false, error: 'prompt required (min 8 chars)' });
+    }
+    const artType = ['website', 'document', 'spreadsheet'].includes(type) ? type : 'website';
+    const instructions =
+      artType === 'website'
+        ? 'Return ONE complete self-contained HTML file (inline CSS and JS, no required external CDN) as JSON: {"title": string, "content": string}. The HTML must start with <!DOCTYPE html>.'
+        : artType === 'spreadsheet'
+          ? 'Return CSV content (header row + data rows) as JSON: {"title": string, "content": string}.'
+          : 'Return a polished Markdown document as JSON: {"title": string, "content": string}.';
+    try {
+      const result = await generateText(
+        `Create a ${artType} artifact.\n\nUser request:\n${prompt.trim().slice(0, 4000)}\n\n${instructions}\n\nRespond with ONLY the JSON object.`,
+        {
+          systemPrompt: 'You are an expert artifact generator. Output valid JSON only - no markdown fences, no commentary.',
+          temperature: 0.6,
+        }
+      );
+      const raw = result.text.trim().replace(/^\`\`\`(json)?\s*/i, '').replace(/\`\`\`\s*$/, '');
+      let parsed: any = null;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        const m = raw.match(/\{[\s\S]*\}/);
+        if (m) {
+          try {
+            parsed = JSON.parse(m[0]);
+          } catch {}
+        }
+      }
+      if (!parsed || typeof parsed.content !== 'string' || !parsed.content.trim()) {
+        return res.status(502).json({ success: false, error: 'Model did not return usable artifact JSON - try rephrasing.' });
+      }
+      const files = sanitizeFiles([
+        { name: `artifact.${artType === 'website' ? 'html' : artType === 'spreadsheet' ? 'csv' : 'md'}`, content: parsed.content },
+      ]);
+      if (!files) return res.status(502).json({ success: false, error: 'Generated artifact exceeds size limits.' });
+      const artifact = saveArtifact({ builderId, type: artType, title: String(parsed.title || prompt.slice(0, 60)), files })!;
+      res.json({
+        success: true,
+        artifact,
+        provider: result.provider,
+        previewUrl: `/artifacts/${artifact.id}/preview`,
+        downloadUrl: `/artifacts/${artifact.id}/download`,
+      });
+    } catch (err: any) {
+      res.status(502).json({ success: false, error: err?.message || 'Artifact generation failed' });
+    }
+  });
+
+  app.delete('/api/artifacts/:id', rateLimit('artifacts', { max: 30 }), (req, res) => {
+    const builderId = req.query.builderId;
+    if (!isValidBuilderId(builderId)) return res.status(400).json({ success: false, error: 'Valid builderId required' });
+    res.json({ success: true, removed: deleteArtifact(builderId, req.params.id) });
+  });
+
+  app.get('/artifacts/:id/preview', (req, res) => {
+    const artifact = getArtifact(req.params.id);
+    const missing =
+      '<!DOCTYPE html><html><body style="font-family:monospace;background:#0a0908;color:#f5f3f0;padding:40px"><h1>Artifact not found</h1></body></html>';
+    if (!artifact) return res.status(404).send(missing);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+
+    if (artifact.type === 'website') {
+      const html = artifact.files[0]?.content || '<!DOCTYPE html><html><body>Empty artifact</body></html>';
+      const escaped = escapeArtifactHtml(html);
+      return res.send(
+        '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' +
+          escapeArtifactHtml(artifact.title) +
+          '</title><style>html,body,iframe{margin:0;height:100%;width:100%;border:0;background:#fff}</style></head><body><iframe sandbox="allow-scripts allow-modals allow-forms allow-popups" srcdoc="' +
+          escaped +
+          '"></iframe></body></html>'
+      );
+    }
+
+    if (artifact.type === 'spreadsheet') {
+      const csv = artifact.files[0]?.content || '';
+      const rows = csv.trim().split(/\r?\n/).map((r) => r.split(','));
+      const table = rows
+        .map(
+          (cells, i) =>
+            '<tr>' +
+            cells
+              .map((c) => (i === 0 ? '<th>' + escapeArtifactHtml(c.trim()) + '</th>' : '<td>' + escapeArtifactHtml(c.trim()) + '</td>'))
+              .join('') +
+            '</tr>'
+        )
+        .join('');
+      return res.send(
+        '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' +
+          escapeArtifactHtml(artifact.title) +
+          '</title><style>body{font-family:ui-monospace,monospace;background:#0a0908;color:#f5f3f0;padding:24px}table{border-collapse:collapse;width:100%}th,td{border:1px solid rgba(201,168,76,.3);padding:6px 10px;text-align:left;font-size:13px}th{background:rgba(201,168,76,.15);color:#e8c96a}h1{font-size:16px;color:#C9A84C}</style></head><body><h1>' +
+          escapeArtifactHtml(artifact.title) +
+          '</h1><table>' +
+          table +
+          '</table></body></html>'
+      );
+    }
+
+    const md = artifact.files[0]?.content || '';
+    const body = escapeArtifactHtml(md)
+      .replace(/^### (.*)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.*)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.*)$/gm, '<h1 style="color:#C9A84C">$1</h1>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>');
+    return res.send(
+      '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' +
+        escapeArtifactHtml(artifact.title) +
+        '</title><style>body{font-family:Georgia,serif;max-width:760px;margin:40px auto;background:#0a0908;color:#e6e2dc;line-height:1.7;padding:0 20px}h1,h2,h3{color:#C9A84C}</style></head><body><p>' +
+        body +
+        '</p></body></html>'
+    );
+  });
+
+  app.get('/artifacts/:id/download', (req, res) => {
+    const artifact = getArtifact(req.params.id);
+    if (!artifact) return res.status(404).json({ success: false, error: 'Artifact not found' });
+    const file = artifact.files[0];
+    const ext = artifact.type === 'website' ? 'html' : artifact.type === 'spreadsheet' ? 'csv' : 'md';
+    const safe = artifact.title.replace(/[^A-Za-z0-9 _-]/g, '').slice(0, 60) || 'artifact';
+    res.setHeader(
+      'Content-Type',
+      artifact.type === 'website'
+        ? 'text/html; charset=utf-8'
+        : artifact.type === 'spreadsheet'
+          ? 'text/csv; charset=utf-8'
+          : 'text/markdown; charset=utf-8'
+    );
+    res.setHeader('Content-Disposition', 'attachment; filename="' + safe + '.' + ext + '"');
+    res.send(file?.content || '');
+  });
+
 
   // GET — restore server-synced memory (facts + transcript) for a builder.
   app.get('/api/ai/memory', rateLimit('ai_memory', { max: 30 }), async (req, res) => {

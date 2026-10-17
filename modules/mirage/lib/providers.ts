@@ -103,10 +103,26 @@ const PROVIDERS: ProviderFn[] = [
   async (prompt: string, opts: any) => {
     const width = opts.width || 1024;
     const height = opts.height || 1024;
-    const seed = opts.seed || Date.now();
+    const rawSeed = Number(opts.seed) || Math.floor(Math.random() * 2000000000);
+    const seed = Math.min(2147483647, Math.max(1, Math.floor(rawSeed)));
     const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&nologo=true&enhance=true&seed=${seed}`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error('Pollinations failed');
+    if (!res.ok) {
+      if (res.status === 402) {
+        // FREE_LIMIT: 1 free image per 45s per IP. Surface retry timing to callers.
+        let retryAfter = 45;
+        try {
+          const body = await res.json();
+          const m = String(body?.error?.message || '').match(/Retry after (\d+)/i);
+          if (m) retryAfter = parseInt(m[1], 10) + 2;
+        } catch {}
+        const err: any = new Error(`Pollinations free limit reached — retry in ~${retryAfter}s`);
+        err.rateLimit = true;
+        err.retryAfter = retryAfter;
+        throw err;
+      }
+      throw new Error(`Pollinations failed (HTTP ${res.status})`);
+    }
     return url;
   },
 
@@ -160,13 +176,17 @@ export async function generateImage(prompt: string, opts: any = {}): Promise<str
     ...opts,
   };
 
+  let rateLimitErr: any = null;
   for (const provider of PROVIDERS) {
     try {
       const url = await provider(prompt, options);
       if (url) return url;
-    } catch (e) {
-      console.error('Provider failed, trying next:', e);
+    } catch (e: any) {
+      if (e?.rateLimit) rateLimitErr = e;
+      console.error('Provider failed, trying next:', e?.message || e);
     }
   }
+  // Free-tier throttling is a distinct, recoverable condition — let callers retry.
+  if (rateLimitErr) throw rateLimitErr;
   throw new Error('All image providers failed. Try again in a moment.');
 }

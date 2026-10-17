@@ -28,19 +28,46 @@ export async function generateMirageImages(
 
   const prompt_used = styleModifier ? `${prompt.trim()}, ${styleModifier}` : prompt.trim();
   const images: string[] = [];
+  let note: string | undefined;
 
   const total = Math.min(6, Math.max(1, count || 3));
-  const baseSeed = Date.now();
+  // Pollinations validates seed <= 2147483647 (Date.now() overflows it).
+  const baseSeed = Math.floor(Math.random() * 2000000000);
   for (let i = 0; i < total; i++) {
     const seed = baseSeed + i * 9973 + Math.floor(Math.random() * 1000);
-    const url = await generateImage(prompt_used, {
-      ...dimensions,
-      seed,
-    });
-    images.push(url);
+    let url = '';
+    try {
+      url = await generateImage(prompt_used, {
+        ...dimensions,
+        seed,
+      });
+    } catch (e: any) {
+      if (e?.rateLimit) {
+        // Free tier allows 1 image / 45s. Wait once so we always return at least
+        // one real image when possible; then return whatever we have, honestly.
+        const waitSec = Math.min(50, Math.max(5, Number(e.retryAfter) || 45));
+        if (images.length === 0) {
+          await new Promise((r) => setTimeout(r, waitSec * 1000));
+          try {
+            url = await generateImage(prompt_used, { ...dimensions, seed });
+          } catch {}
+        }
+        if (!url) {
+          note = `Provider free-tier limit (1 image / 45s): returned ${images.length} of ${total}. Retry in ~${waitSec}s for more.`;
+          break;
+        }
+      } else {
+        throw e;
+      }
+    }
+    if (url) images.push(url);
   }
 
-  return { images, prompt_used };
+  if (!images.length) {
+    throw new Error(note || "PRIME's image engine is busy. Try again in 30 seconds.");
+  }
+
+  return { images, prompt_used, note };
 }
 
 export async function POST(req: Request) {
