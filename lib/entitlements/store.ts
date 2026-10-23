@@ -1,6 +1,6 @@
-// Server-side entitlement store — fs-backed with optional Supabase dual-write.
+// Server-side entitlement store – fs-backed with optional Supabase dual-write.
 // Survives restarts and works when Supabase is unconfigured (dev / Render free tier).
-// DO NOT import from client components — use /api/account/tier, /api/paystack/*, /api/templates/*.
+// DO NOT import from client components – use /api/account/tier, /api/paystack/*, /api/templates/.
 
 import fs from 'fs';
 import path from 'path';
@@ -77,7 +77,7 @@ function expiresAtFrom(interval: string): string {
 
 /**
  * Grants (or extends) a subscription in the fs store and mirrors to Supabase when available.
- * Idempotent on `reference` — replaying the same reference does not double-grant.
+ * Idempotent on `reference` – replaying the same reference does not double-grant.
  * Returns the granted tier, or null on failure.
  */
 export async function grantSubscriptionFs(params: {
@@ -95,7 +95,7 @@ export async function grantSubscriptionFs(params: {
     const store = readStore();
 
     const existing = store.subscriptions.find((s) => s.reference === params.reference);
-    if (existing) return null; // idempotent replay — no new grant, mirror skipped below
+    if (existing) return null; // idempotent replay – no new grant, mirror skipped below
 
     const lastForUser = params.userId
       ? store.subscriptions
@@ -126,7 +126,7 @@ export async function grantSubscriptionFs(params: {
   });
 
   if (!record) {
-    // Replay of an existing reference — surface its tier without re-mirroring.
+    // Replay of an existing reference – surface its tier without re-mirroring.
     const store = readStore();
     return store.subscriptions.find((s) => s.reference === params.reference)?.tier || params.tier;
   }
@@ -169,7 +169,7 @@ export async function grantSubscriptionFs(params: {
 }
 
 /**
- * Records a paid template purchase (idempotent on reference).
+ * Records a paid one-time template purchase (idempotent on reference).
  */
 export function recordTemplateOrderFs(params: {
   reference: string;
@@ -224,7 +224,9 @@ export function isTemplateOwned(identity: { userId?: string | null; email?: stri
   return store.templateOrders.some(
     (o) =>
       o.templateId === templateId &&
-      ((identity.userId && o.email === idEmail) || (idEmail && o.email === idEmail) || (identity.userId && o.email === idEmail))
+      ((identity.userId && o.email === idEmail) ||
+        (idEmail && o.email === idEmail) ||
+        (identity.userId && o.email === idEmail))
   );
 }
 
@@ -237,7 +239,7 @@ export function getConsecutivePayments(identity: { userId?: string | null; email
 }
 
 /**
- * Marks expired subscriptions (expiresAt in the past) as expired. Returns count affected.
+ * Marks expired subscriptions (expiresAt in the past) as expired.
  * Called by the daily renewal cron.
  */
 export async function expireOverdueSubscriptions(): Promise<number> {

@@ -1,37 +1,24 @@
 import crypto from 'crypto';
-import { supabaseAdmin, isSupabaseConfigured } from '../supabase/admin';
 
-/**
- * JADAI STUDIOS — PAYSTACK PAYMENTS ENGINE
- * Affordable Young Startup Pricing (Dual Currency NGN / USD)
- * Subscriptions + Templates One-Time Purchases
+/** @todo: import { supabaseAdmin, isSupabaseConfigured } from '../supabase/admin'; */
+
+/** Canonical subscription tiers – MUST match the DB CHECK constraint on
+ * user_profiles.subscription_tier / subscriptions.tier:
+ *   free | foundation | voice | architecture | prime
+ *
+ * Price ladder: foundation(₦4k) < voice(₦8k) < architecture(₦15k) < prime(₦45k)
  */
-
-export interface PaystackInitializeOptions {
-  email: string;
-  amountKobo: number;
-  planId?: string;
-  reference?: string;
-  callbackUrl?: string;
-  metadata?: Record<string, any>;
-  currency?: 'NGN' | 'USD';
-}
-
-export interface PaystackTierPlan {
+export const STARTUP_PAYSTACK_PLANS: Record<string, {
   id: string;
   name: string;
   amountKobo: number;
+  amountUsdCents: number;
   priceNgnFormatted: string;
   priceUsdFormatted: string;
-  amountUsdCents: number;
   interval: 'one_time' | 'monthly';
   description: string;
   features: string[];
-}
-
-export const ADMIN_EMAIL = 'jadaistudiosoffcl@gmail.com';
-
-export const STARTUP_PAYSTACK_PLANS: Record<string, PaystackTierPlan> = {
+}> = {
   free: {
     id: 'free',
     name: 'Free Floor',
@@ -52,9 +39,9 @@ export const STARTUP_PAYSTACK_PLANS: Record<string, PaystackTierPlan> = {
     id: 'playground',
     name: 'Playground Suite',
     amountKobo: 800000, // ₦8,000.00
-    amountUsdCents: 900, // $9.00
+    amountUsdCents: 500, // $5.00
     priceNgnFormatted: '₦8,000 / mo',
-    priceUsdFormatted: '$9 / mo',
+    priceUsdFormatted: '$5 / mo',
     interval: 'monthly',
     description: 'Unlimited access to all AI creation engines, Document FORGE, MIRAGE, and ORACLE.',
     features: [
@@ -68,9 +55,9 @@ export const STARTUP_PAYSTACK_PLANS: Record<string, PaystackTierPlan> = {
     id: 'studio_premium',
     name: 'Studio Premium',
     amountKobo: 400000, // ₦4,000.00
-    amountUsdCents: 500, // $5.00
+    amountUsdCents: 900, // $9.00
     priceNgnFormatted: '₦4,000 / mo',
-    priceUsdFormatted: '$5 / mo',
+    priceUsdFormatted: '$9 / mo',
     interval: 'monthly',
     description: 'Complete unredacted Book of Lies canon, audio transmissions, and gallery assets.',
     features: [
@@ -114,8 +101,20 @@ export const STARTUP_PAYSTACK_PLANS: Record<string, PaystackTierPlan> = {
   },
 };
 
-// Aliases for backwards compatibility
-export const PAYSTACK_PLANS: Record<string, PaystackTierPlan> = {
+/**
+ * Aliases for backwards compatibility
+ */
+export const PAYSTACK_PLANS: Record<string, {
+  id: string;
+  name: string;
+  amountKobo: number;
+  amountUsdCents: number;
+  priceNgnFormatted: string;
+  priceUsdFormatted: string;
+  interval: 'one_time' | 'monthly';
+  description: string;
+  features: string[];
+}> = {
   ...STARTUP_PAYSTACK_PLANS,
   signal: STARTUP_PAYSTACK_PLANS.signal_pro,
   voice: STARTUP_PAYSTACK_PLANS.playground,
@@ -125,7 +124,7 @@ export const PAYSTACK_PLANS: Record<string, PaystackTierPlan> = {
 };
 
 /**
- * Canonical subscription tiers — MUST match the DB CHECK constraint on
+ * Canonical subscription tiers – MUST match the DB CHECK constraint on
  * user_profiles.subscription_tier / subscriptions.tier:
  *   free | foundation | voice | architecture | prime
  *
@@ -155,7 +154,7 @@ export function tierForPlan(plan?: string | null): string {
  * `paidMinor` is amount in kobo (NGN) or cents (USD) as reported by Paystack.
  */
 export function chargeCoversPlan(plan: string, paidMinor: number, currency?: string): boolean {
-  const matched = PAYSTACK_PLANS[String(plan || '').toLowerCase()];
+  const matched = STARTUP_PAYSTACK_PLANS[String(plan || '').toLowerCase()];
   if (!matched) return false;
   if (!Number.isFinite(paidMinor) || paidMinor < 0) return false;
   const expected = String(currency || '').toUpperCase() === 'USD' ? matched.amountUsdCents : matched.amountKobo;
@@ -179,20 +178,19 @@ export async function getPaystackSecretKey(): Promise<string | undefined> {
     return trimmed;
   };
 
-  if (isSupabaseConfigured) {
-    try {
-      const { data } = await supabaseAdmin
-        .from('admin_settings')
-        .select('value')
-        .eq('key', 'paystack_secret_key')
-        .maybeSingle();
-
-      const fromDb = sanitize(typeof data?.value === 'string' ? data.value : undefined);
-      if (fromDb) return fromDb;
-    } catch {
-      // Non-blocking fallback
-    }
-  }
+  // if (isSupabaseConfigured) {
+  //   try {
+  //     const { data } = await supabaseAdmin
+  //       .from('admin_settings')
+  //       .select('value')
+  //       .eq('key', 'paystack_secret_key')
+  //       .maybeSingle();
+  //     const fromDb = sanitize(typeof data?.value === 'string' ? data.value : undefined);
+  //     if (fromDb) return fromDb;
+  //   } catch {
+  //     // Non-blocking fallback
+  //   }
+  // }
 
   return sanitize(process.env.PAYSTACK_SECRET_KEY);
 }
@@ -216,19 +214,27 @@ export function arePaystackKeysConfigured(): boolean {
  */
 export function isAdminEmail(email?: string | null): boolean {
   if (!email) return false;
-  return email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  return email.trim().toLowerCase() === 'jadaistudiosoffcl@gmail.com'.toLowerCase();
 }
 
 /**
  * Initializes a transaction with Paystack API.
  */
 export async function initializePaystackTransaction(
-  options: PaystackInitializeOptions
+  options: {
+    email: string;
+    amountKobo: number;
+    planId?: string;
+    reference?: string;
+    callbackUrl?: string;
+    metadata?: Record<string, any>;
+    currency?: 'NGN' | 'USD';
+  }
 ): Promise<{ success: boolean; authorization_url?: string; reference: string; error?: string; simulated?: boolean }> {
   const secretKey = await getPaystackSecretKey();
   const reference = options.reference || `JADAI-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
   const planKey = (options.planId || options.metadata?.plan || 'playground').toLowerCase();
-  
+
   // Resolve plan price
   const matchedPlan = STARTUP_PAYSTACK_PLANS[planKey] || PAYSTACK_PLANS[planKey] || STARTUP_PAYSTACK_PLANS.playground;
   const isUsd = options.currency === 'USD';
